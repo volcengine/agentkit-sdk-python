@@ -86,12 +86,12 @@ async def run(payload: dict, headers: dict):
             # Format as SSE data
             sse_event = event.model_dump_json(exclude_none=True, by_alias=True)
             logger.debug("Generated event in agent run streaming: %s", sse_event)
-            yield f"data: {sse_event}\n\n"
+            yield sse_event
     except Exception as e:
         logger.exception("Error in event_generator: %s", e)
         # Yield error event
         error_data = json.dumps({"error": str(e)})
-        yield f'data: {error_data}\n\n'
+        yield error_data
 
 
 @app.ping

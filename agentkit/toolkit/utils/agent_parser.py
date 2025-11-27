@@ -130,15 +130,13 @@ class AgentParser:
         """
         Detect Agent variable name using pattern matching.
         
-        Patterns to match:
-        1. variable_name = Agent(...)
-        2. variable_name = Agent(
+        Only matches direct instantiation: variable_name = Agent(...)
+        For other patterns (e.g., agent = generate_agent_from_config()),
+        user should specify --agent-var explicitly.
         """
-        # Pattern 1: Single line assignment
         # Match: agent = Agent(...) or my_agent = Agent(...)
-        pattern1 = r'(\w+)\s*=\s*Agent\s*\('
-        
-        matches = re.findall(pattern1, content, re.MULTILINE)
+        pattern = r'(\w+)\s*=\s*Agent\s*\('
+        matches = re.findall(pattern, content, re.MULTILINE)
         
         if matches:
             # If multiple matches, prefer common names or last one
@@ -156,10 +154,17 @@ class AgentParser:
     
     def _validate_agent_var(self, content: str, var_name: str) -> bool:
         """
-        Validate that the specified variable is an Agent instance.
+        Validate that the specified variable exists and is assigned a value.
+        
+        When user explicitly specifies --agent-var, we trust them and only check
+        that the variable is assigned something. This handles cases like:
+        - agent = Agent(...)
+        - agent = generate_agent_from_config(config_path)
+        - agent = create_custom_agent()
         """
-        pattern = rf'\b{re.escape(var_name)}\s*=\s*Agent\s*\('
-        return bool(re.search(pattern, content))
+        # Check if variable is assigned to anything: var_name = ...
+        pattern = rf'^\s*{re.escape(var_name)}\s*=\s*\S'
+        return bool(re.search(pattern, content, re.MULTILINE))
     
     def _extract_imports(self, content: str) -> List[str]:
         """
