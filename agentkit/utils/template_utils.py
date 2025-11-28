@@ -67,20 +67,17 @@ def get_account_id() -> str:
         return _ACCOUNT_CACHE['account_id']
     
     try:
-        # Query IAM API for user info
-        from agentkit.toolkit.volcengine.iam import VeIAM
+        # Query STS API for caller identity
+        from agentkit.toolkit.volcengine.sts import VeSTS
         
-        logger.debug("Fetching account info via IAM API...")
-        iam = VeIAM()
-        user_response = iam.get_user_by_access_key_id()
+        logger.debug("Fetching account info via STS API...")
+        sts = VeSTS()
+        account_id = sts.get_account_id()
         
-        # Extract account_id from response (supports both obj and dict)
-        if hasattr(user_response, 'user') and hasattr(user_response.user, 'account_id'):
-            account_id = str(user_response.user.account_id)
-        elif isinstance(user_response, dict) and 'user' in user_response:
-            account_id = str(user_response['user']['account_id'])
-        else:
-            raise ValueError(f"Cannot extract account_id from IAM response: {user_response}")
+        if not account_id:
+            raise ValueError("STS GetCallerIdentity returned empty account_id")
+        
+        account_id = str(account_id)
         
         # Cache result
         _ACCOUNT_CACHE['account_id'] = account_id

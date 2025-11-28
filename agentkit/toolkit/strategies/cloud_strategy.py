@@ -53,6 +53,14 @@ class CloudStrategy(Strategy):
     - Exceptions propagate to Executor layer for handling
     """
     
+    # Cloud mode required services:
+    # - build: cr (Container Registry), tos (Object Storage), cp (Code Pipeline)
+    # - deploy: vefaas (Function Service), ark (Model Service), apmplus_server (APM), id (Identity)
+    REQUIRED_SERVICES = {
+        "build": ["cr", "cp"],
+        "deploy": ["vefaas", "ark", "apmplus_server", "id", "vikingdb", "mem0", "apig"],
+    }
+    
     def __init__(self, config_manager=None, reporter=None):
         """
         Initialize CloudStrategy.

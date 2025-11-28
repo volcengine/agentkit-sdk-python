@@ -54,6 +54,14 @@ class HybridStrategy(Strategy):
     - Exceptions propagate to Executor for handling
     """
     
+    # Hybrid mode required services:
+    # - build: cr (Container Registry) for image push
+    # - deploy: vefaas (Function Service), ark (Model Service), apmplus_server (APM), id (Identity)
+    REQUIRED_SERVICES = {
+        "build": ["cr"],
+        "deploy": ["vefaas", "ark", "apmplus_server", "id", "vikingdb", "mem0", "apig"],
+    }
+    
     def __init__(self, config_manager=None, reporter=None):
         """
         Initialize HybridStrategy.

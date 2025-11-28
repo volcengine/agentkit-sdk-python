@@ -200,42 +200,6 @@ class VeIAM(BaseIAMClient):
             region=region,
             service_name="iam",
         )
-    
-    def get_user_by_name(self, user_name: str) -> Optional[GetUserResponse]:
-        """Get user by name"""
-        request = GetUserRequest(user_name=user_name)
-        res = self.request(
-            "GetUser",
-            params=request.model_dump(by_alias=True, exclude_none=True),
-            data="{}"
-        )
-        response_data = json.loads(res)
-        return GetUserResponse(**response_data.get('Result', {}))
-
-    def get_user_by_uid(self, uid: str) -> Optional[GetUserResponse]:
-        """Get user by uid"""
-        request = GetUserRequest(id=uid)
-        res = self.request(
-            "GetUser",
-            params=request.model_dump(by_alias=True, exclude_none=True),
-            data="{}"
-        )
-        response_data = json.loads(res)
-        return GetUserResponse(**response_data.get('Result', {}))
-    
-    def get_user_by_access_key_id(self, access_key_id: str = None) -> Optional[GetUserResponse]:
-        """Get user by access key id"""
-        if access_key_id is None:
-            from agentkit.utils.ve_sign import get_volc_ak_sk_region
-            access_key_id, _, _ = get_volc_ak_sk_region('IAM')
-        request = GetUserRequest(access_key_id=access_key_id)
-        res = self.request(
-            "GetUser",
-            params=request.model_dump(by_alias=True, exclude_none=True),
-            data="{}"
-        )
-        response_data = json.loads(res)
-        return GetUserResponse(**response_data.get('Result', {}))
 
     def list_users(self, limit: int = 10, offset: int = 0, query: str = '') -> Optional[ListUsersResponse]:
         """List users"""

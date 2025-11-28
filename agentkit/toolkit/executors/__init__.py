@@ -13,21 +13,19 @@
 # limitations under the License.
 
 """
-Executor 层 - 统一的配置管理和错误处理
+Executor layer - Unified configuration management and error handling.
 
-Executor 层职责：
-- 配置加载和验证
-- Strategy 选择和实例化  
-- Reporter 注入
-- 统一错误处理
-- 日志记录
+Responsibilities:
+- Configuration loading and validation
+- Strategy selection and instantiation
+- Reporter injection for progress reporting
+- Unified error handling and logging
 
-不做：
-- 结果转换（Strategy 直接返回标准 Result）
-- 进度报告（由 Strategy → Builder/Runner 处理）
+Design principle: Executors are thin orchestration layers. They delegate actual
+work to Strategies and return results directly without transformation.
 """
 
-from .base_executor import BaseExecutor
+from .base_executor import BaseExecutor, ServiceNotEnabledException
 from .build_executor import BuildExecutor, BuildOptions
 from .deploy_executor import DeployExecutor
 from .invoke_executor import InvokeExecutor
@@ -35,13 +33,18 @@ from .status_executor import StatusExecutor
 from .lifecycle_executor import LifecycleExecutor
 from .init_executor import InitExecutor
 
+# Re-export PreflightMode from models for convenience
+from agentkit.toolkit.models import PreflightMode
+
 __all__ = [
     'BaseExecutor',
     'BuildExecutor',
-    'BuildOptions',  # 导出 BuildOptions 供 CLI 使用
+    'BuildOptions',
     'DeployExecutor',
     'InvokeExecutor',
     'StatusExecutor',
     'LifecycleExecutor',
-    'InitExecutor'
+    'InitExecutor',
+    'PreflightMode',
+    'ServiceNotEnabledException',
 ]

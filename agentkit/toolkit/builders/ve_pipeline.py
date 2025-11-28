@@ -679,6 +679,8 @@ class VeCPCRBuilder(Builder):
             return tos_url
             
         except Exception as e:
+            if "AccountDisable" in str(e):
+                raise Exception(f"Tos Service is not enabled, please enable it in the console. Enable services at: https://console.volcengine.com/agentkit/region:agentkit+cn-beijing/auth")
             raise Exception(f"Failed to upload to TOS: {str(e)}")
     
     def _prepare_cr_resources(self, config: VeCPCRBuilderConfig) -> CRServiceConfig:

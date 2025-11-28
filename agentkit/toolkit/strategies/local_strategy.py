@@ -47,6 +47,9 @@ class LocalStrategy(Strategy):
     - Exceptions are propagated to the Executor layer
     """
     
+    # Local mode does not require any cloud services
+    REQUIRED_SERVICES = {}
+    
     def __init__(self, config_manager=None, reporter=None):
         """
         Initialize LocalStrategy.

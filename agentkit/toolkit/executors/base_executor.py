@@ -33,9 +33,32 @@ NOT Responsible For:
 """
 
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List, Type
 from pathlib import Path
 from agentkit.toolkit.reporter import Reporter, SilentReporter
+from agentkit.toolkit.models import PreflightMode, PreflightResult
+
+
+class ServiceNotEnabledException(Exception):
+    """
+    Exception raised when required cloud services are not enabled.
+    
+    This exception is raised during preflight checks when PreflightMode.FAIL is used
+    and some required services are not enabled.
+    
+    Attributes:
+        missing_services: List of service names that are not enabled
+        auth_url: URL where users can enable the missing services
+    """
+    
+    def __init__(self, missing_services: List[str], auth_url: str):
+        self.missing_services = missing_services
+        self.auth_url = auth_url
+        services_str = ", ".join(missing_services)
+        super().__init__(
+            f"Required services not enabled: {services_str}. "
+            f"Please enable them at: {auth_url}"
+        )
 
 
 class BaseExecutor:
@@ -169,6 +192,123 @@ class BaseExecutor:
             reporter=self.reporter
         )
     
+    def _get_strategy_class(self, launch_type: str) -> Type:
+        """
+        Get Strategy class for the specified launch type.
+        
+        This is used by preflight checks to get required services without
+        instantiating the full strategy.
+        
+        Args:
+            launch_type: Launch type (local/cloud/hybrid)
+            
+        Returns:
+            Strategy class (not instance)
+            
+        Raises:
+            ValueError: Unknown launch_type
+        """
+        from agentkit.toolkit.strategies import LocalStrategy, CloudStrategy, HybridStrategy
+        
+        strategy_map = {
+            'local': LocalStrategy,
+            'cloud': CloudStrategy,
+            'hybrid': HybridStrategy,
+        }
+        
+        strategy_class = strategy_map.get(launch_type)
+        if not strategy_class:
+            available = ", ".join(strategy_map.keys())
+            raise ValueError(
+                f"Unknown launch_type '{launch_type}'. "
+                f"Available strategies: {available}"
+            )
+        return strategy_class
+    
+    def _preflight_check(self, operation: str, launch_type: str) -> PreflightResult:
+        """
+        Execute preflight service status check.
+        
+        Checks whether all required cloud services for an operation are enabled.
+        The required services are defined in each Strategy's REQUIRED_SERVICES.
+        
+        Args:
+            operation: Operation name ('build', 'deploy', etc.)
+            launch_type: Launch type (local/cloud/hybrid)
+            
+        Returns:
+            PreflightResult with passed status and any missing services
+        """
+        strategy_class = self._get_strategy_class(launch_type)
+        required_services = strategy_class.get_required_services(operation)
+        
+        if not required_services:
+            self.logger.debug(f"No required services for {operation} in {launch_type} mode")
+            return PreflightResult(passed=True, missing_services=[])
+        
+        self.logger.debug(f"Checking services for {operation}: {required_services}")
+        
+        try:
+            from agentkit.sdk.account.client import AgentkitAccountClient
+            from agentkit.sdk.account.types import ListAccountLinkedServicesRequest
+            
+            client = AgentkitAccountClient()
+            statuses = client.get_services_status(required_services)
+            
+            missing = [name for name, status in statuses.items() if status != "Enabled"]
+            
+            if missing:
+                self.logger.warning(f"Services not enabled: {missing}")
+                return PreflightResult(passed=False, missing_services=missing)
+            
+            self.logger.debug(f"All required services are enabled: {required_services}")
+            return PreflightResult(passed=True, missing_services=[])
+            
+        except Exception as e:
+            # If service check fails, log warning but allow to continue
+            # This prevents blocking users when the account service is unavailable
+            self.logger.warning(f"Failed to check service status: {e}")
+            return PreflightResult(passed=True, missing_services=[])
+    
+    def _handle_preflight_result(
+        self,
+        result: PreflightResult,
+        mode: PreflightMode
+    ) -> bool:
+        """
+        Handle preflight check result based on mode.
+        
+        Args:
+            result: PreflightResult from _preflight_check()
+            mode: PreflightMode controlling behavior
+            
+        Returns:
+            True if execution should continue, False if aborted
+            
+        Raises:
+            ServiceNotEnabledException: When mode is FAIL and services are missing
+        """
+        if result.passed:
+            return True
+        
+        if mode == PreflightMode.SKIP:
+            return True
+        
+        if mode == PreflightMode.WARN:
+            self.reporter.warning(result.message)
+            self.reporter.info(f"Enable services at: {result.auth_url}")
+            return True
+        
+        if mode == PreflightMode.FAIL:
+            raise ServiceNotEnabledException(result.missing_services, result.auth_url)
+        
+        if mode == PreflightMode.PROMPT:
+            self.reporter.warning(result.message)
+            self.reporter.info(f"Enable services at: {result.auth_url}")
+            return self.reporter.confirm("Continue without enabling services?", default=False)
+        
+        return False
+    
     def _classify_error(self, error: Exception) -> str:
         """
         Classify exception type into error code for Result object.
@@ -179,7 +319,9 @@ class BaseExecutor:
         Returns:
             Error code string (e.g., FILE_NOT_FOUND, INVALID_CONFIG)
         """
-        if isinstance(error, FileNotFoundError):
+        if isinstance(error, ServiceNotEnabledException):
+            return "SERVICE_NOT_ENABLED"
+        elif isinstance(error, FileNotFoundError):
             return "FILE_NOT_FOUND"
         elif isinstance(error, ValueError):
             return "INVALID_CONFIG"
@@ -210,7 +352,9 @@ class BaseExecutor:
         
         # Provide user-friendly error messages
         error_message = str(error)
-        if isinstance(error, FileNotFoundError):
+        if isinstance(error, ServiceNotEnabledException):
+            error_message = str(error)  # Already user-friendly
+        elif isinstance(error, FileNotFoundError):
             error_message = f"File not found: {error}"
         elif isinstance(error, ValueError):
             error_message = f"Invalid configuration: {error}"

@@ -72,6 +72,7 @@ class BaseServiceClient(Service):
         session_token: str = "",
         service_name: str = "",
         credential_env_prefix: str = "",
+        header: Optional[Dict[str, Any]] = {"Accept": "application/json"},
     ) -> None:
         """
         Initialize the service client.
@@ -110,7 +111,7 @@ class BaseServiceClient(Service):
         # Create ServiceInfo
         self.service_info = ServiceInfo(
             host=self.host,
-            header={'Accept': 'application/json'},
+            header=header,
             credentials=Credentials(
                 ak=self.access_key,
                 sk=self.secret_key,
