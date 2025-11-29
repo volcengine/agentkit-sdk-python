@@ -1,2 +1,0 @@
-# Include all resource files recursively
-recursive-include agentkit/toolkit/resources *
