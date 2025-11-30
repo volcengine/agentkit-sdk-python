@@ -48,7 +48,7 @@ jobs:
       - name: Deploy to feat/deploy
         uses: peaceiris/actions-gh-pages@v3
         with:
-          github_token: ${{ secrets.REPO_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: docs/.vitepress/dist
           publish_branch: feat/deploy
           user_name: 'github-actions[bot]'
