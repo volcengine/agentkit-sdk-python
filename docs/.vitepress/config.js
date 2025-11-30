@@ -1,8 +1,8 @@
 export default {
   title: 'AgentKit',
   description: 'Python SDK and CLI for building Agent applications on Volcengine',
-  base: '/',
-  
+  base: '/agentkit-sdk-python/',
+
   head: [
     ['link', { rel: 'icon', href: '/favicon.ico' }]
   ],
