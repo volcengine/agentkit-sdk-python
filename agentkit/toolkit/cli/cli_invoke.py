@@ -20,6 +20,7 @@ import json
 import typer
 from rich.console import Console
 import random
+import uuid
 from agentkit.toolkit.config import get_config
 import logging
 
@@ -64,6 +65,7 @@ def build_a2a_payload(message: Optional[str], payload: Optional[str], headers: d
         "params": {
             "message": {
                 "role": "user",
+                "messageId": str(uuid.uuid4()),
                 "parts": [
                     {"kind": "text", "text": text}
                 ]
@@ -117,15 +119,6 @@ def invoke_command(
     config = get_config(config_path=config_file)
     common_config = config.get_common_config()
     
-    final_payload = build_standard_payload(message, payload)
-    agent_type = getattr(common_config, "agent_type", "") or getattr(common_config, "template_type", "")
-    is_a2a = isinstance(agent_type, str) and "a2a" in agent_type.lower()
-
-    # If it's an A2A Agent, reconstruct payload using A2A constructor
-    if is_a2a:
-        console.print("[cyan]Detected A2A agent type - constructing A2A JSON-RPC envelope[/cyan]")
-        final_payload = build_a2a_payload(message, payload, final_headers)
-
     # Process headers
     final_headers = {"user_id": "agentkit_user", "session_id": "agentkit_sample_session"}
     if headers:
@@ -137,6 +130,16 @@ def invoke_command(
             raise typer.Exit(1)
     else:
         console.print(f"[blue]Using default headers: {final_headers}[/blue]")
+
+    final_payload = build_standard_payload(message, payload)
+    agent_type = getattr(common_config, "agent_type", "") or getattr(common_config, "template_type", "")
+    is_a2a = isinstance(agent_type, str) and "a2a" in agent_type.lower()
+
+    # If it's an A2A Agent, reconstruct payload using A2A constructor
+    if is_a2a:
+        console.print("[cyan]Detected A2A agent type - constructing A2A JSON-RPC envelope[/cyan]")
+        final_payload = build_a2a_payload(message, payload, final_headers)
+
     
     # Set execution context - CLI uses ConsoleReporter (with colored output and progress)
     from agentkit.toolkit.context import ExecutionContext
@@ -194,6 +197,10 @@ def invoke_command(
                     parts = event["message"].get("parts", [])
                 elif isinstance(event.get("content"), dict):
                     parts = event["content"].get("parts", [])
+                elif isinstance(event.get("status"), dict):
+                    role = event["status"].get("message", {}).get("role")
+                    if role == "agent":
+                        parts = event["status"].get("message", {}).get("parts", [])
                 if not event.get("partial", True):
                     logger.info("Partial event: %s", event)  # Log partial events
                     continue
@@ -216,7 +223,6 @@ def invoke_command(
 
                 # Handle status updates (e.g., final flag or completed status)
                 if event.get("final") is True:
-                    console.print("\n[cyan]Stream marked final[/cyan]")
                     break
 
                 status = event.get("status")

@@ -15,15 +15,14 @@
 import logging
 
 from veadk import Agent, Runner
-
-from agentkit.apps import AgentkitSimpleApp
+from veadk.a2a.agent_card import get_agent_card
 from veadk.prompts.agent_default_prompt import DEFAULT_DESCRIPTION, DEFAULT_INSTRUCTION
+from google.adk.a2a.executor.a2a_agent_executor import A2aAgentExecutor
+from agentkit.apps import AgentkitA2aApp
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
 
-
-app = AgentkitSimpleApp()
+a2a_app = AgentkitA2aApp()
 
 agent_name = "{{ agent_name | default('Agent') }}"
 {% if description %}description = "{{ description }}" {% else %}description = DEFAULT_DESCRIPTION {% endif %}
@@ -60,27 +59,28 @@ agent = Agent(
 )
 runner = Runner(agent=agent)
 
-
-@app.entrypoint
-async def run(payload: dict, headers: dict) -> str:
-    prompt = payload["prompt"]
-    user_id = headers["user_id"]
-    session_id = headers["session_id"]
-
-    logger.info(
-        f"Running agent with prompt: {prompt}, user_id: {user_id}, session_id: {session_id}"
-    )
-    response = await runner.run(messages=prompt, user_id=user_id, session_id=session_id)
-
-    logger.info(f"Run response: {response}")
-    return response
-
-
-@app.ping
-def ping() -> str:
-    return "pong!"
+@a2a_app.agent_executor(runner=runner)
+class MyAgentExecutor(A2aAgentExecutor):
+    pass
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000)
-
+    from a2a.types import AgentCard, AgentProvider, AgentSkill, AgentCapabilities
+    
+    agent_card = AgentCard(
+        capabilities=AgentCapabilities(streaming=True),  # 启用流式
+        description=agent.description,
+        name=agent.name,
+        defaultInputModes=["text"],
+        defaultOutputModes=["text"],
+        provider=AgentProvider(organization="veadk", url=""),
+        skills=[AgentSkill(id="0", name="chat", description="Chat", tags=["chat"])],
+        url="http://0.0.0.0:8000",
+        version="1.0.0",
+    )
+    
+    a2a_app.run(
+        agent_card=agent_card,
+        host="0.0.0.0",
+        port=8000,
+    )

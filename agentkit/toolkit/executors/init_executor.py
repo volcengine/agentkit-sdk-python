@@ -56,6 +56,15 @@ TEMPLATES = {
         "type": "Stream App",
         "extra_requirements": ["# google-adk"],
     },
+    "a2a": {
+        "file": "a2a.py",
+        "name": "A2A Agent App",
+        "language": "Python",
+        "language_version": "3.12",
+        "description": "支持A2A协议的Agent应用",
+        "type": "A2A App",
+        "extra_requirements": ["# google-adk"],
+    },
     # "eino_a2a": {
     #     "filepath": "eino_a2a",
     #     "name": "Eino A2A Agent App",

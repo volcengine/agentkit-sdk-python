@@ -133,7 +133,10 @@ class InvokeHandler(BaseHandler):
         Returns:
             bytes: SSE-formatted data ready for streaming
         """
-        json_string = safe_serialize_to_json_string(obj)
+        if isinstance(obj, str):
+            json_string = obj
+        else:
+            json_string = safe_serialize_to_json_string(obj)
         sse_data = f"data: {json_string}\n\n"
         return sse_data.encode("utf-8")
 

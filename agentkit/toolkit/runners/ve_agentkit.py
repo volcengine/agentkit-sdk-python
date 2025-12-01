@@ -308,7 +308,12 @@ class VeAgentkitRuntimeRunner(Runner):
                     )
             
             # Construct invoke endpoint URL
-            invoke_endpoint = urljoin(endpoint, "invoke")
+            # Auto-detect invoke path based on agent_type: A2A agents use '/', others use '/invoke'
+            common_config = runner_config.common_config
+            agent_type = getattr(common_config, 'agent_type', '') or '' if common_config else ''
+            is_a2a = 'a2a' in agent_type.lower()
+            invoke_path = "/" if is_a2a else "/invoke"
+            invoke_endpoint = urljoin(endpoint, invoke_path.lstrip('/')) if invoke_path != "/" else endpoint
             
             # Prepare request headers
             if headers is None:

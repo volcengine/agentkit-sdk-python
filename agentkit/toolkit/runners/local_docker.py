@@ -530,9 +530,14 @@ class LocalDockerRunner(Runner):
                 )
             
             # Build invocation endpoint
+            # Auto-detect invoke path based on agent_type: A2A agents use '/', others use '/invoke'
             port = docker_config.invoke_port or 8000
             endpoint = f"http://127.0.0.1:{port}/"
-            invoke_endpoint = urljoin(endpoint, "invoke")
+            
+            agent_type = getattr(common_config, 'agent_type', '') or ''
+            is_a2a = 'a2a' in agent_type.lower()
+            invoke_path = "/" if is_a2a else "/invoke"
+            invoke_endpoint = urljoin(endpoint, invoke_path.lstrip('/')) if invoke_path != "/" else endpoint
             
             # Prepare default request headers
             if headers is None:
