@@ -11,9 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from agentkit.knowledge.knowledge import AgentkitKnowledge
-from agentkit.knowledge.knowledge_all_types import (
+from .client import AgentkitKnowledge
+from .types import (
     ListKnowledgeBasesRequest,
     ListKnowledgeBasesResponse,
     AddKnowledgeBaseRequest,
@@ -25,8 +24,6 @@ from agentkit.knowledge.knowledge_all_types import (
     KnowledgeBasesForListKnowledgeBases,
     KnowledgeBasesForAddKnowledgeBase,
     ConnectionInfosForGetKnowledgeConnectionInfo,
-    KnowledgeBasesItem,
-    FiltersItem,
 )
 
 __all__ = [

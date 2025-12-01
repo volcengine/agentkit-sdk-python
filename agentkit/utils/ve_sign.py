@@ -281,8 +281,17 @@ def get_volc_ak_sk_region(service: str = ""):
 
 
 def get_volc_agentkit_host_info():
-    # 优先使用新的 VOLCENGINE_* 环境变量，兼容旧的 VOLC_* 环境变量
     host = os.getenv("VOLCENGINE_AGENTKIT_HOST") or os.getenv("VOLC_AGENTKIT_HOST")
     api_version = os.getenv("VOLCENGINE_AGENTKIT_API_VERSION") or os.getenv("VOLC_AGENTKIT_API_VERSION")
     service_code = os.getenv("VOLCENGINE_AGENTKIT_SERVICE") or os.getenv("VOLC_AGENTKIT_SERVICE")
     return host if host else "open.volcengineapi.com", api_version if api_version else "2025-10-30", service_code if service_code else "agentkit"
+
+
+
+def get_identity_host_info():
+    host = os.getenv("VOLCENGINE_IDENTITY_HOST") or os.getenv("VOLC_IDENTITY_HOST")
+    api_version = os.getenv("VOLCENGINE_IDENTITY_API_VERSION") or os.getenv("VOLC_IDENTITY_API_VERSION")
+    service_code = os.getenv("VOLCENGINE_IDENTITY_SERVICE") or os.getenv("VOLC_IDENTITY_SERVICE")
+    region = os.getenv("VOLCENGINE_IDENTITY_REGION") or os.getenv("VOLC_IDENTITY_REGION")
+    return host if host else "open.volcengineapi.com", api_version if api_version else "2023-10-01", service_code if service_code else "cis_test", region if region else "cn-beijing"
+

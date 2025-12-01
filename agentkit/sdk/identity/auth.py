@@ -18,7 +18,7 @@ from functools import wraps
 from typing import Any, Callable
 
 from agentkit.utils.credential import get_credential_from_vefaas_iam
-from agentkit.utils.ve_sign import ve_request
+from agentkit.utils.ve_sign import ve_request, get_identity_host_info
 
 
 def requires_api_key(*, provider_name: str, into: str = "api_key"):
@@ -37,6 +37,7 @@ def requires_api_key(*, provider_name: str, into: str = "api_key"):
             access_key = os.getenv("VOLCENGINE_ACCESS_KEY")
             secret_key = os.getenv("VOLCENGINE_SECRET_KEY")
             session_token = ""
+            host, version, service, region = get_identity_host_info()
 
             if not (access_key and secret_key):
                 cred = get_credential_from_vefaas_iam()
@@ -53,10 +54,10 @@ def requires_api_key(*, provider_name: str, into: str = "api_key"):
                 header={"X-Security-Token": session_token} if session_token else {},
                 ak=access_key,
                 sk=secret_key,
-                version="2023-10-01",
-                service="cis_test",
-                host="open.volcengineapi.com",
-                region="cn-beijing",
+                version=version,
+                service=service,
+                host=host,
+                region=region,
             )
 
             try:

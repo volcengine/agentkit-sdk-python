@@ -273,7 +273,6 @@ class ListToolsResponse(ToolsBaseModel):
     tools: Optional[list[ToolsForListTools]] = Field(default=None, alias="Tools")
     page_number: Optional[int] = Field(default=None, alias="PageNumber")
     page_size: Optional[int] = Field(default=None, alias="PageSize")
-    tools: Optional[list[ToolsForListTools]] = Field(default=None, alias="Tools")
     total_count: Optional[int] = Field(default=None, alias="TotalCount")
 
 
@@ -302,7 +301,6 @@ class ListSessionsResponse(ToolsBaseModel):
     session_infos: Optional[list[SessionInfosForListSessions]] = Field(default=None, alias="SessionInfos")
     page_number: Optional[int] = Field(default=None, alias="PageNumber")
     page_size: Optional[int] = Field(default=None, alias="PageSize")
-    session_infos: Optional[list[SessionInfosForListSessions]] = Field(default=None, alias="SessionInfos")
     total_count: Optional[int] = Field(default=None, alias="TotalCount")
 
 

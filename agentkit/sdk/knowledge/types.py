@@ -133,7 +133,6 @@ class ListKnowledgeBasesRequest(KnowledgeBaseModel):
 class ListKnowledgeBasesResponse(KnowledgeBaseModel):
     knowledge_bases: Optional[list[KnowledgeBasesForListKnowledgeBases]] = Field(default=None, alias="KnowledgeBases")
     next_token: Optional[str] = Field(default=None, alias="NextToken")
-    knowledge_bases: Optional[list[KnowledgeBasesForListKnowledgeBases]] = Field(default=None, alias="KnowledgeBases")
     page_number: Optional[int] = Field(default=None, alias="PageNumber")
     page_size: Optional[int] = Field(default=None, alias="PageSize")
     total_count: Optional[int] = Field(default=None, alias="TotalCount")

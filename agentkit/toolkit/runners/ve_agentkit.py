@@ -27,8 +27,8 @@ from agentkit.toolkit.models import DeployResult, InvokeResult, StatusResult
 from agentkit.toolkit.reporter import Reporter
 from agentkit.toolkit.errors import ErrorCode
 from agentkit.utils.misc import generate_runtime_name, generate_runtime_role_name, generate_apikey_name, generate_client_token
-from agentkit.runtime.client import AgentkitRuntimeClient
-import agentkit.runtime.types as runtime_types
+from agentkit.sdk.runtime.client import AgentkitRuntimeClient
+import agentkit.sdk.runtime.types as runtime_types
 
 from agentkit.toolkit.volcengine.iam import VeIAM
 
@@ -194,12 +194,10 @@ class VeAgentkitRuntimeRunner(Runner):
                     metadata={"message": "Runtime not deployed"}
                 )
             
-            # Get Runtime information
             runtime = self.agentkit_runtime_client.get_runtime(runtime_types.GetRuntimeRequest(runtime_id=runner_config.runtime_id))
             if not runner_config.runtime_apikey:
                 runner_config.runtime_apikey = runtime.authorizer_configuration.key_auth.api_key
 
-            # Check endpoint connectivity
             ping_status = None
             public_endpoint = self.get_public_endpoint_of_runtime(runtime)
             if runtime.status == RUNTIME_STATUS_READY and public_endpoint:
@@ -214,7 +212,6 @@ class VeAgentkitRuntimeRunner(Runner):
                     logger.error(f"Failed to check endpoint connectivity: {str(e)}")
                     ping_status = False
             
-            # Map Runtime status to standard status
             if runtime.status == RUNTIME_STATUS_READY:
                 status = "running"
             elif runtime.status == RUNTIME_STATUS_ERROR:

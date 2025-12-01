@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from typing import Dict
 from agentkit.client import BaseAgentkitClient
-from agentkit.memory.types import (
+from agentkit.sdk.memory.types import (
     AddMemoryCollectionRequest,
     AddMemoryCollectionResponse,
     CreateMemoryCollectionRequest,

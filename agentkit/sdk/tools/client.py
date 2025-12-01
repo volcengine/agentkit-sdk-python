@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from typing import Dict
 from agentkit.client import BaseAgentkitClient
-from agentkit.tools.types import (
+from agentkit.sdk.tools.types import (
     CreateSessionRequest,
     CreateSessionResponse,
     CreateToolRequest,

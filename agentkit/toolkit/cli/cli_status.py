@@ -53,14 +53,16 @@ def status_command(
             'running': 'green',
             'stopped': 'yellow',
             'not_deployed': 'dim',
-            'unknown': 'dim'
+            'error': 'red',
+            'unknown': 'dim',
         }.get(status_str, 'white')
         
         status_icon = {
             'running': '✅',
             'stopped': '⏸️',
             'not_deployed': '⚫',
-            'unknown': '❓'
+            'error': '❌',
+            'unknown': '❓',
         }.get(status_str, '●')
         
         console.print(f"\n[bold {status_color}]{status_icon} Service Status: {status_str.upper()}[/bold {status_color}]\n")

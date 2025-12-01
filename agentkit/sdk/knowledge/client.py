@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from typing import Dict
 from agentkit.client import BaseAgentkitClient
-from agentkit.knowledge.types import (
+from agentkit.sdk.knowledge.types import (
     AddKnowledgeBaseRequest,
     AddKnowledgeBaseResponse,
     DeleteKnowledgeBaseRequest,

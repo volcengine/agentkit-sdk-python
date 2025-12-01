@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from typing import Dict
 from agentkit.client import BaseAgentkitClient
-from agentkit.runtime.types import (
+from agentkit.sdk.runtime.types import (
     CreateRuntimeRequest,
     CreateRuntimeResponse,
     DeleteRuntimeRequest,

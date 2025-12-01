@@ -436,7 +436,6 @@ class ListRuntimeVersionsRequest(RuntimeTypeBaseModel):
 class ListRuntimeVersionsResponse(RuntimeTypeBaseModel):
     agent_kit_runtime_versions: Optional[list[AgentKitRuntimeVersionsForListRuntimeVersions]] = Field(default=None, alias="AgentKitRuntimeVersions")
     next_token: Optional[str] = Field(default=None, alias="NextToken")
-    agent_kit_runtime_versions: Optional[list[AgentKitRuntimeVersionsForListRuntimeVersions]] = Field(default=None, alias="AgentKitRuntimeVersions")
     page_number: Optional[int] = Field(default=None, alias="PageNumber")
     page_size: Optional[int] = Field(default=None, alias="PageSize")
     total_count: Optional[int] = Field(default=None, alias="TotalCount")

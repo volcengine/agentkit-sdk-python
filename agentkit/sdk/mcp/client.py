@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from typing import Dict
 from agentkit.client import BaseAgentkitClient
-from agentkit.mcp.types import (
+from .types import (
     CreateMCPServiceRequest,
     CreateMCPServiceResponse,
     CreateMCPToolsetRequest,

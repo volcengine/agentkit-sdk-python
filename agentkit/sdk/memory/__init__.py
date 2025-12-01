@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from agentkit.memory.memory import AgentkitMemory
-from agentkit.memory.memory_all_types import (
+from .client import AgentkitMemoryClient
+from .types import (
     CreateMemoryCollectionRequest,
     CreateMemoryCollectionResponse,
     UpdateMemoryCollectionRequest,
@@ -41,7 +41,7 @@ from agentkit.memory.memory_all_types import (
 )
 
 __all__ = [
-    "AgentkitMemory",
+    "AgentkitMemoryClient",
     "CreateMemoryCollectionRequest",
     "CreateMemoryCollectionResponse",
     "UpdateMemoryCollectionRequest",

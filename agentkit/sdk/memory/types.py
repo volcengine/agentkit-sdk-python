@@ -206,7 +206,6 @@ class ListMemoryCollectionsRequest(MemoryBaseModel):
 class ListMemoryCollectionsResponse(MemoryBaseModel):
     memories: Optional[list[MemoriesForListMemoryCollections]] = Field(default=None, alias="Memories")
     next_token: Optional[str] = Field(default=None, alias="NextToken")
-    memories: Optional[list[MemoriesForListMemoryCollections]] = Field(default=None, alias="Memories")
     page_number: Optional[int] = Field(default=None, alias="PageNumber")
     page_size: Optional[int] = Field(default=None, alias="PageSize")
     total_count: Optional[int] = Field(default=None, alias="TotalCount")

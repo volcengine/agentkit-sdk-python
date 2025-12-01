@@ -498,7 +498,6 @@ class ListMCPToolsetsRequest(MCPBaseModel):
 class ListMCPToolsetsResponse(MCPBaseModel):
     mcp_toolsets: Optional[list[MCPToolsetsForListMCPToolsets]] = Field(default=None, alias="MCPToolsets")
     next_token: Optional[str] = Field(default=None, alias="NextToken")
-    mcp_toolsets: Optional[list[MCPToolsetsForListMCPToolsets]] = Field(default=None, alias="MCPToolsets")
     page_number: Optional[int] = Field(default=None, alias="PageNumber")
     page_size: Optional[int] = Field(default=None, alias="PageSize")
     total_count: Optional[int] = Field(default=None, alias="TotalCount")
@@ -620,7 +619,6 @@ class ListMCPServicesRequest(MCPBaseModel):
 class ListMCPServicesResponse(MCPBaseModel):
     mcp_services: Optional[list[MCPServicesForListMCPServices]] = Field(default=None, alias="MCPServices")
     next_token: Optional[str] = Field(default=None, alias="NextToken")
-    mcp_services: Optional[list[MCPServicesForListMCPServices]] = Field(default=None, alias="MCPServices")
     page_number: Optional[int] = Field(default=None, alias="PageNumber")
     page_size: Optional[int] = Field(default=None, alias="PageSize")
     total_count: Optional[int] = Field(default=None, alias="TotalCount")

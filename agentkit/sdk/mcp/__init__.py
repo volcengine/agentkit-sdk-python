@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from agentkit.mcp.mcp import AgentkitMCP
-from agentkit.mcp.mcp_all_types import (
+from .client import AgentkitMCPClient
+from .types import (
     # MCP Service
     CreateMCPServiceRequest,
     CreateMCPServiceResponse,
@@ -46,7 +46,7 @@ from agentkit.mcp.mcp_all_types import (
 )
 
 __all__ = [
-    "AgentkitMCP",
+    "AgentkitMCPClient",
     # MCP Service
     "CreateMCPServiceRequest",
     "CreateMCPServiceResponse",
