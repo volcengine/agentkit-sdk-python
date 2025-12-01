@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Dict, List
 from .dataclass_utils import AutoSerializableMixin
-from .constants import AUTO_CREATE_VE, DEFAULT_CR_NAMESPACE, DEFAULT_IMAGE_TAG, DEFAULT_WORKSPACE_NAME
+from .constants import AUTO_CREATE_VE, DEFAULT_CR_NAMESPACE, DEFAULT_IMAGE_TAG, DEFAULT_WORKSPACE_NAME, DEFAULT_CR_INSTANCE_TEMPLATE_NAME, DEFAULT_TOS_BUCKET_TEMPLATE_NAME
 
 
 @dataclass
@@ -55,7 +55,7 @@ class HybridStrategyConfig(AutoSerializableMixin):
     region: str = field(default="cn-beijing", metadata={"description": "Volcano Engine service region", "icon": "🌏", "aliases": ["ve_region"]})
     
     # Container Registry (CR) configuration
-    cr_instance_name: str = field(default=AUTO_CREATE_VE, metadata={"description": "Container Registry instance name", "icon": "📦", "render_template": True, "default_template": "agentkit-cli-{{account_id}}", "aliases": ["ve_cr_instance_name"]})
+    cr_instance_name: str = field(default=AUTO_CREATE_VE, metadata={"description": "Container Registry instance name", "icon": "📦", "render_template": True, "default_template": DEFAULT_CR_INSTANCE_TEMPLATE_NAME, "aliases": ["ve_cr_instance_name"]})
     cr_namespace_name: str = field(default=DEFAULT_CR_NAMESPACE, metadata={"description": "Container Registry namespace", "icon": "📁", "render_template": True, "aliases": ["ve_cr_namespace_name"]})
     cr_repo_name: str = field(default="", metadata={"description": "Container Registry repository name", "icon": "📋", "aliases": ["ve_cr_repo_name"]})
     cr_image_full_url: str = field(default="", metadata={"system": True, "description": "Full Container Registry image URL", "aliases": ["ve_cr_image_full_url"]})
@@ -101,7 +101,7 @@ class CloudStrategyConfig(AutoSerializableMixin):
     )
 
     # Tencent Object Storage (TOS) configuration for build artifacts
-    tos_bucket: str = field(default=AUTO_CREATE_VE, metadata={"system": True, "description": "TOS bucket name for storing build artifacts", "icon": "🗂️", "render_template": True, "default_template": "agentkit-cli-{{account_id}}"})
+    tos_bucket: str = field(default=AUTO_CREATE_VE, metadata={"system": True, "description": "TOS bucket name for storing build artifacts", "icon": "🗂️", "render_template": True, "default_template": DEFAULT_TOS_BUCKET_TEMPLATE_NAME})
     tos_prefix: str = field(default="agentkit-builds", metadata={"system": True, "description": "TOS object prefix for build artifacts"})
     tos_region: str = field(default="cn-beijing", metadata={"system": True, "description": "TOS service region"})
     tos_object_key: str = field(default="", metadata={"system": True, "description": "TOS object key for uploaded build artifact"})
@@ -109,7 +109,7 @@ class CloudStrategyConfig(AutoSerializableMixin):
     
     # Container Registry (CR) configuration for Docker images
     image_tag: str = field(default=DEFAULT_IMAGE_TAG, metadata={"system": True, "description": "Docker image tag", "icon": "🏷️", "render_template": True})
-    cr_instance_name: str = field(default=AUTO_CREATE_VE, metadata={"description": "Container Registry instance name", "icon": "📦", "render_template": True, "default_template": "agentkit-cli-{{account_id}}", "aliases": ["ve_cr_instance_name"]})
+    cr_instance_name: str = field(default=AUTO_CREATE_VE, metadata={"description": "Container Registry instance name", "icon": "📦", "render_template": True, "default_template": DEFAULT_CR_INSTANCE_TEMPLATE_NAME, "aliases": ["ve_cr_instance_name"]})
     cr_namespace_name: str = field(default=DEFAULT_CR_NAMESPACE, metadata={"description": "Container Registry namespace", "icon": "📁", "render_template": True, "aliases": ["ve_cr_namespace_name"]})
     cr_repo_name: str = field(default="", metadata={"description": "Container Registry repository name (defaults to AgentKit project name)", "icon": "📋", "aliases": ["ve_cr_repo_name"]})
     cr_region: str = field(default="cn-beijing", metadata={"system": True, "description": "Container Registry service region", "aliases": ["ve_cr_region"]})

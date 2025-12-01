@@ -46,6 +46,7 @@ from agentkit.toolkit.config import (
     global_config_exists,
     get_global_config,
 )
+from agentkit.toolkit.config.constants import DEFAULT_CR_INSTANCE_TEMPLATE_NAME, DEFAULT_TOS_BUCKET_TEMPLATE_NAME
 
 
 TEMPLATES = {
@@ -444,7 +445,7 @@ class InitExecutor(BaseExecutor):
                 cloud_config.cr_instance_name = ""
                 self.logger.debug("Using global CR instance config")
             else:
-                cloud_config.cr_instance_name = CRService.default_cr_instance_name_template()
+                cloud_config.cr_instance_name = DEFAULT_CR_INSTANCE_TEMPLATE_NAME
             
             if global_config and global_config.cr.namespace_name:
                 cloud_config.cr_namespace_name = ""
@@ -456,7 +457,7 @@ class InitExecutor(BaseExecutor):
                 cloud_config.tos_bucket = ""
                 self.logger.debug("Using global TOS bucket config")
             else:
-                cloud_config.tos_bucket = TOSService.default_bucket_name_template()
+                cloud_config.tos_bucket = DEFAULT_TOS_BUCKET_TEMPLATE_NAME
             
             if global_config and global_config.tos.prefix:
                 cloud_config.tos_prefix = ""
@@ -485,7 +486,7 @@ class InitExecutor(BaseExecutor):
                 hybrid_config.cr_instance_name = ""
                 self.logger.debug("Using global CR instance config")
             else:
-                hybrid_config.cr_instance_name = CRService.default_cr_instance_name_template()
+                hybrid_config.cr_instance_name = DEFAULT_CR_INSTANCE_TEMPLATE_NAME
             
             if global_config and global_config.cr.namespace_name:
                 hybrid_config.cr_namespace_name = ""

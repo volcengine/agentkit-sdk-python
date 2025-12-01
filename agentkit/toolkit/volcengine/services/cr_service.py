@@ -19,7 +19,7 @@ from agentkit.utils.misc import generate_random_id
 from agentkit.utils.ve_sign import get_volc_ak_sk_region
 import agentkit.toolkit.volcengine.cr as ve_cr
 import agentkit.toolkit.config as config
-from agentkit.toolkit.config import AUTO_CREATE_VE
+from agentkit.toolkit.config import AUTO_CREATE_VE, DEFAULT_CR_INSTANCE_TEMPLATE_NAME
 from agentkit.toolkit.config.dataclass_utils import AutoSerializableMixin
 from agentkit.toolkit.reporter import Reporter
 from agentkit.toolkit.context import ExecutionContext
@@ -429,16 +429,12 @@ class CRService:
         except Exception as e:
             logger.warning(f"Failed to retrieve CR configuration: {str(e)}")
             return {}
-    
-    @staticmethod
-    def default_cr_instance_name_template():
-        return "agentkit-cli-{{account_id}}"
 
     @staticmethod
     def generate_cr_instance_name() -> str:
         """Generate a CR instance name from the default template."""
         from agentkit.utils.template_utils import render_template
-        cr_instance_name_template = CRService.default_cr_instance_name_template()
+        cr_instance_name_template = DEFAULT_CR_INSTANCE_TEMPLATE_NAME
         rendered = render_template(cr_instance_name_template)
         return rendered
 

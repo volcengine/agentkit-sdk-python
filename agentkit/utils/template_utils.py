@@ -22,7 +22,7 @@ Supported variables:
 
 Example:
     >>> from agentkit.utils.template_utils import render_template
-    >>> result = render_template("agentkit-cli-{{account_id}}")
+    >>> result = render_template("agentkit-platform-{{account_id}}")
 """
 
 import re
