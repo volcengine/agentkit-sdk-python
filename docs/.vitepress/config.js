@@ -1,8 +1,8 @@
 export default {
   title: 'AgentKit',
   description: 'Python SDK and CLI for building Agent applications on Volcengine',
-  base: '/agentkit-sdk-python/',
-
+  base: '/',
+  
   head: [
     ['link', { rel: 'icon', href: '/favicon.ico' }]
   ],
@@ -20,10 +20,10 @@ export default {
           text: '📖 概述',
           collapsed: false,
           items: [
-            { text: 'AgentKit 概述', link: '/content/1.introduction/1.overview' },
+            { text: 'AgentKit', link: '/content/1.introduction/1.overview' },
             { text: '安装指南', link: '/content/1.introduction/2.installation' },
             { text: '快速开始', link: '/content/1.introduction/3.quickstart' },
-            { text: '常见问题', link: '/content/1.introduction/4.troubleshooting' }
+            { text: 'Troubleshooting', link: '/content/1.introduction/4.troubleshooting' }
           ]
         },
         {
@@ -47,7 +47,7 @@ export default {
           text: '🚀 Runtime',
           collapsed: true,
           items: [
-            { text: 'Runtime 概览', link: '/content/4.runtime/1.overview' }
+            { text: 'Runtime 快速开始', link: '/content/4.runtime/1.runtime_quickstart.md' }
           ]
         },
         {
@@ -86,10 +86,10 @@ export default {
           text: '📖 概述',
           collapsed: true,
           items: [
-            { text: 'AgentKit 概述', link: '/content/1.introduction/1.overview' },
+            { text: 'AgentKit', link: '/content/1.introduction/1.overview' },
             { text: '安装指南', link: '/content/1.introduction/2.installation' },
             { text: '快速开始', link: '/content/1.introduction/3.quickstart' },
-            { text: '常见问题', link: '/content/1.introduction/4.troubleshooting' }
+            { text: 'Troubleshooting', link: '/content/1.introduction/4.troubleshooting' }
           ]
         },
         {
@@ -113,7 +113,7 @@ export default {
           text: '🚀 Runtime',
           collapsed: true,
           items: [
-            { text: 'Runtime 概览', link: '/content/4.runtime/1.overview' }
+            { text: 'Runtime 快速开始', link: '/content/4.runtime/1.runtime_quickstart.md' }
           ]
         },
         {
@@ -152,10 +152,10 @@ export default {
           text: '📖 概述',
           collapsed: true,
           items: [
-            { text: 'AgentKit 概述', link: '/content/1.introduction/1.overview' },
+            { text: 'AgentKit', link: '/content/1.introduction/1.overview' },
             { text: '安装指南', link: '/content/1.introduction/2.installation' },
             { text: '快速开始', link: '/content/1.introduction/3.quickstart' },
-            { text: '常见问题', link: '/content/1.introduction/4.troubleshooting' }
+            { text: 'Troubleshooting', link: '/content/1.introduction/4.troubleshooting' }
           ]
         },
         {
@@ -179,7 +179,7 @@ export default {
           text: '🚀 Runtime',
           collapsed: true,
           items: [
-            { text: 'Runtime 概览', link: '/content/4.runtime/1.overview' }
+            { text: 'Runtime 快速开始', link: '/content/4.runtime/1.runtime_quickstart.md' }
           ]
         },
         {
@@ -218,10 +218,10 @@ export default {
           text: '📖 概述',
           collapsed: true,
           items: [
-            { text: 'AgentKit 概述', link: '/content/1.introduction/1.overview' },
+            { text: 'AgentKit', link: '/content/1.introduction/1.overview' },
             { text: '安装指南', link: '/content/1.introduction/2.installation' },
             { text: '快速开始', link: '/content/1.introduction/3.quickstart' },
-            { text: '常见问题', link: '/content/1.introduction/4.troubleshooting' }
+            { text: 'Troubleshooting', link: '/content/1.introduction/4.troubleshooting' }
           ]
         },
         {
@@ -245,7 +245,7 @@ export default {
           text: '🚀 Runtime',
           collapsed: false,
           items: [
-            { text: 'Runtime 概览', link: '/content/4.runtime/1.overview' }
+            { text: 'Runtime 快速开始', link: '/content/4.runtime/1.runtime_quickstart.md' }
           ]
         },
         {
@@ -283,10 +283,10 @@ export default {
           text: '📖 概述',
           collapsed: true,
           items: [
-            { text: 'AgentKit 概述', link: '/content/1.introduction/1.overview' },
+            { text: 'AgentKit', link: '/content/1.introduction/1.overview' },
             { text: '安装指南', link: '/content/1.introduction/2.installation' },
             { text: '快速开始', link: '/content/1.introduction/3.quickstart' },
-            { text: '常见问题', link: '/content/1.introduction/4.troubleshooting' }
+            { text: 'Troubleshooting', link: '/content/1.introduction/4.troubleshooting' }
           ]
         },
         {
@@ -310,7 +310,7 @@ export default {
           text: '🚀 Runtime',
           collapsed: true,
           items: [
-            { text: 'Runtime 概览', link: '/content/4.runtime/1.overview' }
+            { text: 'Runtime 快速开始', link: '/content/4.runtime/1.runtime_quickstart.md' }
           ]
         },
         {
@@ -348,10 +348,10 @@ export default {
           text: '📖 概述',
           collapsed: true,
           items: [
-            { text: 'AgentKit 概述', link: '/content/1.introduction/1.overview' },
+            { text: 'AgentKit', link: '/content/1.introduction/1.overview' },
             { text: '安装指南', link: '/content/1.introduction/2.installation' },
             { text: '快速开始', link: '/content/1.introduction/3.quickstart' },
-            { text: '常见问题', link: '/content/1.introduction/4.troubleshooting' }
+            { text: 'Troubleshooting', link: '/content/1.introduction/4.troubleshooting' }
           ]
         },
         {
@@ -375,7 +375,7 @@ export default {
           text: '🚀 Runtime',
           collapsed: true,
           items: [
-            { text: 'Runtime 概览', link: '/content/4.runtime/1.overview' }
+            { text: 'Runtime 快速开始', link: '/content/4.runtime/1.runtime_quickstart.md' }
           ]
         },
         {
@@ -413,10 +413,10 @@ export default {
           text: '📖 概述',
           collapsed: true,
           items: [
-            { text: 'AgentKit 概述', link: '/content/1.introduction/1.overview' },
+            { text: 'AgentKit', link: '/content/1.introduction/1.overview' },
             { text: '安装指南', link: '/content/1.introduction/2.installation' },
             { text: '快速开始', link: '/content/1.introduction/3.quickstart' },
-            { text: '常见问题', link: '/content/1.introduction/4.troubleshooting' }
+            { text: 'Troubleshooting', link: '/content/1.introduction/4.troubleshooting' }
           ]
         },
         {
@@ -440,7 +440,7 @@ export default {
           text: '🚀 Runtime',
           collapsed: true,
           items: [
-            { text: 'Runtime 概览', link: '/content/4.runtime/1.overview' }
+            { text: 'Runtime 快速开始', link: '/content/4.runtime/1.runtime_quickstart.md' }
           ]
         },
         {
@@ -478,10 +478,10 @@ export default {
           text: '📖 概述',
           collapsed: true,
           items: [
-            { text: 'AgentKit 概述', link: '/content/1.introduction/1.overview' },
+            { text: 'AgentKit', link: '/content/1.introduction/1.overview' },
             { text: '安装指南', link: '/content/1.introduction/2.installation' },
             { text: '快速开始', link: '/content/1.introduction/3.quickstart' },
-            { text: '常见问题', link: '/content/1.introduction/4.troubleshooting' }
+            { text: 'Troubleshooting', link: '/content/1.introduction/4.troubleshooting' }
           ]
         },
         {
@@ -505,7 +505,7 @@ export default {
           text: '🚀 Runtime',
           collapsed: true,
           items: [
-            { text: 'Runtime 概览', link: '/content/4.runtime/1.overview' }
+            { text: 'Runtime 快速开始', link: '/content/4.runtime/1.runtime_quickstart.md' }
           ]
         },
         {
