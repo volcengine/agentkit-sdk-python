@@ -296,7 +296,8 @@ class HybridStrategy(Strategy):
         cr_cfg = CRServiceConfig(
             instance_name=strategy_config.cr_instance_name,
             namespace_name=strategy_config.cr_namespace_name,
-            repo_name=cr_repo_name
+            repo_name=cr_repo_name,
+            auto_create_instance_type=strategy_config.cr_auto_create_instance_type
         )
         cr_service = CRService(reporter=self.reporter)
         ensure_result = cr_service.ensure_cr_resources(cr_cfg, common_config=common_config)

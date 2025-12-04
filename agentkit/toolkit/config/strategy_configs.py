@@ -58,6 +58,7 @@ class HybridStrategyConfig(AutoSerializableMixin):
     cr_instance_name: str = field(default=AUTO_CREATE_VE, metadata={"description": "Container Registry instance name", "icon": "📦", "render_template": True, "default_template": DEFAULT_CR_INSTANCE_TEMPLATE_NAME, "aliases": ["ve_cr_instance_name"]})
     cr_namespace_name: str = field(default=DEFAULT_CR_NAMESPACE, metadata={"description": "Container Registry namespace", "icon": "📁", "render_template": True, "aliases": ["ve_cr_namespace_name"]})
     cr_repo_name: str = field(default="", metadata={"description": "Container Registry repository name", "icon": "📋", "aliases": ["ve_cr_repo_name"]})
+    cr_auto_create_instance_type: str = field(default="Micro", metadata={"description": "CR instance type when auto-creating (Micro or Enterprise)", "icon": "⚙️"})
     cr_image_full_url: str = field(default="", metadata={"system": True, "description": "Full Container Registry image URL", "aliases": ["ve_cr_image_full_url"]})
 
     # Runtime configuration
@@ -112,6 +113,7 @@ class CloudStrategyConfig(AutoSerializableMixin):
     cr_instance_name: str = field(default=AUTO_CREATE_VE, metadata={"description": "Container Registry instance name", "icon": "📦", "render_template": True, "default_template": DEFAULT_CR_INSTANCE_TEMPLATE_NAME, "aliases": ["ve_cr_instance_name"]})
     cr_namespace_name: str = field(default=DEFAULT_CR_NAMESPACE, metadata={"description": "Container Registry namespace", "icon": "📁", "render_template": True, "aliases": ["ve_cr_namespace_name"]})
     cr_repo_name: str = field(default="", metadata={"description": "Container Registry repository name (defaults to AgentKit project name)", "icon": "📋", "aliases": ["ve_cr_repo_name"]})
+    cr_auto_create_instance_type: str = field(default="Micro", metadata={"description": "CR instance type when auto-creating (Micro or Enterprise)", "icon": "⚙️"})
     cr_region: str = field(default="cn-beijing", metadata={"system": True, "description": "Container Registry service region", "aliases": ["ve_cr_region"]})
     cr_image_full_url: str = field(default="", metadata={"system": True, "description": "Full Container Registry image URL", "aliases": ["ve_cr_image_full_url"]})
     build_timeout: int = field(default=3600, metadata={"system": True, "description": "Build timeout in seconds"})

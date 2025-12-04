@@ -54,6 +54,7 @@ class VeCPCRBuilderConfig(AutoSerializableMixin):
     cr_instance_name: str = field(default=AUTO_CREATE_VE, metadata={"description": "CR instance name", "render_template": True})
     cr_namespace_name: str = field(default=AUTO_CREATE_VE, metadata={"description": "CR namespace", "render_template": True})
     cr_repo_name: str = field(default=AUTO_CREATE_VE, metadata={"description": "CR repository name"})
+    cr_auto_create_instance_type: str = field(default="Micro", metadata={"description": "CR instance type when auto-creating (Micro or Enterprise)"})
     cr_region: str = field(default="cn-beijing", metadata={"description": "CR region"})
     
     cp_workspace_name: str = field(default=DEFAULT_WORKSPACE_NAME, metadata={"description": "Code Pipeline workspace name"})
@@ -702,6 +703,7 @@ class VeCPCRBuilder(Builder):
                 instance_name=config.cr_instance_name,
                 namespace_name=config.cr_namespace_name,
                 repo_name=config.cr_repo_name,
+                auto_create_instance_type=config.cr_auto_create_instance_type,
                 region=config.cr_region
             )
             
@@ -730,9 +732,7 @@ class VeCPCRBuilder(Builder):
             cr_result = cr_service.ensure_cr_resources(cr_config, common_config)
             
             if not cr_result.success:
-                error_msg = f"CR resource preparation failed: {cr_result.error}"
-                self.reporter.error(error_msg)
-                raise Exception(error_msg)
+                raise Exception(cr_result.error)
             
             # Ensure public endpoint access for image pulls
             self.reporter.info("Ensuring CR public endpoint access...")
@@ -740,7 +740,6 @@ class VeCPCRBuilder(Builder):
             
             if not public_result.success:
                 error_msg = f"Public endpoint configuration failed: {public_result.error}"
-                self.reporter.error(error_msg)
                 raise Exception(error_msg)
             
             self.reporter.success("CR resource preparation completed")

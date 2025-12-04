@@ -272,6 +272,7 @@ def _handle_global_config(show: bool, set_field: Optional[str], init_global: boo
             console.print("  [dim]CR:[/dim]")
             console.print("    • [green]cr.instance_name[/green]        - CR instance name")
             console.print("    • [green]cr.namespace_name[/green]       - CR namespace")
+            console.print("    • [green]cr.auto_create_instance_type[/green] - Instance type when auto-creating (Micro/Enterprise)")
             console.print("  [dim]TOS:[/dim]")
             console.print("    • [green]tos.bucket[/green]              - Bucket name")
             console.print("    • [green]tos.prefix[/green]              - Object prefix")
@@ -315,6 +316,7 @@ def _init_global_config():
         console.print("\n[bold]📦 CR Configuration[/bold]")
         console.print("  instance_name: ''  # CR instance name")
         console.print("  namespace_name: '' # CR namespace")
+        console.print("  auto_create_instance_type: Micro  # Instance type when auto-creating (Micro/Enterprise)")
         
         console.print("\n[bold]🗂️  TOS Configuration[/bold]")
         console.print("  bucket: ''         # TOS bucket name")
@@ -363,6 +365,7 @@ def _show_global_config():
     console.print("\n[bold]📦 CR Configuration[/bold]")
     console.print(f"  Instance:   [yellow]{config.cr.instance_name or '[dim](not set)[/dim]'}[/yellow]")
     console.print(f"  Namespace:  [yellow]{config.cr.namespace_name or '[dim](not set)[/dim]'}[/yellow]")
+    console.print(f"  Auto-create Type: [yellow]{config.cr.auto_create_instance_type}[/yellow]")
     
     # Display TOS configuration
     console.print("\n[bold]🗂️  TOS Configuration[/bold]")
@@ -395,6 +398,7 @@ def _set_global_field(field_value: str):
         console.print("  • volcengine.secret_key")
         console.print("  • volcengine.region")
         console.print("  • cr.instance_name")
+        console.print("  • cr.auto_create_instance_type")
         console.print("  • cr.namespace_name")
         console.print("  • tos.bucket")
         console.print("  • tos.prefix")

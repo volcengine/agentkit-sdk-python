@@ -34,6 +34,7 @@ class CRServiceConfig(AutoSerializableMixin):
     namespace_name: str = AUTO_CREATE_VE
     repo_name: str = AUTO_CREATE_VE
     region: str = "cn-beijing"
+    auto_create_instance_type: str = "Micro"  # Instance type when auto-creating: "Micro" or "Enterprise"
     vpc_id: str = field(default=AUTO_CREATE_VE, metadata={"system": True})
     subnet_id: str = field(default=AUTO_CREATE_VE, metadata={"system": True})
     image_full_url: str = field(default=None, metadata={"system": True})
@@ -51,7 +52,12 @@ class CRServiceResult:
 
 
 class CRErrorHandler:
-    """Unified error handler for Container Registry operations."""
+    """Unified error handler for Container Registry operations.
+    
+    Provides two handlers based on operation type (not name source):
+    - handle_create_error: For resource creation operations
+    - handle_reuse_error: For reusing existing resources
+    """
     
     @staticmethod
     def is_quota_exceeded(error: Exception) -> bool:
@@ -66,13 +72,16 @@ class CRErrorHandler:
         return "Insufficient.Balance" in str(error)
     
     @staticmethod
-    def handle_auto_create_error(
+    def handle_create_error(
         error: Exception,
         resource_type: str,
         result: CRServiceResult,
         reporter: Reporter
     ) -> bool:
-        """Handle errors during automatic resource creation.
+        """Handle errors during resource creation.
+        
+        Used for any creation operation, whether the name is auto-generated
+        or user-specified.
         
         Args:
             error: The exception object.
@@ -84,25 +93,29 @@ class CRErrorHandler:
             False to indicate creation failure and stop further processing.
         """
         if CRErrorHandler.is_quota_exceeded(error):
-            result.error = f"Failed to create CR {resource_type}: account quota exceeded. Please upgrade your account quota or clean up unused CR {resource_type}s."
+            result.error = f"Failed to create CR {resource_type}: account quota exceeded.\n"
+            result.error += "  Note: Micro and Enterprise instance quotas are calculated separately.\n"
+            result.error += "  To use existing resources(e.g. CR instance, namespace, repository), you can:\n"
+            result.error += "    - Run: agentkit config (interactive mode)\n"
+            result.error += "    - Run: agentkit config --cr_instance_name <your-instance> (non-interactive mode)\n"
+            result.error += "    - Edit: ~/.agentkit/config.yaml (global) or agentkit.yaml (local) directly"
         elif CRErrorHandler.is_insufficient_balance(error):
             result.error = f"Failed to create CR {resource_type}: insufficient balance. Please ensure that you have enough balance in your account to create a container registry instance."
+        elif CRErrorHandler.is_already_exists(error):
+            result.error = f"Failed to create CR {resource_type}: name already taken. Please choose a different name."
         else:
             result.error = f"Failed to create CR {resource_type}: {str(error)}"
-        
-        reporter.error(result.error)
         return False
     
     @staticmethod
-    def handle_existing_resource_error(
+    def handle_reuse_error(
         error: Exception,
         resource_type: str,
         resource_name: str,
         result: CRServiceResult,
-        reporter: Reporter,
-        status: str = ""
+        reporter: Reporter
     ) -> bool:
-        """Handle errors when using existing resource names.
+        """Handle errors when checking/reusing existing resources.
         
         Args:
             error: The exception object.
@@ -110,28 +123,15 @@ class CRErrorHandler:
             resource_name: Name of the resource.
             result: Result object to store error information.
             reporter: Reporter interface for logging.
-            status: Resource status (used for instance status checks).
             
         Returns:
-            True if operation can continue, False if it should stop.
+            True if resource exists and can be reused, False otherwise.
         """
-        if CRErrorHandler.is_quota_exceeded(error):
-            result.error = f"Failed to create CR {resource_type}: account quota exceeded. Please upgrade your account quota or clean up unused CR {resource_type}s."
-            reporter.error(result.error)
-            return False
-        
         if CRErrorHandler.is_already_exists(error):
             reporter.success(f"CR {resource_type} already exists: {resource_name}")
-            
-            # Edge case: instance status is NONEXIST but AlreadyExists error occurs.
-            # This typically indicates a naming conflict or configuration issue.
-            if status == "NONEXIST":
-                reporter.error(f"Instance name is already taken. Please check your configuration: {resource_name}")
-                return False
-            
             return True
         
-        result.error = f"Failed to operate on CR {resource_type}: {str(error)}"
+        result.error = f"Failed to access CR {resource_type} '{resource_name}': {str(error)}"
         reporter.error(result.error)
         return False
 
@@ -219,35 +219,43 @@ class CRService:
         if not instance_name or instance_name == AUTO_CREATE_VE:
             # Auto-generate instance name when not configured
             instance_name = CRService.generate_cr_instance_name()
-            self.reporter.info(f"No CR instance configured. Creating new instance: {instance_name}")
+            self.reporter.info(f"No CR instance configured. Creating new {cr_config.auto_create_instance_type} instance: {instance_name}")
             
             try:
-                created_instance = self._vecr_client._create_instance(instance_name)
+                created_instance = self._vecr_client._create_instance(
+                    instance_name, 
+                    instance_type=cr_config.auto_create_instance_type
+                )
                 cr_config.instance_name = created_instance
                 result.instance_name = created_instance
                 self._notify_config_update(cr_config)
                 self.reporter.success(f"CR instance created: {created_instance}")
             except Exception as e:
-                return CRErrorHandler.handle_auto_create_error(e, "instance", result, self.reporter)
+                return CRErrorHandler.handle_create_error(e, "instance", result, self.reporter)
         else:
-            # Use existing instance name
-            status = ""
+            # Use user-specified instance name
             try:
                 status = self._vecr_client._check_instance(instance_name)
                 
                 if status == "NONEXIST":
-                    self.reporter.warning(f"CR instance does not exist. Creating: {instance_name}")
-                    self._vecr_client._create_instance(instance_name)
-                    self.reporter.success(f"CR instance created: {instance_name}")
+                    # Instance doesn't exist, create it
+                    self.reporter.warning(f"CR instance does not exist. Creating {cr_config.auto_create_instance_type} instance: {instance_name}")
+                    try:
+                        self._vecr_client._create_instance(
+                            instance_name,
+                            instance_type=cr_config.auto_create_instance_type
+                        )
+                        self.reporter.success(f"CR instance created: {instance_name}")
+                    except Exception as e:
+                        return CRErrorHandler.handle_create_error(e, "instance", result, self.reporter)
                 elif status == "Running":
                     self.reporter.success(f"CR instance exists and is running: {instance_name}")
                 else:
                     self.reporter.warning(f"CR instance status: {status}. Waiting for it to be ready...")
                     
             except Exception as e:
-                if not CRErrorHandler.handle_existing_resource_error(
-                    e, "instance", instance_name, result, self.reporter, status
-                ):
+                # Error during status check (not creation)
+                if not CRErrorHandler.handle_reuse_error(e, "instance", instance_name, result, self.reporter):
                     return False
         
         result.instance_name = cr_config.instance_name
@@ -269,17 +277,18 @@ class CRService:
                 self._notify_config_update(cr_config)
                 self.reporter.success(f"CR namespace created: {created_namespace}")
             except Exception as e:
-                return CRErrorHandler.handle_auto_create_error(e, "namespace", result, self.reporter)
+                return CRErrorHandler.handle_create_error(e, "namespace", result, self.reporter)
         else:
-            # Use existing namespace name
+            # Use user-specified namespace name
             try:
                 self._vecr_client._create_namespace(cr_config.instance_name, namespace_name)
-                self.reporter.success(f"CR namespace already exists: {namespace_name}")
+                self.reporter.success(f"CR namespace created: {namespace_name}")
             except Exception as e:
-                if not CRErrorHandler.handle_existing_resource_error(
-                    e, "namespace", namespace_name, result, self.reporter
-                ):
-                    return False
+                # AlreadyExists means reuse success, other errors are creation failures
+                if CRErrorHandler.is_already_exists(e):
+                    self.reporter.success(f"CR namespace already exists: {namespace_name}")
+                else:
+                    return CRErrorHandler.handle_create_error(e, "namespace", result, self.reporter)
         
         result.namespace_name = cr_config.namespace_name
         return True
@@ -304,19 +313,20 @@ class CRService:
                 self._notify_config_update(cr_config)
                 self.reporter.success(f"CR repository created: {created_repo}")
             except Exception as e:
-                return CRErrorHandler.handle_auto_create_error(e, "repository", result, self.reporter)
+                return CRErrorHandler.handle_create_error(e, "repository", result, self.reporter)
         else:
-            # Use existing repository name
+            # Use user-specified repository name
             try:
                 self._vecr_client._create_repo(
                     cr_config.instance_name, cr_config.namespace_name, repo_name
                 )
-                self.reporter.success(f"CR repository already exists: {repo_name}")
+                self.reporter.success(f"CR repository created: {repo_name}")
             except Exception as e:
-                if not CRErrorHandler.handle_existing_resource_error(
-                    e, "repository", repo_name, result, self.reporter
-                ):
-                    return False
+                # AlreadyExists means reuse success, other errors are creation failures
+                if CRErrorHandler.is_already_exists(e):
+                    self.reporter.success(f"CR repository already exists: {repo_name}")
+                else:
+                    return CRErrorHandler.handle_create_error(e, "repository", result, self.reporter)
         
         result.repo_name = cr_config.repo_name
         return True

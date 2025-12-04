@@ -31,16 +31,27 @@ class VeCR:
         assert region in ["cn-beijing", "cn-guangzhou", "cn-shanghai"]
         self.version = "2022-05-12"
 
-    def _create_instance(self, instance_name: str = DEFAULT_CR_INSTANCE_NAME) -> str:
+    def _create_instance(
+        self, 
+        instance_name: str = DEFAULT_CR_INSTANCE_NAME,
+        instance_type: str = "Micro"
+    ) -> str:
         """
-        create cr instance
+        Create CR instance.
 
         Args:
-            instance_name: cr instance name
+            instance_name: CR instance name.
+            instance_type: Instance type, must be "Micro" or "Enterprise". Defaults to "Micro".
 
         Returns:
-            cr instance name
+            CR instance name.
+        
+        Raises:
+            ValueError: If instance_type is invalid or instance creation fails.
         """
+        if instance_type not in ("Micro", "Enterprise"):
+            raise ValueError(f"Invalid instance_type: {instance_type}. Must be 'Micro' or 'Enterprise'.")
+        
         status = self._check_instance(instance_name)
         if status != "NONEXIST":
             logger.debug(f"cr instance {instance_name} already running")
@@ -49,8 +60,9 @@ class VeCR:
             request_body={
                 "Name": instance_name,
                 "ResourceTags": [
-                    {"Key": "provider", "Value": "veadk"},
+                    {"Key": "provider", "Value": "agentkit-cli"},
                 ],
+                "Type": instance_type,
             },
             action="CreateRegistry",
             ak=self.ak,

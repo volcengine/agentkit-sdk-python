@@ -67,11 +67,13 @@ class CRGlobalConfig:
     """
     instance_name: str = ""
     namespace_name: str = ""
+    auto_create_instance_type: str = "Micro"  # Instance type when auto-creating: "Micro" or "Enterprise"
     
     def to_dict(self):
         return {
             "instance_name": self.instance_name,
             "namespace_name": self.namespace_name,
+            "auto_create_instance_type": self.auto_create_instance_type,
         }
     
     @classmethod
@@ -79,6 +81,7 @@ class CRGlobalConfig:
         return cls(
             instance_name=data.get("instance_name", ""),
             namespace_name=data.get("namespace_name", ""),
+            auto_create_instance_type=data.get("auto_create_instance_type", "Micro"),
         )
 
 
@@ -324,6 +327,7 @@ def apply_global_config_defaults(
         field_mappings = {
             'cr_instance_name': ('cr', 'instance_name'),
             'cr_namespace_name': ('cr', 'namespace_name'),
+            'cr_auto_create_instance_type': ('cr', 'auto_create_instance_type'),
         }
         
         # For VeAgentkitConfig, also apply TOS-related settings

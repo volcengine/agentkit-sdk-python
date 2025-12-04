@@ -265,6 +265,7 @@ class CloudStrategy(Strategy):
             cr_instance_name=strategy_config.cr_instance_name,
             cr_namespace_name=strategy_config.cr_namespace_name,
             cr_repo_name=strategy_config.cr_repo_name,
+            cr_auto_create_instance_type=strategy_config.cr_auto_create_instance_type,
             cr_region=strategy_config.cr_region,
             cp_workspace_name=strategy_config.cp_workspace_name,
             cp_pipeline_name=cp_pipeline_name_override or strategy_config.cp_pipeline_name,
