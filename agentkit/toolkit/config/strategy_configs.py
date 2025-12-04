@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Dict, List
 from .dataclass_utils import AutoSerializableMixin
-from .constants import AUTO_CREATE_VE, DEFAULT_CR_NAMESPACE, DEFAULT_IMAGE_TAG, DEFAULT_WORKSPACE_NAME, DEFAULT_CR_INSTANCE_TEMPLATE_NAME, DEFAULT_TOS_BUCKET_TEMPLATE_NAME
+from .constants import AUTO_CREATE_VE, DEFAULT_CR_NAMESPACE, DEFAULT_IMAGE_TAG, DEFAULT_IMAGE_TAG_TEMPLATE, DEFAULT_WORKSPACE_NAME, DEFAULT_CR_INSTANCE_TEMPLATE_NAME, DEFAULT_TOS_BUCKET_TEMPLATE_NAME
 
 
 @dataclass
@@ -45,7 +45,7 @@ class LocalStrategyConfig(AutoSerializableMixin):
 class HybridStrategyConfig(AutoSerializableMixin):
     """Hybrid deployment strategy configuration combining local Docker and Volcano Engine services."""
     # User-configurable fields
-    image_tag: str = field(default=DEFAULT_IMAGE_TAG, metadata={"system": True, "description": "Docker image tag", "icon": "🏷️", "render_template": True})
+    image_tag: str = field(default=DEFAULT_IMAGE_TAG, metadata={"system": True, "description": "Docker image tag", "icon": "🏷️", "render_template": True, "default_template": DEFAULT_IMAGE_TAG_TEMPLATE})
     
     # System internal fields (not visible to users during configuration)
     image_id: str = field(default="", metadata={"system": True, "description": "Docker image ID"})
@@ -108,7 +108,7 @@ class CloudStrategyConfig(AutoSerializableMixin):
     tos_object_url: str = field(default="", metadata={"system": True, "description": "TOS object URL for build artifact"})
     
     # Container Registry (CR) configuration for Docker images
-    image_tag: str = field(default=DEFAULT_IMAGE_TAG, metadata={"system": True, "description": "Docker image tag", "icon": "🏷️", "render_template": True})
+    image_tag: str = field(default=DEFAULT_IMAGE_TAG, metadata={"system": True, "description": "Docker image tag", "icon": "🏷️", "render_template": True, "default_template": DEFAULT_IMAGE_TAG_TEMPLATE})
     cr_instance_name: str = field(default=AUTO_CREATE_VE, metadata={"description": "Container Registry instance name", "icon": "📦", "render_template": True, "default_template": DEFAULT_CR_INSTANCE_TEMPLATE_NAME, "aliases": ["ve_cr_instance_name"]})
     cr_namespace_name: str = field(default=DEFAULT_CR_NAMESPACE, metadata={"description": "Container Registry namespace", "icon": "📁", "render_template": True, "aliases": ["ve_cr_namespace_name"]})
     cr_repo_name: str = field(default="", metadata={"description": "Container Registry repository name (defaults to AgentKit project name)", "icon": "📋", "aliases": ["ve_cr_repo_name"]})

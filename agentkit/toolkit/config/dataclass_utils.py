@@ -133,16 +133,13 @@ class AutoSerializableMixin:
             instance = apply_global_config_defaults(instance, data)
             after = instance.to_dict()
             if before != after:
-                # Compute diff of updated fields
                 diff = {k: (before.get(k), after.get(k)) for k in after.keys() if before.get(k) != after.get(k)}
                 logger.debug("from_dict: applied global defaults for %s; changes=%r", cls.__name__, diff)
             else:
                 logger.debug("from_dict: applied global defaults for %s; no changes", cls.__name__)
         except ImportError:
-            # Global config module unavailable
             logger.debug("from_dict: global_config not available; skipped applying globals for %s", cls.__name__)
         except Exception:
-            # Global defaults application should not break overall flow
             logger.debug("from_dict: apply_global_config_defaults raised; ignored for %s", cls.__name__)
         
         # Render template fields after globals/defaults. Skipped if skip_render is True.
@@ -213,19 +210,15 @@ class AutoSerializableMixin:
                                 default_template,
                             )
                             field_value = default_template
-                            # Save original template string
                             self._template_originals[field_info.name] = default_template
-                            # Mark value source
                             try:
                                 if not hasattr(self, '_value_sources'):
                                     self._value_sources = {}
                                 self._value_sources[field_info.name] = 'default_template'
                             except Exception:
                                 pass
-                            # Set template value first so there is a visible value even if rendering fails
                             setattr(self, field_info.name, default_template)
                         else:
-                            # No default_template; skip
                             logger.debug("[%s] [template] field %s is Auto/empty and has no default_template -> skip", cfg_name, field_info.name)
                             continue
                     
@@ -239,13 +232,7 @@ class AutoSerializableMixin:
                         
                         try:
                             rendered = render_template(field_value)
-                            logger.debug(
-                                "[%s] [template] rendered field %s: %r -> %r",
-                                cfg_name,
-                                field_info.name,
-                                field_value,
-                                rendered,
-                            )
+                            logger.debug("[%s] [template] rendered field %s: %r -> %r", cfg_name, field_info.name, field_value, rendered)
                             # Fail if unresolved placeholders remain
                             if '{{' in str(rendered) and '}}' in str(rendered):
                                 error_msg = (
@@ -258,9 +245,6 @@ class AutoSerializableMixin:
                             if rendered != field_value:
                                 logger.debug("[%s] [template] apply rendered value for %s", cfg_name, field_info.name)
                                 setattr(self, field_info.name, rendered)
-                            # Extra logging for image_tag
-                            if field_info.name == "image_tag":
-                                logger.info("[%s] [template] image_tag final value: %r", cfg_name, getattr(self, field_info.name))
                         except Exception as e:
                             # Do not silently fallback on render failures; surface details
                             error_type = type(e).__name__
@@ -320,18 +304,12 @@ class AutoSerializableMixin:
                 chosen = original_tpl if original_tpl is not None else current_value
                 result[name] = chosen
                 logger.debug("[persist] field=%s source=default_template original=%r current=%r -> write=%r", name, original_tpl, current_value, chosen)
-            elif source == 'default':
-                # Default source: persist current value
-                result[name] = current_value
-                logger.debug("[persist] field=%s source=default -> write=%r", name, current_value)
-            elif source == 'local':
-                # Local source: if it was a template input, prefer original template
+            elif source == 'default' or source == 'local':
                 if original_tpl is not None:
                     result[name] = original_tpl
-                    logger.debug("[persist] field=%s source=local original_tpl exists -> write original=%r", name, original_tpl)
                 else:
                     result[name] = current_value
-                    logger.debug("[persist] field=%s source=local no original_tpl -> write current=%r", name, current_value)
+                logger.debug("[persist] field=%s source=%s original=%r current=%r -> write=%r", name, source, original_tpl, current_value, result[name])
             else:
                 # Unknown source: keep current value
                 result[name] = current_value
