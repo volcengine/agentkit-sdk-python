@@ -35,9 +35,6 @@ from .types import (
     StrategiesForGetMemoryCollection,
     LongTermConfigurationForUpdateMemoryCollection,
     LongTermConfigurationForGetMemoryCollection,
-    CollectionsItem,
-    FiltersItem,
-    StrategiesItem,
 )
 
 __all__ = [
@@ -63,7 +60,4 @@ __all__ = [
     "StrategiesForGetMemoryCollection",
     "LongTermConfigurationForUpdateMemoryCollection",
     "LongTermConfigurationForGetMemoryCollection",
-    "CollectionsItem",
-    "FiltersItem",
-    "StrategiesItem",
 ]

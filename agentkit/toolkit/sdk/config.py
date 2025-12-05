@@ -40,6 +40,9 @@ from typing import Optional, Dict, Any, Union
 from pathlib import Path
 import logging
 
+from ..config import AgentkitConfigManager, CommonConfig, get_config
+from ..config.config_validator import ConfigValidator
+
 logger = logging.getLogger(__name__)
 
 
@@ -116,12 +119,57 @@ class AgentConfig:
             )
 
         # Load configuration using the existing config manager
-        from ..config import get_config
-
         self._manager = get_config(config_path=str(self.file_path))
 
         # Cache common config for quick access
         self._common_config = self._manager.get_common_config()
+
+    @classmethod
+    def create(
+        cls,
+        project_dir: Union[str, Path],
+        *,
+        agent_name: str,
+        entry_point: str,
+        language: str = "Python",
+        launch_type: str = "cloud",
+        description: Optional[str] = None,
+        dependencies_file: Optional[str] = None,
+    ) -> "AgentConfig":
+        config_path = Path(project_dir)
+
+        if config_path.is_dir():
+            config_path = config_path / "agentkit.yaml"
+
+        if config_path.exists():
+            raise FileExistsError(f"Configuration file already exists: {config_path}")
+
+        manager = AgentkitConfigManager(config_path=config_path)
+        common_config: CommonConfig = manager.get_common_config()
+
+        common_config.agent_name = agent_name
+        common_config.entry_point = entry_point
+
+        if description is not None:
+            common_config.description = description
+
+        if language:
+            common_config.set_language(language)
+
+        if dependencies_file is not None:
+            common_config.dependencies_file = dependencies_file
+
+        common_config.launch_type = launch_type
+
+        validator = ConfigValidator()
+        errors = validator.validate_common_config(common_config)
+        if errors:
+            joined = "; ".join(errors)
+            raise ValueError(f"Invalid agent configuration: {joined}")
+
+        manager.update_common_config(common_config)
+
+        return cls(config_path)
 
     @classmethod
     def load(cls, path: Union[str, Path]) -> "AgentConfig":
@@ -467,6 +515,12 @@ class AgentConfig:
             >>>
             >>> config.save("new_config.yaml")  # Save to new file
         """
+        validator = ConfigValidator()
+        errors = validator.validate_common_config(self._common_config)
+        if errors:
+            joined = "; ".join(errors)
+            raise ValueError(f"Invalid agent configuration: {joined}")
+
         # Update common config in manager
         self._manager.update_common_config(self._common_config)
 
@@ -502,7 +556,7 @@ class AgentConfig:
 
         Returns:
             Complete configuration dictionary including common config
-            and all workflow configurations.
+            and all strategy configurations.
 
         Example:
             >>> config_dict = config.to_dict()
@@ -517,38 +571,38 @@ class AgentConfig:
             },
         }
 
-    def get_workflow_config(
-        self, workflow_name: Optional[str] = None
+    def get_strategy_config(
+        self, strategy_name: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Get workflow-specific configuration.
+        """Get strategy-specific configuration.
 
         Args:
-            workflow_name: Workflow name ('local', 'cloud', 'hybrid').
+            strategy_name: strategy name ('local', 'cloud', 'hybrid').
                           If None, uses current launch_type.
 
         Returns:
-            Workflow configuration dictionary
+            strategy configuration dictionary
 
         Example:
             >>> cloud_config = config.get_strategy_config("cloud")
             >>> print(cloud_config.get("region"))
             'cn-beijing'
             >>>
-            >>> # Get current workflow config
+            >>> # Get current strategy config
             >>> current_config = config.get_strategy_config()
         """
-        if workflow_name is None:
-            workflow_name = self.launch_type
-        return self._manager.get_strategy_config(workflow_name)
+        if strategy_name is None:
+            strategy_name = self.launch_type
+        return self._manager.get_strategy_config(strategy_name)
 
-    def update_workflow_config(
-        self, config: Dict[str, Any], workflow_name: Optional[str] = None
+    def update_strategy_config(
+        self, config: Dict[str, Any], strategy_name: Optional[str] = None
     ) -> "AgentConfig":
-        """Update workflow-specific configuration.
+        """Update strategy-specific configuration.
 
         Args:
-            config: Workflow configuration updates
-            workflow_name: Workflow name. If None, uses current launch_type.
+            config: strategy configuration updates
+            strategy_name: strategy name. If None, uses current launch_type.
 
         Returns:
             Self for method chaining
@@ -559,10 +613,10 @@ class AgentConfig:
             ...     "image_tag": "v1.0.0"
             ... }, strategy_name="cloud")
         """
-        if workflow_name is None:
-            workflow_name = self.launch_type
-        self._manager.update_strategy_config(workflow_name, config)
-        logger.debug(f"Updated workflow config for '{workflow_name}'")
+        if strategy_name is None:
+            strategy_name = self.launch_type
+        self._manager.update_strategy_config(strategy_name, config)
+        logger.debug(f"Updated strategy config for '{strategy_name}'")
         return self
 
     # ========== Utility Methods ==========

@@ -17,8 +17,8 @@
 from typing import Optional, Dict, Any
 
 from ..executors import LifecycleExecutor
-from ..reporter import SilentReporter
-from ..models import LifecycleResult
+from ..reporter import SilentReporter, Reporter
+from ..models import LifecycleResult, PreflightMode
 from ..context import ExecutionContext
 
 
@@ -26,6 +26,8 @@ def launch(
     config_file: Optional[str] = None,
     config_dict: Optional[Dict[str, Any]] = None,
     platform: str = "auto",
+    preflight_mode: PreflightMode = PreflightMode.WARN,
+    reporter: Optional[Reporter] = None,
 ) -> LifecycleResult:
     """
     Launch agent (build + deploy in one operation).
@@ -38,16 +40,19 @@ def launch(
             If not provided, uses default "agentkit.yaml" in current directory.
         config_dict: Configuration as dictionary (highest priority).
             Overrides config_file if both provided.
-        platform: Build platform: "auto", "local", or "cloud".
-            Default is "auto" which selects based on workflow configuration.
+        platform: Docker build platform/architecture string
+            (e.g., "linux/amd64", "linux/arm64", or "auto"). This controls
+            the Docker build target platform and is independent from the
+            launch_type (local/cloud/hybrid) configured in agentkit.yaml.
 
     Returns:
         LifecycleResult: Launch operation result containing:
             - success: Whether launch succeeded
             - operation: "launch"
-            - message: Success message with endpoint info
+            - build_result: BuildResult from the build step
+            - deploy_result: DeployResult from the deploy step
+            - metadata: Extra information (e.g. endpoint, image)
             - error: Error message if failed
-            - details: Contains BuildResult and DeployResult
 
     Example:
         >>> from agentkit.toolkit import sdk
@@ -60,30 +65,40 @@ def launch(
         >>>
         >>> # Check result
         >>> if result.success:
-        ...     print(result.message)
-        ...     build_res = result.details['build_result']
-        ...     deploy_res = result.details['deploy_result']
-        ...     print(f"Image: {build_res.image_name}")
-        ...     print(f"Endpoint: {deploy_res.endpoint_url}")
+        ...     print(f"Operation: {result.operation}")
+        ...     build_res = result.build_result
+        ...     deploy_res = result.deploy_result
+        ...     if build_res and build_res.image:
+        ...         print(f"Image: {build_res.image}")
+        ...     if deploy_res:
+        ...         print(f"Endpoint: {deploy_res.endpoint_url}")
+        ...     # Or use metadata from LifecycleResult
+        ...     endpoint = result.metadata.get("endpoint")
+        ...     if endpoint:
+        ...         print(f"Endpoint (from metadata): {endpoint}")
         ... else:
         ...     print(f"Launch failed: {result.error}")
 
     Raises:
         No exceptions are raised. All errors are captured in LifecycleResult.error.
     """
-    reporter = SilentReporter()
+    if reporter is None:
+        reporter = SilentReporter()
     ExecutionContext.set_reporter(reporter)
 
     executor = LifecycleExecutor(reporter=reporter)
     return executor.launch(
-        config_dict=config_dict, config_file=config_file, platform=platform
+        config_dict=config_dict,
+        config_file=config_file,
+        platform=platform,
+        preflight_mode=preflight_mode,
     )
 
 
 def destroy(
     config_file: Optional[str] = None,
     config_dict: Optional[Dict[str, Any]] = None,
-    force: bool = False,
+    reporter: Optional[Reporter] = None,
 ) -> LifecycleResult:
     """
     Destroy agent runtime and resources.
@@ -96,14 +111,11 @@ def destroy(
             If not provided, uses default "agentkit.yaml" in current directory.
         config_dict: Configuration as dictionary (highest priority).
             Overrides config_file if both provided.
-        force: Force destroy without confirmation prompts.
-            Default is False. When used from CLI, user is prompted.
 
     Returns:
         LifecycleResult: Destroy operation result containing:
             - success: Whether destroy succeeded
             - operation: "destroy"
-            - message: Success message
             - error: Error message if failed
 
     Example:
@@ -112,11 +124,8 @@ def destroy(
         >>> # Destroy agent runtime
         >>> result = sdk.destroy()
         >>>
-        >>> # Force destroy
-        >>> result = sdk.destroy(force=True)
-        >>>
         >>> if result.success:
-        ...     print(result.message)
+        ...     print(f"Destroy succeeded: {result.operation}")
         ... else:
         ...     print(f"Destroy failed: {result.error}")
 
@@ -128,46 +137,3 @@ def destroy(
 
     executor = LifecycleExecutor(reporter=reporter)
     return executor.destroy(config_dict=config_dict, config_file=config_file)
-
-
-def stop(
-    config_file: Optional[str] = None, config_dict: Optional[Dict[str, Any]] = None
-) -> LifecycleResult:
-    """
-    Stop agent runtime (without destroying resources).
-
-    This function stops the running agent but keeps resources intact,
-    allowing for faster restart later.
-
-    Args:
-        config_file: Path to configuration file (e.g., "agentkit.yaml").
-            If not provided, uses default "agentkit.yaml" in current directory.
-        config_dict: Configuration as dictionary (highest priority).
-            Overrides config_file if both provided.
-
-    Returns:
-        LifecycleResult: Stop operation result containing:
-            - success: Whether stop succeeded
-            - operation: "stop"
-            - message: Success message
-            - error: Error message if failed
-
-    Example:
-        >>> from agentkit.toolkit import sdk
-        >>>
-        >>> # Stop agent runtime
-        >>> result = sdk.stop()
-        >>>
-        >>> if result.success:
-        ...     print(result.message)
-        ... else:
-        ...     print(f"Stop failed: {result.error}")
-
-    Raises:
-        No exceptions are raised. All errors are captured in LifecycleResult.error.
-    """
-    reporter = SilentReporter()
-    ExecutionContext.set_reporter(reporter)
-
-    executor = LifecycleExecutor(reporter=reporter)
-    return executor.stop(config_dict=config_dict, config_file=config_file)

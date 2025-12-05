@@ -17,19 +17,20 @@
 from typing import Optional, Dict, Any
 
 from ..executors import InitExecutor
-from ..reporter import SilentReporter
+from ..reporter import SilentReporter, Reporter
 from ..models import InitResult
 
 
 def init_project(
     project_name: str,
     template: str = "basic",
-    directory: str = ".",
+    project_root: str = ".",
     agent_name: Optional[str] = None,
     description: Optional[str] = None,
     system_prompt: Optional[str] = None,
     model_name: Optional[str] = None,
     tools: Optional[str] = None,
+    reporter: Optional[Reporter] = None,
 ) -> InitResult:
     """
     Initialize a new agent project from template.
@@ -44,12 +45,18 @@ def init_project(
             - "basic": Simple agent application (default)
             - "basic_stream": Agent with streaming support
             - "eino_a2a": Eino framework A2A application
-        directory: Target directory for the project (default: current directory).
+        project_root: Project root directory where agent files and agentkit.yaml
+            will be created (default: current directory). This is the final
+            directory; AgentKit will **not** automatically append project_name
+            as a subdirectory.
         agent_name: Custom agent name (optional).
         description: Agent description (optional).
         system_prompt: System prompt for the agent (optional).
         model_name: Model name to use (optional, default: doubao-seed-1-6-250615).
         tools: Comma-separated list of tools to include (optional).
+        reporter: Optional Reporter for progress/log output. If None, uses
+            SilentReporter (no console output). Advanced users can pass
+            LoggingReporter or a custom Reporter implementation.
 
     Returns:
         InitResult: Initialization result containing:
@@ -72,7 +79,7 @@ def init_project(
         >>> result = sdk.init_project(
         ...     project_name="smart-assistant",
         ...     template="basic_stream",
-        ...     directory="./projects",
+        ...     project_root="./projects",
         ...     agent_name="SmartAssistant",
         ...     description="An intelligent assistant",
         ...     model_name="doubao-1.5-pro",
@@ -88,11 +95,14 @@ def init_project(
     Raises:
         No exceptions are raised. All errors are captured in InitResult.error.
     """
-    executor = InitExecutor(reporter=SilentReporter())
+    if reporter is None:
+        reporter = SilentReporter()
+
+    executor = InitExecutor(reporter=reporter)
     return executor.init_project(
         project_name=project_name,
         template=template,
-        directory=directory,
+        directory=project_root,
         agent_name=agent_name,
         description=description,
         system_prompt=system_prompt,
@@ -101,7 +111,9 @@ def init_project(
     )
 
 
-def get_available_templates() -> Dict[str, Dict[str, Any]]:
+def get_available_templates(
+    reporter: Optional[Reporter] = None,
+) -> Dict[str, Dict[str, Any]]:
     """
     Get available project templates.
 
@@ -127,5 +139,7 @@ def get_available_templates() -> Dict[str, Dict[str, Any]]:
         >>> if "basic" in templates:
         ...     print("Basic template available")
     """
-    executor = InitExecutor(reporter=SilentReporter())
+    if reporter is None:
+        reporter = SilentReporter()
+    executor = InitExecutor(reporter=reporter)
     return executor.get_available_templates()

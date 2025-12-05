@@ -126,7 +126,10 @@ class LifecycleExecutor(BaseExecutor):
         Args:
             config_dict: Configuration dictionary (optional)
             config_file: Path to configuration file (optional)
-            platform: Build platform: "auto", "local", or "cloud"
+            platform: Docker build platform/architecture string
+                (e.g., "linux/amd64", "linux/arm64", or "auto"). This controls
+                the Docker build target platform and is independent from the
+                launch_type (local/cloud/hybrid) configured in agentkit.yaml.
             preflight_mode: How to handle missing cloud services (default: PROMPT)
 
         Returns:

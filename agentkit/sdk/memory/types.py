@@ -170,6 +170,9 @@ class LongTermStrategiesItemForUpdateMemoryCollection(MemoryBaseModel):
 class UpdateMemoryCollectionRequest(MemoryBaseModel):
     description: Optional[str] = Field(default=None, alias="Description")
     memory_id: str = Field(..., alias="MemoryId")
+    long_term_configuration: Optional[LongTermForUpdateMemoryCollection] = Field(
+        default=None, alias="LongTermConfiguration"
+    )
     vpc_config: Optional[VpcForUpdateMemoryCollection] = Field(
         default=None, alias="VpcConfig"
     )
@@ -348,11 +351,14 @@ class CreateMemoryCollectionRequest(MemoryBaseModel):
     name: str = Field(..., alias="Name")
     project_name: Optional[str] = Field(default=None, alias="ProjectName")
     provider_type: Optional[str] = Field(default=None, alias="ProviderType")
-    tags: Optional[list[TagsItemForCreateMemoryCollection]] = Field(
-        default=None, alias="Tags"
+    long_term_configuration: Optional[LongTermForCreateMemoryCollection] = Field(
+        default=None, alias="LongTermConfiguration"
     )
     vpc_config: Optional[VpcForCreateMemoryCollection] = Field(
         default=None, alias="VpcConfig"
+    )
+    tags: Optional[list[TagsItemForCreateMemoryCollection]] = Field(
+        default=None, alias="Tags"
     )
 
 

@@ -20,7 +20,7 @@ from .builder import build as _build
 from .deployer import deploy as _deploy
 from .invoker import invoke as _invoke
 from .status import status as _status
-from .lifecycle import launch as _launch, destroy as _destroy, stop as _stop
+from .lifecycle import launch as _launch, destroy as _destroy
 from .initializer import (
     init_project as _init_project,
     get_available_templates as _get_available_templates,
@@ -33,8 +33,9 @@ from ..models import (
     StatusResult,
     LifecycleResult,
     InitResult,
+    PreflightMode,
 )
-
+from ..reporter import Reporter
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -75,6 +76,7 @@ class AgentKitClient:
         config: Optional[Union[str, "AgentConfig"]] = None,
         config_file: Optional[str] = None,
         config_dict: Optional[Dict[str, Any]] = None,
+        reporter: Optional[Reporter] = None,
     ):
         """
         Initialize AgentKit client.
@@ -88,6 +90,8 @@ class AgentKitClient:
                 Ignored if 'config' is provided.
             config_dict: Configuration as dictionary (highest priority).
                 Overrides config/config_file if provided.
+            reporter: Optional Reporter for progress/log output. If None,
+                the underlying SDK APIs use SilentReporter (no console output).
 
         Example:
             >>> # Recommended: With AgentConfig object
@@ -111,6 +115,9 @@ class AgentKitClient:
         """
         # Import AgentConfig here to avoid circular import
         from .config import AgentConfig
+
+        # Store reporter for all subsequent operations
+        self.reporter: Optional[Reporter] = reporter
 
         # Handle the new 'config' parameter
         if isinstance(config, AgentConfig):
@@ -185,16 +192,24 @@ class AgentKitClient:
         return merged
 
     def build(
-        self, platform: str = "auto", config_overrides: Optional[Dict[str, Any]] = None
+        self,
+        platform: str = "auto",
+        config_overrides: Optional[Dict[str, Any]] = None,
+        preflight_mode: PreflightMode = PreflightMode.WARN,
     ) -> BuildResult:
         """
         Build agent image using client configuration.
 
         Args:
-            platform: Build platform: "auto", "local", or "cloud".
-                Default is "auto" which selects based on strongly configuration.
+            platform: Docker build platform/architecture string
+                (e.g., "linux/amd64", "linux/arm64", or "auto"). This controls
+                the Docker build target platform and is independent from the
+                launch_type (local/cloud/hybrid) configured in agentkit.yaml.
             config_overrides: Optional configuration overrides for this operation.
                 These will be merged with the client's base configuration.
+            preflight_mode: Preflight check behavior for required cloud services when
+                using cloud or hybrid launch types. Options are the same as
+                agentkit.toolkit.models.PreflightMode. SDK default is WARN.
 
         Returns:
             BuildResult: Build operation result.
@@ -215,16 +230,27 @@ class AgentKitClient:
         """
         merged_config = self._merge_config(config_overrides)
         return _build(
-            config_file=self.config_file, config_dict=merged_config, platform=platform
+            config_file=self.config_file,
+            config_dict=merged_config,
+            platform=platform,
+            preflight_mode=preflight_mode,
+            reporter=self.reporter,
         )
 
-    def deploy(self, config_overrides: Optional[Dict[str, Any]] = None) -> DeployResult:
+    def deploy(
+        self,
+        config_overrides: Optional[Dict[str, Any]] = None,
+        preflight_mode: PreflightMode = PreflightMode.WARN,
+    ) -> DeployResult:
         """
         Deploy agent using client configuration.
 
         Args:
             config_overrides: Optional configuration overrides for this operation.
                 These will be merged with the client's base configuration.
+            preflight_mode: Preflight check behavior for required cloud services when
+                using cloud or hybrid launch types. Options are the same as
+                agentkit.toolkit.models.PreflightMode. SDK default is WARN.
 
         Returns:
             DeployResult: Deploy operation result.
@@ -241,13 +267,17 @@ class AgentKitClient:
             ... )
         """
         merged_config = self._merge_config(config_overrides)
-        return _deploy(config_file=self.config_file, config_dict=merged_config)
+        return _deploy(
+            config_file=self.config_file,
+            config_dict=merged_config,
+            preflight_mode=preflight_mode,
+            reporter=self.reporter,
+        )
 
     def invoke(
         self,
         payload: Dict[str, Any],
-        headers: Optional[Dict[str, str]] = None,
-        apikey: Optional[str] = None,
+        headers: Optional[Dict[str, str]],
         config_overrides: Optional[Dict[str, Any]] = None,
     ) -> InvokeResult:
         """
@@ -258,7 +288,6 @@ class AgentKitClient:
                 Typically contains fields like "prompt", "messages", etc.
             headers: Optional HTTP headers dictionary.
                 Common headers: {"user_id": "...", "session_id": "..."}
-            apikey: Optional API key for authentication.
             config_overrides: Optional configuration overrides for this operation.
 
         Returns:
@@ -270,11 +299,10 @@ class AgentKitClient:
             >>> # Simple invocation
             >>> result = client.invoke({"prompt": "Hello, agent!"})
             >>>
-            >>> # With headers and API key
+            >>> # With headers
             >>> result = client.invoke(
             ...     payload={"prompt": "What's the weather?"},
             ...     headers={"user_id": "user123"},
-            ...     apikey=""
             ... )
             >>>
             >>> # Handle streaming response
@@ -291,7 +319,7 @@ class AgentKitClient:
             config_file=self.config_file,
             config_dict=merged_config,
             headers=headers,
-            apikey=apikey,
+            reporter=self.reporter,
         )
 
     def status(self, config_overrides: Optional[Dict[str, Any]] = None) -> StatusResult:
@@ -314,20 +342,33 @@ class AgentKitClient:
             >>> if result.is_running():
             ...     print(f"Agent running at: {result.endpoint_url}")
             ... else:
-            ...     print(f"Agent status: {result.status.value}")
+            ...     print(f"Agent status: {result.status}")
         """
         merged_config = self._merge_config(config_overrides)
-        return _status(config_file=self.config_file, config_dict=merged_config)
+        return _status(
+            config_file=self.config_file,
+            config_dict=merged_config,
+            reporter=self.reporter,
+        )
 
     def launch(
-        self, platform: str = "auto", config_overrides: Optional[Dict[str, Any]] = None
+        self,
+        platform: str = "auto",
+        config_overrides: Optional[Dict[str, Any]] = None,
+        preflight_mode: PreflightMode = PreflightMode.WARN,
     ) -> LifecycleResult:
         """
         Launch agent (build + deploy) using client configuration.
 
         Args:
-            platform: Build platform: "auto", "local", or "cloud".
+            platform: Docker build platform/architecture string
+                (e.g., "linux/amd64", "linux/arm64", or "auto"). This controls
+                the Docker build target platform and is independent from the
+                launch_type (local/cloud/hybrid) configured in agentkit.yaml.
             config_overrides: Optional configuration overrides for this operation.
+            preflight_mode: Preflight check behavior for required cloud services when
+                using cloud or hybrid launch types. Options are the same as
+                agentkit.toolkit.models.PreflightMode. SDK default is WARN.
 
         Returns:
             LifecycleResult: Launch operation result.
@@ -342,17 +383,20 @@ class AgentKitClient:
         """
         merged_config = self._merge_config(config_overrides)
         return _launch(
-            config_file=self.config_file, config_dict=merged_config, platform=platform
+            config_file=self.config_file,
+            config_dict=merged_config,
+            platform=platform,
+            preflight_mode=preflight_mode,
+            reporter=self.reporter,
         )
 
     def destroy(
-        self, force: bool = False, config_overrides: Optional[Dict[str, Any]] = None
+        self, config_overrides: Optional[Dict[str, Any]] = None
     ) -> LifecycleResult:
         """
         Destroy agent runtime using client configuration.
 
         Args:
-            force: Force destroy even if there are errors.
             config_overrides: Optional configuration overrides for this operation.
 
         Returns:
@@ -363,35 +407,13 @@ class AgentKitClient:
             >>>
             >>> # Destroy agent
             >>> result = client.destroy()
-            >>>
-            >>> # Force destroy
-            >>> result = client.destroy(force=True)
         """
         merged_config = self._merge_config(config_overrides)
         return _destroy(
-            config_file=self.config_file, config_dict=merged_config, force=force
+            config_file=self.config_file,
+            config_dict=merged_config,
+            reporter=self.reporter,
         )
-
-    def stop(
-        self, config_overrides: Optional[Dict[str, Any]] = None
-    ) -> LifecycleResult:
-        """
-        Stop agent runtime using client configuration.
-
-        Args:
-            config_overrides: Optional configuration overrides for this operation.
-
-        Returns:
-            LifecycleResult: Stop operation result.
-
-        Example:
-            >>> client = AgentKitClient("agentkit.yaml")
-            >>>
-            >>> # Stop agent
-            >>> result = client.stop()
-        """
-        merged_config = self._merge_config(config_overrides)
-        return _stop(config_file=self.config_file, config_dict=merged_config)
 
     def __enter__(self):
         """Context manager entry - returns self."""
@@ -410,7 +432,7 @@ class AgentKitClient:
     def init_project(
         project_name: str,
         template: str = "basic",
-        directory: str = ".",
+        project_root: str = ".",
         agent_name: Optional[str] = None,
         description: Optional[str] = None,
         system_prompt: Optional[str] = None,
@@ -426,7 +448,8 @@ class AgentKitClient:
         Args:
             project_name: Name of the project.
             template: Project template (basic, basic_stream, eino_a2a).
-            directory: Target directory.
+            project_root: Project root directory where agent files and
+                agentkit.yaml will be created.
             agent_name: Custom agent name (optional).
             description: Agent description (optional).
             system_prompt: System prompt (optional).
@@ -443,7 +466,7 @@ class AgentKitClient:
             >>> result = AgentKitClient.init_project(
             ...     project_name="my-agent",
             ...     template="basic",
-            ...     directory="./projects"
+            ...     project_root="./projects"
             ... )
             >>>
             >>> if result.success:
@@ -458,7 +481,7 @@ class AgentKitClient:
         return _init_project(
             project_name=project_name,
             template=template,
-            directory=directory,
+            project_root=project_root,
             agent_name=agent_name,
             description=description,
             system_prompt=system_prompt,

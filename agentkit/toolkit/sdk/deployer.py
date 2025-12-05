@@ -17,13 +17,16 @@
 from typing import Optional, Dict, Any
 
 from ..executors import DeployExecutor
-from ..models import DeployResult
-from ..reporter import SilentReporter
+from ..models import DeployResult, PreflightMode
+from ..reporter import SilentReporter, Reporter
 from ..context import ExecutionContext
 
 
 def deploy(
-    config_file: Optional[str] = None, config_dict: Optional[Dict[str, Any]] = None
+    config_file: Optional[str] = None,
+    config_dict: Optional[Dict[str, Any]] = None,
+    preflight_mode: PreflightMode = PreflightMode.WARN,
+    reporter: Optional[Reporter] = None,
 ) -> DeployResult:
     """
     Deploy agent to target environment.
@@ -37,6 +40,15 @@ def deploy(
             If not provided, uses default "agentkit.yaml" in current directory.
         config_dict: Configuration as dictionary (highest priority).
             Overrides config_file if both provided.
+        preflight_mode: Preflight check behavior for required cloud services when
+            using cloud or hybrid launch types. Options:
+            - PreflightMode.PROMPT: Ask for confirmation (CLI-style, not recommended for SDK)
+            - PreflightMode.FAIL: Fail immediately if services are not enabled
+            - PreflightMode.WARN: Log warning but continue execution (SDK default)
+            - PreflightMode.SKIP: Skip preflight check entirely
+        reporter: Optional Reporter for progress/log output. If None, uses
+            SilentReporter (no console output). Advanced users can pass
+            LoggingReporter or a custom Reporter implementation.
 
     Returns:
         DeployResult: Deploy operation result containing:
@@ -65,9 +77,13 @@ def deploy(
     Raises:
         No exceptions are raised. All errors are captured in DeployResult.error.
     """
-    # SDK 使用 SilentReporter（无控制台输出）
-    reporter = SilentReporter()
+    if reporter is None:
+        reporter = SilentReporter()
     ExecutionContext.set_reporter(reporter)
 
     executor = DeployExecutor(reporter=reporter)
-    return executor.execute(config_dict=config_dict, config_file=config_file)
+    return executor.execute(
+        config_dict=config_dict,
+        config_file=config_file,
+        preflight_mode=preflight_mode,
+    )
