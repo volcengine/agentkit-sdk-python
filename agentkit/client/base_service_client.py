@@ -107,6 +107,7 @@ class BaseServiceClient(Service):
         self.host = config['host']
         self.api_version = config['api_version']
         self.service = config['service']
+        self.scheme = config.get('scheme', 'https')
         
         # Create ServiceInfo
         self.service_info = ServiceInfo(
@@ -121,7 +122,7 @@ class BaseServiceClient(Service):
             ),
             connection_timeout=30,
             socket_timeout=30,
-            scheme="https",
+            scheme=self.scheme,
         )
         
         # Generate ApiInfo for all actions

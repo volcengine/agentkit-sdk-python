@@ -181,3 +181,5 @@ local_test/
 
 # deprecated files
 *deprecated*
+
+.trae/

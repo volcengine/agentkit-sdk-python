@@ -424,6 +424,20 @@ def _set_global_field(field_value: str):
             if not hasattr(config.tos, field):
                 raise AttributeError(f"tos has no field: {field}")
             setattr(config.tos, field, value)
+        elif section == 'agentkit':
+            if field not in ['host', 'schema']:
+                raise AttributeError(f"agentkit has no field: {field}")
+            if field == 'host':
+                config.agentkit_host = value
+            elif field == 'schema':
+                config.agentkit_schema = value
+        elif section == 'iam':
+            if field not in ['host', 'schema']:
+                raise AttributeError(f"iam has no field: {field}")
+            if field == 'host':
+                config.iam_host = value
+            elif field == 'schema':
+                config.iam_schema = value
         else:
             console.print(f"[red]❌ Unknown config section: {section}[/red]")
             console.print("\nSupported sections: volcengine, cr, tos")

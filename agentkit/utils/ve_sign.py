@@ -25,6 +25,7 @@ Version = ""
 Region = ""
 Host = ""
 ContentType = ""
+Scheme = "https"
 
 
 def norm_query(params):
@@ -149,7 +150,7 @@ def request(method, date, query, header, ak, sk, action, body):
     # 第六步：将 Signature 签名写入 HTTP Header 中，并发送 HTTP 请求。
     r = requests.request(
         method=method,
-        url="https://{}{}".format(request_param["host"], request_param["path"]),
+        url=f"{Scheme}://{request_param['host']}{request_param['path']}",
         headers=header,
         params=request_param["query"],
         data=request_param["body"],
@@ -168,6 +169,7 @@ def ve_request(
     host: str,
     header: dict = {},
     content_type: str = "application/json",
+    scheme: str = "https",
 ):
     # response_body = request("Get", datetime.datetime.utcnow(), {}, {}, AK, SK, "ListUsers", None)
     # print(response_body)
@@ -182,6 +184,8 @@ def ve_request(
     Host = host
     global ContentType
     ContentType = content_type
+    global Scheme
+    Scheme = scheme or "https"
 
     AK = ak
     SK = sk
@@ -281,7 +285,15 @@ def get_volc_ak_sk_region(service: str = ""):
 
 
 def get_volc_agentkit_host_info():
-    host = os.getenv("VOLCENGINE_AGENTKIT_HOST") or os.getenv("VOLC_AGENTKIT_HOST")
+    try:
+        from agentkit.toolkit.config.global_config import get_global_config
+        gc = get_global_config()
+        if gc.agentkit_host:
+            host = gc.agentkit_host
+        else:
+            host = os.getenv("VOLCENGINE_AGENTKIT_HOST") or os.getenv("VOLC_AGENTKIT_HOST")
+    except Exception:
+        host = os.getenv("VOLCENGINE_AGENTKIT_HOST") or os.getenv("VOLC_AGENTKIT_HOST")
     api_version = os.getenv("VOLCENGINE_AGENTKIT_API_VERSION") or os.getenv("VOLC_AGENTKIT_API_VERSION")
     service_code = os.getenv("VOLCENGINE_AGENTKIT_SERVICE") or os.getenv("VOLC_AGENTKIT_SERVICE")
     return host if host else "open.volcengineapi.com", api_version if api_version else "2025-10-30", service_code if service_code else "agentkit"
@@ -294,4 +306,3 @@ def get_identity_host_info():
     service_code = os.getenv("VOLCENGINE_IDENTITY_SERVICE") or os.getenv("VOLC_IDENTITY_SERVICE")
     region = os.getenv("VOLCENGINE_IDENTITY_REGION") or os.getenv("VOLC_IDENTITY_REGION")
     return host if host else "open.volcengineapi.com", api_version if api_version else "2023-10-01", service_code if service_code else "cis_test", region if region else "cn-beijing"
-

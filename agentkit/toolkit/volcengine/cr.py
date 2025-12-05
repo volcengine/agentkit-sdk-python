@@ -28,8 +28,16 @@ class VeCR:
         self.ak = access_key
         self.sk = secret_key
         self.region = region
-        assert region in ["cn-beijing", "cn-guangzhou", "cn-shanghai"]
         self.version = "2022-05-12"
+        try:
+            from agentkit.toolkit.config.global_config import get_global_config
+            gc = get_global_config()
+            default_host = f"cr.{self.region}.volcengineapi.com"
+            self.host = gc.cr.host or default_host
+            self.scheme = gc.cr.schema or "https"
+        except Exception:
+            self.host = f"cr.{self.region}.volcengineapi.com"
+            self.scheme = "https"
 
     def _create_instance(
         self, 
@@ -70,7 +78,8 @@ class VeCR:
             service="cr",
             version=self.version,
             region=self.region,
-            host=f"cr.{self.region}.volcengineapi.com",
+            host=self.host,
+            scheme=self.scheme,
         )
         logger.debug(f"create cr instance {instance_name}: {response}")
 
@@ -122,7 +131,8 @@ class VeCR:
             service="cr",
             version=self.version,
             region=self.region,
-            host=f"cr.{self.region}.volcengineapi.com",
+            host=self.host,
+            scheme=self.scheme,
         )
         logger.debug(f"check cr instance {instance_name}: {response}")
 
@@ -159,7 +169,8 @@ class VeCR:
             service="cr",
             version=self.version,
             region=self.region,
-            host=f"cr.{self.region}.volcengineapi.com",
+            host=self.host,
+            scheme=self.scheme,
         )
         logger.debug(f"create cr namespace {namespace_name}: {response}")
 
@@ -210,7 +221,8 @@ class VeCR:
             service="cr",
             version=self.version,
             region=self.region,
-            host=f"cr.{self.region}.volcengineapi.com",
+            host=self.host,
+            scheme=self.scheme,
         )
         logger.debug(f"create cr repo {repo_name}: {response}")
 
@@ -243,7 +255,8 @@ class VeCR:
             service="cr",
             version=self.version,
             region=self.region,
-            host=f"cr.{self.region}.volcengineapi.com",
+            host=self.host,
+            scheme=self.scheme,
         )
         logger.debug(f"get cr authorization token: {response}")
 
@@ -274,7 +287,8 @@ class VeCR:
             service="cr",
             version=self.version,
             region=self.region,
-            host=f"cr.{self.region}.volcengineapi.com",
+            host=self.host,
+            scheme=self.scheme,
         )
         logger.debug(f"get cr public endpoint: {response}")
         if "Error" in response["ResponseMetadata"]:
@@ -304,7 +318,8 @@ class VeCR:
             service="cr",
             version=self.version,
             region=self.region,
-            host=f"cr.{self.region}.volcengineapi.com",
+            host=self.host,
+            scheme=self.scheme,
         )
         logger.debug(f"update cr public endpoint: {response}")
         if "Error" in response["ResponseMetadata"]:
@@ -336,7 +351,8 @@ class VeCR:
             service="cr",
             version=self.version,
             region=self.region,
-            host=f"cr.{self.region}.volcengineapi.com",
+            host=self.host,
+            scheme=self.scheme,
         )
         logger.debug(f"create endpoint acl policies: {response}")
         
@@ -367,7 +383,8 @@ class VeCR:
             service="cr",
             version=self.version,
             region=self.region,
-            host=f"cr.{self.region}.volcengineapi.com",
+            host=self.host,
+            scheme=self.scheme,
         )
         logger.debug(f"list cr domains: {response}")
         if "Error" in response["ResponseMetadata"]:
@@ -386,6 +403,14 @@ class VeCR:
         get default cr domain
         """
         domains = self._list_domains(instance_name=instance_name)
+        # 如果只有一个结果，直接返回该域名
+        try:
+            if isinstance(domains, list) and len(domains) == 1:
+                single = domains[0]
+                if isinstance(single, dict) and "Domain" in single:
+                    return single["Domain"]
+        except Exception:
+            pass
         for domain in domains:
             if domain["Default"] == True:
                 return domain["Domain"]

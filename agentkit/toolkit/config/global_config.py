@@ -24,7 +24,6 @@ Priority:
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
-import yaml
 import logging
 
 from .utils import is_valid_config
@@ -68,12 +67,16 @@ class CRGlobalConfig:
     instance_name: str = ""
     namespace_name: str = ""
     auto_create_instance_type: str = "Micro"  # Instance type when auto-creating: "Micro" or "Enterprise"
+    host: str = ""
+    schema: str = "https"
     
     def to_dict(self):
         return {
             "instance_name": self.instance_name,
             "namespace_name": self.namespace_name,
             "auto_create_instance_type": self.auto_create_instance_type,
+            "host": self.host,
+            "schema": self.schema,
         }
     
     @classmethod
@@ -82,6 +85,8 @@ class CRGlobalConfig:
             instance_name=data.get("instance_name", ""),
             namespace_name=data.get("namespace_name", ""),
             auto_create_instance_type=data.get("auto_create_instance_type", "Micro"),
+            host=data.get("host", ""),
+            schema=data.get("schema", "https"),
         )
 
 
@@ -120,12 +125,24 @@ class GlobalConfig:
     volcengine: VolcengineCredentials = field(default_factory=VolcengineCredentials)
     cr: CRGlobalConfig = field(default_factory=CRGlobalConfig)
     tos: TOSGlobalConfig = field(default_factory=TOSGlobalConfig)
+    agentkit_host: str = ""
+    agentkit_schema: str = "https"
+    iam_host: str = ""
+    iam_schema: str = "https"
     
     def to_dict(self):
         return {
             "volcengine": self.volcengine.to_dict(),
             "cr": self.cr.to_dict(),
             "tos": self.tos.to_dict(),
+            "agentkit": {
+                "host": self.agentkit_host,
+                "schema": self.agentkit_schema,
+            },
+            "iam": {
+                "host": self.iam_host,
+                "schema": self.iam_schema,
+            },
         }
     
     @classmethod
@@ -134,6 +151,10 @@ class GlobalConfig:
             volcengine=VolcengineCredentials.from_dict(data.get("volcengine", {})),
             cr=CRGlobalConfig.from_dict(data.get("cr", {})),
             tos=TOSGlobalConfig.from_dict(data.get("tos", {})),
+            agentkit_host=(data.get("agentkit", {}) or {}).get("host", ""),
+            agentkit_schema=(data.get("agentkit", {}) or {}).get("schema", "https"),
+            iam_host=(data.get("iam", {}) or {}).get("host", ""),
+            iam_schema=(data.get("iam", {}) or {}).get("schema", "https"),
         )
 
 
@@ -169,6 +190,7 @@ class GlobalConfigManager:
             return GlobalConfig()
         
         try:
+            import yaml
             with open(self.config_path, 'r', encoding='utf-8') as f:
                 data = yaml.safe_load(f) or {}
             logger.debug(f"Loaded global config from: {self.config_path}")
@@ -188,6 +210,7 @@ class GlobalConfigManager:
         
         # Write YAML config
         with open(self.config_path, 'w', encoding='utf-8') as f:
+            import yaml
             yaml.dump(
                 config.to_dict(), 
                 f, 
