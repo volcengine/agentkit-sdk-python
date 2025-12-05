@@ -252,7 +252,13 @@ class VeIAM(BaseIAMClient):
             data="{}"
         )
         response_data = json.loads(res)
-        return CreateRoleResponse(**response_data.get('Result', {}))
+        result_data = response_data.get('Result', {})
+        role_data = result_data.get('Role')
+        if isinstance(role_data, dict):
+            tpd = role_data.get('TrustPolicyDocument')
+            if isinstance(tpd, dict):
+                role_data['TrustPolicyDocument'] = json.dumps(tpd)
+        return CreateRoleResponse(**result_data)
     
 
     def attach_role_policy(self, role_name: str, policy_name: str, policy_type: str) -> Optional[AttachRolePolicyResponse]:
@@ -293,20 +299,31 @@ class VeIAM(BaseIAMClient):
             AgentKitTosAccess
             AgentKitToolAccess
             '''
-            policies = [
-                "ArkReadOnlyAccess",
-                "TLSReadOnlyAccess",
-                "APMPlusServerReadOnlyAccess",
-                "VikingdbReadOnlyAccess",
-                "ESCloudReadOnlyAccess",
-                "LLMShieldProtectSdkAccess",
-                "AgentKitReadOnlyAccess",
-                "TorchlightApiFullAccess",
-                "Mem0ReadOnlyAccess",
-                "IDReadOnlyAccess",
-                "AgentKitTosAccess",
-                "AgentKitToolAccess",
-            ]
-            for policy in policies:
+            try:
+                from agentkit.toolkit.config.global_config import get_global_config
+                gc = get_global_config()
+                defaults = getattr(gc, 'defaults', None)
+                custom_policies = getattr(defaults, 'iam_role_policies', None) if defaults else None
+            except Exception:
+                custom_policies = None
+            
+            if custom_policies and isinstance(custom_policies, list) and len(custom_policies) > 0:
+                to_attach = custom_policies
+            else:
+                to_attach = [
+                    "ArkReadOnlyAccess",
+                    "TLSReadOnlyAccess",
+                    "APMPlusServerReadOnlyAccess",
+                    "VikingdbReadOnlyAccess",
+                    "ESCloudReadOnlyAccess",
+                    "LLMShieldProtectSdkAccess",
+                    "AgentKitReadOnlyAccess",
+                    "TorchlightApiFullAccess",
+                    "Mem0ReadOnlyAccess",
+                    "IDReadOnlyAccess",
+                    "AgentKitTosAccess",
+                    "AgentKitToolAccess",
+                ]
+            for policy in to_attach:
                 self.attach_role_policy(role_name, policy_name=policy, policy_type="System")
         return True

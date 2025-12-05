@@ -438,6 +438,45 @@ def _set_global_field(field_value: str):
                 config.iam_host = value
             elif field == 'schema':
                 config.iam_schema = value
+        elif section == 'defaults':
+            if field == 'launch_type':
+                clean_value = value.strip() if value is not None else None
+                if clean_value == "":
+                    clean_value = None
+                config.defaults.launch_type = clean_value
+            elif field == 'preflight_mode':
+                clean_value = value.strip().lower() if value is not None else None
+                if clean_value == "":
+                    clean_value = None
+                # Accept only known modes
+                allowed = {"prompt", "fail", "warn", "skip"}
+                if clean_value and clean_value not in allowed:
+                    raise AttributeError(f"Invalid preflight_mode: {value}. Allowed: prompt|fail|warn|skip")
+                config.defaults.preflight_mode = clean_value
+            elif field == 'cr_public_endpoint_check':
+                clean_value = value.strip().lower() if value is not None else None
+                if clean_value == "":
+                    clean_value = None
+                if clean_value is None:
+                    config.defaults.cr_public_endpoint_check = None
+                else:
+                    truthy = {"true", "1", "yes", "y"}
+                    falsy = {"false", "0", "no", "n"}
+                    if clean_value in truthy:
+                        config.defaults.cr_public_endpoint_check = True
+                    elif clean_value in falsy:
+                        config.defaults.cr_public_endpoint_check = False
+                    else:
+                        raise AttributeError(f"Invalid cr_public_endpoint_check: {value}. Allowed: true|false|1|0|yes|no")
+            elif field == 'iam_role_policies':
+                clean_value = value.strip() if value is not None else None
+                if clean_value == "" or clean_value is None:
+                    config.defaults.iam_role_policies = None
+                else:
+                    policies = [p.strip() for p in clean_value.split(',') if p.strip()]
+                    config.defaults.iam_role_policies = policies
+            else:
+                raise AttributeError(f"defaults has no field: {field}")
         else:
             console.print(f"[red]❌ Unknown config section: {section}[/red]")
             console.print("\nSupported sections: volcengine, cr, tos")

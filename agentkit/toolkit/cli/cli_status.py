@@ -122,7 +122,7 @@ def status_command(
             if result.endpoint_url:
                 table.add_row("🌐 Endpoint", result.endpoint_url)
             if result.service_id:
-                table.add_row("☁️  Service ID", result.service_id)
+                table.add_row("☁️ Service ID", result.service_id)
             if result.uptime_seconds:
                 # Format uptime to human-readable format
                 uptime = result.uptime_seconds
@@ -130,7 +130,7 @@ def status_command(
                 minutes = (uptime % 3600) // 60
                 seconds = uptime % 60
                 uptime_str = f"{hours}h {minutes}m {seconds}s" if hours > 0 else f"{minutes}m {seconds}s"
-                table.add_row("⏱️  Uptime", uptime_str)
+                table.add_row("⏱️ Uptime", uptime_str)
             
             # Extract other information from metadata
             details = result.metadata or {}

@@ -304,10 +304,19 @@ class HybridStrategy(Strategy):
         if not ensure_result.success:
             raise Exception(ensure_result.error or "Failed to ensure CR resources")
 
-        # Ensure public endpoint is enabled for CR instance
-        public_result = cr_service.ensure_public_endpoint(cr_cfg)
-        if not public_result.success:
-            raise Exception(public_result.error or "Failed to enable CR public endpoint")
+        # Ensure public endpoint is enabled for CR instance (controlled by global config)
+        try:
+            from agentkit.toolkit.config.global_config import get_global_config
+            gc = get_global_config()
+            do_check = getattr(getattr(gc, 'defaults', None), 'cr_public_endpoint_check', None)
+        except Exception:
+            do_check = None
+        if do_check is False:
+            self.reporter.info("Skipping CR public endpoint check per global config")
+        else:
+            public_result = cr_service.ensure_public_endpoint(cr_cfg)
+            if not public_result.success:
+                raise Exception(public_result.error or "Failed to enable CR public endpoint")
 
         # Write back any auto-created names to config
         if ensure_result.instance_name and ensure_result.instance_name != strategy_config.cr_instance_name:

@@ -734,13 +734,22 @@ class VeCPCRBuilder(Builder):
             if not cr_result.success:
                 raise Exception(cr_result.error)
             
-            # Ensure public endpoint access for image pulls
-            self.reporter.info("Ensuring CR public endpoint access...")
-            public_result = cr_service.ensure_public_endpoint(cr_config)
-            
-            if not public_result.success:
-                error_msg = f"Public endpoint configuration failed: {public_result.error}"
-                raise Exception(error_msg)
+            # Ensure public endpoint access for image pulls (controlled by global config)
+            try:
+                from agentkit.toolkit.config.global_config import get_global_config
+                gc = get_global_config()
+                do_check = getattr(getattr(gc, 'defaults', None), 'cr_public_endpoint_check', None)
+            except Exception:
+                do_check = None
+            if do_check is False:
+                self.reporter.info("Skipping CR public endpoint check per global config")
+            else:
+                self.reporter.info("Ensuring CR public endpoint access...")
+                public_result = cr_service.ensure_public_endpoint(cr_config)
+                
+                if not public_result.success:
+                    error_msg = f"Public endpoint configuration failed: {public_result.error}"
+                    raise Exception(error_msg)
             
             self.reporter.success("CR resource preparation completed")
             self.reporter.info(f"   Instance: {cr_result.instance_name}")
