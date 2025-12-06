@@ -20,10 +20,10 @@ from pydantic import BaseModel
 
 def prompt_base_model(model: type[BaseModel]) -> dict:
     """Generate interactive prompts for a Pydantic BaseModel.
-    
+
     Args:
         model: A Pydantic BaseModel class
-        
+
     Returns:
         Dictionary of user responses mapped to field names
     """

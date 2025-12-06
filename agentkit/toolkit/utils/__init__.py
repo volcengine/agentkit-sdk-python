@@ -16,4 +16,4 @@
 
 from .agent_parser import AgentParser
 
-__all__ = ['AgentParser']
+__all__ = ["AgentParser"]

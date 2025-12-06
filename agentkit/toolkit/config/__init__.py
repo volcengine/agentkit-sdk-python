@@ -23,6 +23,8 @@ from .strategy_configs import (
     LocalStrategyConfig,
     HybridStrategyConfig,
     CloudStrategyConfig,
+    AUTH_TYPE_KEY_AUTH,
+    AUTH_TYPE_CUSTOM_JWT,
 )
 
 from .docker_build_config import (
@@ -50,7 +52,6 @@ __all__ = [
     "ConfigUpdateResult",
     "get_config",
     "create_config_update_result",
-    
     "GlobalConfig",
     "GlobalConfigManager",
     "get_global_config",
@@ -60,7 +61,6 @@ __all__ = [
     "VolcengineCredentials",
     "CRGlobalConfig",
     "TOSGlobalConfig",
-    
     "AUTO_CREATE_VE",
     "DEFAULT_WORKSPACE_NAME",
     "DEFAULT_CR_NAMESPACE",
@@ -68,14 +68,13 @@ __all__ = [
     "GLOBAL_CONFIG_DIR",
     "GLOBAL_CONFIG_FILE",
     "GLOBAL_CONFIG_FILE_PERMISSIONS",
-    
     "is_valid_config",
     "is_invalid_config",
     "merge_runtime_envs",
-    
     "LocalStrategyConfig",
     "HybridStrategyConfig",
     "CloudStrategyConfig",
-    
+    "AUTH_TYPE_KEY_AUTH",
+    "AUTH_TYPE_CUSTOM_JWT",
     "DockerBuildConfig",
 ]
