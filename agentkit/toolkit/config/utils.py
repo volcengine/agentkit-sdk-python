@@ -27,26 +27,28 @@ def is_valid_config(s: str) -> bool:
     return not is_invalid_config(s)
 
 
-def merge_runtime_envs(common_config: Any, strategy_config: Dict[str, Any]) -> Dict[str, str]:
+def merge_runtime_envs(
+    common_config: Any, strategy_config: Dict[str, Any]
+) -> Dict[str, str]:
     """Merge application-level and strategy-level environment variables.
-    
+
     Strategy-level variables override application-level ones with the same name.
-    
+
     Args:
         common_config: CommonConfig instance
         strategy_config: Strategy configuration dict
-        
+
     Returns:
         Merged environment variables dict
     """
     merged_envs = {}
-    
-    app_level_envs = getattr(common_config, 'runtime_envs', {})
+
+    app_level_envs = getattr(common_config, "runtime_envs", {})
     if isinstance(app_level_envs, dict):
         merged_envs.update(app_level_envs)
 
-    strategy_level_envs = strategy_config.get('runtime_envs', {})
+    strategy_level_envs = strategy_config.get("runtime_envs", {})
     if isinstance(strategy_level_envs, dict):
         merged_envs.update(strategy_level_envs)
-    
+
     return merged_envs

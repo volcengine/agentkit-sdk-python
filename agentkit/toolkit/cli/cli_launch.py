@@ -31,26 +31,26 @@ def launch_command(
     from agentkit.toolkit.executors import LifecycleExecutor
     from agentkit.toolkit.cli.console_reporter import ConsoleReporter
     from agentkit.toolkit.context import ExecutionContext
-    
+
     console.print("[green]Launching agent...[/green]")
-    
+
     # Set execution context - CLI uses ConsoleReporter (with colored output and progress)
     reporter = ConsoleReporter()
     ExecutionContext.set_reporter(reporter)
-    
+
     executor = LifecycleExecutor(reporter=reporter)
     result = executor.launch(config_file=str(config_file), platform=platform)
-    
+
     # Format output
     if result.success:
         console.print("[green]✅ Launch completed successfully![/green]")
-        
+
         # Show build and deploy details
         if result.build_result:
             build_res = result.build_result
-            if hasattr(build_res, 'image_name') and build_res.image_name:
+            if hasattr(build_res, "image_name") and build_res.image_name:
                 console.print(f"[cyan]Built image: {build_res.image_name}[/cyan]")
-        
+
         if result.deploy_result:
             deploy_res = result.deploy_result
             if deploy_res.endpoint_url:

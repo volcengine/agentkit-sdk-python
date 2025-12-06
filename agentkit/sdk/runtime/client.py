@@ -45,6 +45,7 @@ from agentkit.sdk.runtime.types import (
 
 class AgentkitRuntimeClient(BaseAgentkitClient):
     """AgentKit Runtime Management Service"""
+
     API_ACTIONS: Dict[str, str] = {
         "UpdateRuntime": "UpdateRuntime",
         "GetRuntimeVersion": "GetRuntimeVersion",
@@ -73,7 +74,6 @@ class AgentkitRuntimeClient(BaseAgentkitClient):
             service_name="runtime",
         )
 
-
     def update_runtime(self, request: UpdateRuntimeRequest) -> UpdateRuntimeResponse:
         return self._invoke_api(
             api_action="UpdateRuntime",
@@ -81,14 +81,18 @@ class AgentkitRuntimeClient(BaseAgentkitClient):
             response_type=UpdateRuntimeResponse,
         )
 
-    def get_runtime_version(self, request: GetRuntimeVersionRequest) -> GetRuntimeVersionResponse:
+    def get_runtime_version(
+        self, request: GetRuntimeVersionRequest
+    ) -> GetRuntimeVersionResponse:
         return self._invoke_api(
             api_action="GetRuntimeVersion",
             request=request,
             response_type=GetRuntimeVersionResponse,
         )
 
-    def list_runtime_cr_registries(self, request: ListRuntimeCrRegistriesRequest) -> ListRuntimeCrRegistriesResponse:
+    def list_runtime_cr_registries(
+        self, request: ListRuntimeCrRegistriesRequest
+    ) -> ListRuntimeCrRegistriesResponse:
         return self._invoke_api(
             api_action="ListRuntimeCrRegistries",
             request=request,
@@ -123,14 +127,18 @@ class AgentkitRuntimeClient(BaseAgentkitClient):
             response_type=GetRuntimeResponse,
         )
 
-    def list_runtime_versions(self, request: ListRuntimeVersionsRequest) -> ListRuntimeVersionsResponse:
+    def list_runtime_versions(
+        self, request: ListRuntimeVersionsRequest
+    ) -> ListRuntimeVersionsResponse:
         return self._invoke_api(
             api_action="ListRuntimeVersions",
             request=request,
             response_type=ListRuntimeVersionsResponse,
         )
 
-    def get_runtime_coze_token(self, request: GetRuntimeCozeTokenRequest) -> GetRuntimeCozeTokenResponse:
+    def get_runtime_coze_token(
+        self, request: GetRuntimeCozeTokenRequest
+    ) -> GetRuntimeCozeTokenResponse:
         return self._invoke_api(
             api_action="GetRuntimeCozeToken",
             request=request,

@@ -26,15 +26,15 @@ def build(
     config_file: Optional[str] = None,
     config_dict: Optional[Dict[str, Any]] = None,
     platform: str = "auto",
-    regenerate_dockerfile: bool = False
+    regenerate_dockerfile: bool = False,
 ) -> BuildResult:
     """
     Build agent image.
-    
+
     This function builds a Docker image for your agent application according
     to the configuration. The build can happen locally or in the cloud depending
     on your strongly configuration.
-    
+
     Args:
         config_file: Path to configuration file (e.g., "agentkit.yaml").
             If not provided, uses default "agentkit.yaml" in current directory.
@@ -44,7 +44,7 @@ def build(
             Default is "auto" which selects based on strongly configuration.
         regenerate_dockerfile: Force regenerate Dockerfile even if it exists.
             Default is False.
-    
+
     Returns:
         BuildResult: Build operation result containing:
             - success: Whether build succeeded
@@ -52,16 +52,16 @@ def build(
             - image_id: Image ID/digest if successful
             - error: Error message if failed
             - build_logs: Build logs if available
-    
+
     Example:
         >>> from agentkit.toolkit import sdk
-        >>> 
+        >>>
         >>> # Build with default config
         >>> result = sdk.build()
-        >>> 
+        >>>
         >>> # Build with specific config file
         >>> result = sdk.build(config_file="my-config.yaml")
-        >>> 
+        >>>
         >>> # Check result
         >>> if result.success:
         ...     print(f"Image built: {result.image_name}")
@@ -69,7 +69,7 @@ def build(
         ...     print(f"Build failed: {result.error}")
         ...     for log in result.build_logs or []:
         ...         print(log)
-    
+
     Raises:
         No exceptions are raised. All errors are captured in BuildResult.error.
     """
@@ -78,13 +78,10 @@ def build(
     ExecutionContext.set_reporter(reporter)
 
     options = BuildOptions(
-        platform=platform,
-        regenerate_dockerfile=regenerate_dockerfile
+        platform=platform, regenerate_dockerfile=regenerate_dockerfile
     )
-    
+
     executor = BuildExecutor(reporter=reporter)
     return executor.execute(
-        config_dict=config_dict,
-        config_file=config_file,
-        options=options
+        config_dict=config_dict, config_file=config_file, options=options
     )

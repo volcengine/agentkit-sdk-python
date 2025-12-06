@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-'''
+"""
 **simple agent demo app with veadk and apmplus**
 
 Before running, the user must set the following environment variables; otherwise, runtime exceptions will inevitably occur:
@@ -24,11 +24,12 @@ Before running, the user must set the following environment variables; otherwise
 MODEL_AGENT_API_KEY is used to access the model service of the Volcano Engine Ark platform.
 The remaining three variables are used to set up the observable services of APMPLUS
 
-'''
+"""
 
 import logging
 
 from veadk import Agent, Runner
+
 # from veadk.tools.demo_tools import get_city_weather
 from veadk.tracing.telemetry.exporters.apmplus_exporter import APMPlusExporter
 from veadk.tracing.telemetry.opentelemetry_tracer import OpentelemetryTracer

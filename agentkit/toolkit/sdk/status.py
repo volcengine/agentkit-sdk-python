@@ -23,21 +23,20 @@ from ..context import ExecutionContext
 
 
 def status(
-    config_file: Optional[str] = None,
-    config_dict: Optional[Dict[str, Any]] = None
+    config_file: Optional[str] = None, config_dict: Optional[Dict[str, Any]] = None
 ) -> StatusResult:
     """
     Query agent runtime status.
-    
+
     This function retrieves the current status of your deployed agent,
     including whether it's running, endpoint information, and other details.
-    
+
     Args:
         config_file: Path to configuration file (e.g., "agentkit.yaml").
             If not provided, uses default "agentkit.yaml" in current directory.
         config_dict: Configuration as dictionary (highest priority).
             Overrides config_file if both provided.
-    
+
     Returns:
         StatusResult: Status query result containing:
             - success: Whether status query succeeded
@@ -48,16 +47,16 @@ def status(
             - uptime: Service uptime if available
             - details: Additional status details
             - error: Error message if query failed
-    
+
     Example:
         >>> from agentkit.toolkit import sdk
-        >>> 
+        >>>
         >>> # Query status with default config
         >>> result = sdk.status()
-        >>> 
+        >>>
         >>> # Query with specific config
         >>> result = sdk.status(config_file="my-config.yaml")
-        >>> 
+        >>>
         >>> # Check result
         >>> if result.success:
         ...     print(f"Status: {result.status.value}")
@@ -66,16 +65,13 @@ def status(
         ...     print(f"Uptime: {result.uptime}")
         ... else:
         ...     print(f"Status query failed: {result.error}")
-    
+
     Raises:
         No exceptions are raised. All errors are captured in StatusResult.error.
     """
     # SDK 使用 SilentReporter（无控制台输出）
     reporter = SilentReporter()
     ExecutionContext.set_reporter(reporter)
-    
+
     executor = StatusExecutor(reporter=reporter)
-    return executor.execute(
-        config_dict=config_dict,
-        config_file=config_file
-    )
+    return executor.execute(config_dict=config_dict, config_file=config_file)

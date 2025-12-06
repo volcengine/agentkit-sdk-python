@@ -39,25 +39,42 @@ logger = logging.getLogger(__name__)
 @dataclass
 class LocalDockerBuilderConfig(AutoSerializableMixin):
     """Docker builder configuration"""
-    common_config: Optional[CommonConfig] = field(default=None, metadata={"system": True, "description": "Common configuration"})
+
+    common_config: Optional[CommonConfig] = field(
+        default=None, metadata={"system": True, "description": "Common configuration"}
+    )
     image_name: str = field(default="", metadata={"description": "Image name"})
     image_tag: str = field(default="latest", metadata={"description": "Image tag"})
-    dockerfile_path: str = field(default=".", metadata={"description": "Dockerfile directory path"})
-    dockerfile_name: str = field(default="Dockerfile", metadata={"description": "Dockerfile filename"})
-    template_dir: Optional[str] = field(default=None, metadata={"description": "Dockerfile template directory"})
-    template_name: str = field(default="Dockerfile.j2", metadata={"description": "Dockerfile template filename"})
+    dockerfile_path: str = field(
+        default=".", metadata={"description": "Dockerfile directory path"}
+    )
+    dockerfile_name: str = field(
+        default="Dockerfile", metadata={"description": "Dockerfile filename"}
+    )
+    template_dir: Optional[str] = field(
+        default=None, metadata={"description": "Dockerfile template directory"}
+    )
+    template_name: str = field(
+        default="Dockerfile.j2",
+        metadata={"description": "Dockerfile template filename"},
+    )
     docker_build_config: Optional[DockerBuildConfig] = field(
         default=None,
-        metadata={"system": True, "description": "Docker build customization (base_image, build_script, etc.)"}
+        metadata={
+            "system": True,
+            "description": "Docker build customization (base_image, build_script, etc.)",
+        },
     )
 
 
 class LocalDockerBuilder(Builder):
     """Docker builder implementation"""
-    
-    def __init__(self, project_dir: Optional[Path] = None, reporter: Optional[Reporter] = None):
+
+    def __init__(
+        self, project_dir: Optional[Path] = None, reporter: Optional[Reporter] = None
+    ):
         """Initialize LocalDockerBuilder.
-        
+
         Args:
             project_dir: Project root directory.
             reporter: Progress reporter for build progress. Defaults to SilentReporter (no output).
@@ -66,29 +83,29 @@ class LocalDockerBuilder(Builder):
         try:
             from agentkit.toolkit.docker.container import DockerManager
         except ImportError:
-            raise ImportError("Missing Docker dependencies, please install agentkit[docker] extras")
+            raise ImportError(
+                "Missing Docker dependencies, please install agentkit[docker] extras"
+            )
         self.docker_manager = DockerManager()
         self.dockerfile_renderer = None
-    
-    
+
     def build(self, config: LocalDockerBuilderConfig) -> BuildResult:
         """Build Docker image.
-        
+
         Args:
             config: Build configuration object (strongly typed).
-            
+
         Returns:
             BuildResult: Unified build result object.
         """
         docker_config = config
         common_config = docker_config.common_config
-        
+
         docker_build_config = docker_config.docker_build_config
         force_regenerate = (
-            docker_build_config.regenerate_dockerfile 
-            if docker_build_config else False
+            docker_build_config.regenerate_dockerfile if docker_build_config else False
         )
-        
+
         if common_config is None:
             error_msg = "Missing common configuration"
             logger.error(error_msg)
@@ -96,25 +113,41 @@ class LocalDockerBuilder(Builder):
                 success=False,
                 error=error_msg,
                 error_code=ErrorCode.CONFIG_MISSING,
-                build_logs=[error_msg]
+                build_logs=[error_msg],
             )
-        
+
         docker_available, docker_message = self.docker_manager.is_docker_available()
         if not docker_available:
             logger.error("Docker availability check failed")
-            error_lines = docker_message.split('\n')
+            error_lines = docker_message.split("\n")
             return BuildResult(
                 success=False,
                 error=docker_message,
                 error_code=ErrorCode.DOCKER_NOT_AVAILABLE,
-                build_logs=error_lines
+                build_logs=error_lines,
             )
-        
+
         try:
             if common_config.language == "Python":
-                template_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "resources", "templates", "python"))
+                template_dir = os.path.abspath(
+                    os.path.join(
+                        os.path.dirname(__file__),
+                        "..",
+                        "resources",
+                        "templates",
+                        "python",
+                    )
+                )
             elif common_config.language == "Golang":
-                template_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "resources", "templates", "golang"))
+                template_dir = os.path.abspath(
+                    os.path.join(
+                        os.path.dirname(__file__),
+                        "..",
+                        "resources",
+                        "templates",
+                        "golang",
+                    )
+                )
             else:
                 error_msg = f"Unsupported language: {common_config.language}"
                 logger.error(error_msg)
@@ -122,11 +155,14 @@ class LocalDockerBuilder(Builder):
                     success=False,
                     error=error_msg,
                     error_code=ErrorCode.CONFIG_INVALID,
-                    build_logs=[error_msg]
+                    build_logs=[error_msg],
                 )
 
             try:
-                from agentkit.toolkit.docker.container import DockerfileRenderer, DockerManager
+                from agentkit.toolkit.docker.container import (
+                    DockerfileRenderer,
+                    DockerManager,
+                )
             except ImportError:
                 error_msg = "Missing Docker dependencies"
                 logger.error(error_msg)
@@ -134,7 +170,7 @@ class LocalDockerBuilder(Builder):
                     success=False,
                     error=error_msg,
                     error_code=ErrorCode.DEPENDENCY_MISSING,
-                    build_logs=[error_msg]
+                    build_logs=[error_msg],
                 )
 
             try:
@@ -146,36 +182,48 @@ class LocalDockerBuilder(Builder):
                     success=False,
                     error=error_msg,
                     error_code=ErrorCode.BUILD_FAILED,
-                    build_logs=[error_msg]
+                    build_logs=[error_msg],
                 )
 
             context = {
                 "language_version": common_config.language_version,
             }
-            
+
             if docker_build_config:
                 if docker_build_config.base_image:
-                    if common_config.language == "Golang" and isinstance(docker_build_config.base_image, dict):
-                        context["base_image_builder"] = docker_build_config.base_image.get("builder")
-                        context["base_image_runtime"] = docker_build_config.base_image.get("runtime")
+                    if common_config.language == "Golang" and isinstance(
+                        docker_build_config.base_image, dict
+                    ):
+                        context["base_image_builder"] = (
+                            docker_build_config.base_image.get("builder")
+                        )
+                        context["base_image_runtime"] = (
+                            docker_build_config.base_image.get("runtime")
+                        )
                     else:
                         context["base_image"] = docker_build_config.base_image
-                
+
                 if docker_build_config.build_script:
                     build_script_path = self.workdir / docker_build_config.build_script
                     if build_script_path.exists():
                         context["build_script"] = docker_build_config.build_script
                     else:
-                        logger.warning(f"Build script not found: {docker_build_config.build_script}")
+                        logger.warning(
+                            f"Build script not found: {docker_build_config.build_script}"
+                        )
 
             if common_config.language == "Python":
-                context["agent_module_path"] = os.path.splitext(common_config.entry_point)[0]
+                context["agent_module_path"] = os.path.splitext(
+                    common_config.entry_point
+                )[0]
                 if common_config.dependencies_file:
-                    dependencies_file_path = self.workdir / common_config.dependencies_file
+                    dependencies_file_path = (
+                        self.workdir / common_config.dependencies_file
+                    )
                     if not dependencies_file_path.exists():
                         dependencies_file_path.write_text("")
                     context["dependencies_file"] = common_config.dependencies_file
-            
+
             if common_config.language == "Golang":
                 entry_path = (self.workdir / common_config.entry_point).resolve()
                 if not entry_path.exists():
@@ -189,13 +237,15 @@ class LocalDockerBuilder(Builder):
                     if found:
                         entry_path = found.resolve()
                     else:
-                        error_msg = f"Project path not found: {common_config.entry_point}"
+                        error_msg = (
+                            f"Project path not found: {common_config.entry_point}"
+                        )
                         logger.error(error_msg)
                         return BuildResult(
                             success=False,
                             error=error_msg,
                             error_code=ErrorCode.CONFIG_INVALID,
-                            build_logs=[error_msg]
+                            build_logs=[error_msg],
                         )
 
                 src_dest = self.workdir / "src"
@@ -203,10 +253,14 @@ class LocalDockerBuilder(Builder):
 
                 if entry_path.is_file() and entry_path.suffix == ".sh":
                     project_root = entry_path.parent
-                    entry_relative_path = str((Path("src") / project_root.name / entry_path.name).as_posix())
+                    entry_relative_path = str(
+                        (Path("src") / project_root.name / entry_path.name).as_posix()
+                    )
                 elif entry_path.is_dir():
                     project_root = entry_path
-                    entry_relative_path = str((Path("src") / project_root.name).as_posix())
+                    entry_relative_path = str(
+                        (Path("src") / project_root.name).as_posix()
+                    )
                 else:
                     error_msg = "Unsupported Go entry: single-file compilation is not supported. Provide project directory or build.sh"
                     logger.error(error_msg)
@@ -214,10 +268,10 @@ class LocalDockerBuilder(Builder):
                         success=False,
                         error=error_msg,
                         error_code=ErrorCode.CONFIG_INVALID,
-                        build_logs=[error_msg]
+                        build_logs=[error_msg],
                     )
 
-                binary_name = (common_config.agent_name or project_root.name)
+                binary_name = common_config.agent_name or project_root.name
 
                 try:
                     proj_res = project_root.resolve()
@@ -242,79 +296,88 @@ class LocalDockerBuilder(Builder):
                         dest.parent.mkdir(parents=True, exist_ok=True)
                         shutil.copy2(child, dest)
 
-                context.update({
-                    "entry_relative_path": entry_relative_path,
-                    "binary_name": binary_name,
-                    "agent_module_path": f"/usr/local/bin/{binary_name}"
-                })
+                context.update(
+                    {
+                        "entry_relative_path": entry_relative_path,
+                        "binary_name": binary_name,
+                        "agent_module_path": f"/usr/local/bin/{binary_name}",
+                    }
+                )
 
             from agentkit.toolkit.docker.dockerfile import DockerfileManager
-            
+
             config_hash_dict = {
-                'language': common_config.language,
-                'language_version': common_config.language_version,
-                'entry_point': common_config.entry_point,
-                'dependencies_file': common_config.dependencies_file,
+                "language": common_config.language,
+                "language_version": common_config.language_version,
+                "entry_point": common_config.entry_point,
+                "dependencies_file": common_config.dependencies_file,
             }
             if docker_build_config:
-                config_hash_dict['docker_build'] = {
-                    'base_image': docker_build_config.base_image,
-                    'build_script': docker_build_config.build_script,
+                config_hash_dict["docker_build"] = {
+                    "base_image": docker_build_config.base_image,
+                    "build_script": docker_build_config.build_script,
                 }
-            
+
             def generate_dockerfile_content() -> str:
                 """Generate Dockerfile content."""
                 from io import StringIO
+
                 output = StringIO()
-                
+
                 # 使用 renderer 渲染到字符串
                 template = renderer.env.get_template(docker_config.template_name)
                 rendered = template.render(**context)
                 return rendered
-            
+
             dockerfile_manager = DockerfileManager(self.workdir, self.logger)
             generated, dockerfile_path = dockerfile_manager.prepare_dockerfile(
                 config_hash_dict=config_hash_dict,
                 content_generator=generate_dockerfile_content,
-                force_regenerate=force_regenerate
+                force_regenerate=force_regenerate,
             )
-            
+
             dockerignore_path = self.workdir / ".dockerignore"
             if not dockerignore_path.exists():
                 renderer.create_dockerignore(str(dockerignore_path))
             image_name = f"{docker_config.image_name or 'agentkit-app'}"
             image_tag = f"{docker_config.image_tag or 'latest'}"
-            
+
             self.reporter.info(f"Building Docker image: {image_name}:{image_tag}")
-            
+
             build_kwargs = {
-                'dockerfile_path': str(self.workdir),
-                'image_name': image_name,
-                'image_tag': image_tag,
-                'build_args': {}
+                "dockerfile_path": str(self.workdir),
+                "image_name": image_name,
+                "image_tag": image_tag,
+                "build_args": {},
             }
-            
+
             if docker_build_config and docker_build_config.platform:
                 if docker_build_config.platform.lower() != "auto":
-                    build_kwargs['platform'] = docker_build_config.platform
-                    self.reporter.info(f"Target platform: {docker_build_config.platform}")
+                    build_kwargs["platform"] = docker_build_config.platform
+                    self.reporter.info(
+                        f"Target platform: {docker_build_config.platform}"
+                    )
                 else:
                     self.reporter.info("Target platform: auto-detect")
-            
+
             self.reporter.info("Executing Docker build...")
-            success, build_logs, image_id = self.docker_manager.build_image(**build_kwargs)
-            
+            success, build_logs, image_id = self.docker_manager.build_image(
+                **build_kwargs
+            )
+
             if success:
-                self.reporter.success(f"Image built successfully: {image_name}:{image_tag}")
+                self.reporter.success(
+                    f"Image built successfully: {image_name}:{image_tag}"
+                )
                 return BuildResult(
                     success=True,
                     image=ImageInfo(
                         repository=image_name,
                         tag=image_tag,
-                        digest=image_id  # Docker image ID 作为 digest
+                        digest=image_id,  # Docker image ID 作为 digest
                     ),
                     build_timestamp=datetime.now(),
-                    build_logs=build_logs
+                    build_logs=build_logs,
                 )
             else:
                 error_msg = "Docker build failed"
@@ -325,9 +388,9 @@ class LocalDockerBuilder(Builder):
                     error=error_msg,
                     error_code=ErrorCode.BUILD_FAILED,
                     build_logs=build_logs,
-                    build_timestamp=datetime.now()
+                    build_timestamp=datetime.now(),
                 )
-                
+
         except Exception as e:
             error_msg = f"Build error: {str(e)}"
             logger.exception("Build failed with exception")
@@ -336,24 +399,26 @@ class LocalDockerBuilder(Builder):
                 error=error_msg,
                 error_code=ErrorCode.BUILD_FAILED,
                 build_logs=[str(e)],
-                build_timestamp=datetime.now()
+                build_timestamp=datetime.now(),
             )
-    
+
     def check_artifact_exists(self, config: Dict[str, Any]) -> bool:
         """Check if build artifact exists"""
         try:
-            exists, image_info, actual_image_id = self.docker_manager.check_image_exists(
-                config['full_image_name'], None
+            exists, image_info, actual_image_id = (
+                self.docker_manager.check_image_exists(config["full_image_name"], None)
             )
             return exists
         except Exception as e:
             self.logger.error(f"Error checking image existence: {str(e)}")
             return False
-    
+
     def remove_artifact(self, config: Dict[str, Any]) -> bool:
         """Remove Docker image"""
         try:
-            return self.docker_manager.remove_image(config['full_image_name'], force=True)
+            return self.docker_manager.remove_image(
+                config["full_image_name"], force=True
+            )
         except Exception as e:
             self.logger.error(f"Error removing image: {str(e)}")
             return False

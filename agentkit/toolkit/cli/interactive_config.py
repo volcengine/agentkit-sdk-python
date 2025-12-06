@@ -13,14 +13,22 @@
 # limitations under the License.
 
 import readline
-from typing import Any, Dict, Optional, List, Union, get_type_hints, get_origin, get_args
+from typing import (
+    Any,
+    Dict,
+    Optional,
+    List,
+    Union,
+    get_type_hints,
+    get_origin,
+    get_args,
+)
 from dataclasses import fields, is_dataclass, MISSING
 from rich.console import Console
 from rich.prompt import Confirm
 from rich.panel import Panel
 from rich.text import Text
 from rich.table import Table
-from rich.align import Align
 from rich import box
 
 console = Console()
@@ -54,14 +62,14 @@ ICONS = {
 
 # Color configuration
 COLORS = {
-    "primary": "#2196F3",      # Tech blue
-    "success": "#4CAF50",      # Vibrant green
-    "warning": "#FF9800",      # Orange
-    "error": "#F44336",        # Red
-    "border": "#37474F",       # Border gray
-    "muted": "#78909C",        # Soft gray
-    "label": "#64B5F6",        # Light blue
-    "description": "#90A4AE"   # Description gray
+    "primary": "#2196F3",  # Tech blue
+    "success": "#4CAF50",  # Vibrant green
+    "warning": "#FF9800",  # Orange
+    "error": "#F44336",  # Red
+    "border": "#37474F",  # Border gray
+    "muted": "#78909C",  # Soft gray
+    "label": "#64B5F6",  # Light blue
+    "description": "#90A4AE",  # Description gray
 }
 
 # Style configuration
@@ -74,8 +82,9 @@ STYLES = {
     "label": "bold #64B5F6",
     "value": "#4CAF50",
     "description": "#78909C",
-    "muted": "#78909C"
+    "muted": "#78909C",
 }
+
 
 class AutoPromptGenerator:
     def __init__(self):
@@ -103,16 +112,20 @@ class AutoPromptGenerator:
         # Convert Rich Text to string with ANSI escape codes
         # Use Console's internal method to render styles as ANSI codes
         from io import StringIO
+
         string_io = StringIO()
         # Use global console's is_terminal property to determine if terminal features should be enabled
         # This allows automatic adaptation to the actual terminal environment, avoiding garbled output
-        temp_console = Console(file=string_io, force_terminal=console.is_terminal, width=200)
+        temp_console = Console(
+            file=string_io, force_terminal=console.is_terminal, width=200
+        )
         temp_console.print(prompt_text, end="")
         rendered_prompt = string_io.getvalue()
 
         # If there's a default value, try to use readline's pre_input_hook to prefill
         # Add compatibility handling as some systems (e.g., macOS libedit) may not support these features
         if default:
+
             def prefill():
                 try:
                     readline.insert_text(default)
@@ -121,6 +134,7 @@ class AutoPromptGenerator:
                     # Some readline implementations (e.g., libedit) may not support insert_text or redisplay
                     # In this case, we'll display the default value in the prompt as a fallback
                     pass
+
             try:
                 readline.set_pre_input_hook(prefill)
             except (AttributeError, OSError):
@@ -147,7 +161,9 @@ class AutoPromptGenerator:
             except (AttributeError, OSError):
                 pass
 
-    def generate_config(self, dataclass_type: type, existing_config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def generate_config(
+        self, dataclass_type: type, existing_config: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         if not is_dataclass(dataclass_type):
             raise ValueError(f"{dataclass_type} must be a dataclass")
 
@@ -157,16 +173,19 @@ class AutoPromptGenerator:
         # Get dataclass metadata
         # Try to get from class attributes; if not found, create instance to get field values
         config_metadata = {}
-        if hasattr(dataclass_type, '_config_metadata'):
+        if hasattr(dataclass_type, "_config_metadata"):
             # If it's a class attribute
-            config_metadata = getattr(dataclass_type, '_config_metadata', {})
+            config_metadata = getattr(dataclass_type, "_config_metadata", {})
         else:
             # If it's a field, need to create instance to get default value
             try:
                 # Get field's default value factory or default value
                 for field in fields(dataclass_type):
-                    if field.name == '_config_metadata':
-                        if field.default_factory is not None and field.default_factory != MISSING:
+                    if field.name == "_config_metadata":
+                        if (
+                            field.default_factory is not None
+                            and field.default_factory != MISSING
+                        ):
                             config_metadata = field.default_factory()
                         elif field.default != MISSING:
                             config_metadata = field.default
@@ -174,31 +193,50 @@ class AutoPromptGenerator:
             except Exception:
                 pass
 
-        config_name = config_metadata.get('name', dataclass_type.__name__)
+        config_name = config_metadata.get("name", dataclass_type.__name__)
 
         # Get custom messages
-        welcome_message = config_metadata.get('welcome_message')
-        next_step_hint = config_metadata.get('next_step_hint')
-        completion_message = config_metadata.get('completion_message')
-        next_action_hint = config_metadata.get('next_action_hint')
+        welcome_message = config_metadata.get("welcome_message")
+        next_step_hint = config_metadata.get("next_step_hint")
+        completion_message = config_metadata.get("completion_message")
+        next_action_hint = config_metadata.get("next_action_hint")
 
         # Display modern welcome panel
         self._show_welcome_panel(config_name, welcome_message, next_step_hint)
 
         # Get field list and display progress
-        visible_fields = [f for f in fields(dataclass_type)
-                         if not f.metadata.get("hidden", False) and not f.metadata.get("system", False) and f.name != "_config_metadata"]
+        visible_fields = [
+            f
+            for f in fields(dataclass_type)
+            if not f.metadata.get("hidden", False)
+            and not f.metadata.get("system", False)
+            and f.name != "_config_metadata"
+        ]
         total_fields = len(visible_fields)
 
         for idx, field in enumerate(visible_fields, 1):
             field_name = field.name
             field_type = get_type_hints(dataclass_type).get(field_name, str)
             existing_value = existing_config.get(field_name)
-            default_value = existing_value if existing_value is not None else field.default
-            description = field.metadata.get("description") or field.name.replace("_", " ").title()
+            default_value = (
+                existing_value if existing_value is not None else field.default
+            )
+            description = (
+                field.metadata.get("description")
+                or field.name.replace("_", " ").title()
+            )
 
             # Pass progress info and current config to field handler
-            value = self._prompt_for_field(field_name, field_type, description, default_value, field.metadata, idx, total_fields, config)
+            value = self._prompt_for_field(
+                field_name,
+                field_type,
+                description,
+                default_value,
+                field.metadata,
+                idx,
+                total_fields,
+                config,
+            )
 
             if value is not None:
                 config[field_name] = value
@@ -209,7 +247,9 @@ class AutoPromptGenerator:
         # Handle hidden and system fields
         for field in fields(dataclass_type):
             field_name = field.name
-            if field.metadata.get("hidden", False) or field.metadata.get("system", False):
+            if field.metadata.get("hidden", False) or field.metadata.get(
+                "system", False
+            ):
                 if field_name in existing_config:
                     config[field_name] = existing_config[field_name]
 
@@ -221,9 +261,19 @@ class AutoPromptGenerator:
 
         return filtered_config
 
-    def _prompt_for_field(self, name: str, field_type: type, description: str, default: Any, metadata: Dict[str, Any] = None, current: int = 1, total: int = 1, current_config: Dict[str, Any] = None) -> Any:
+    def _prompt_for_field(
+        self,
+        name: str,
+        field_type: type,
+        description: str,
+        default: Any,
+        metadata: Dict[str, Any] = None,
+        current: int = 1,
+        total: int = 1,
+        current_config: Dict[str, Any] = None,
+    ) -> Any:
         """Field input coordinator - handles advanced validation logic.
-        
+
         Args:
             name: Field name
             field_type: Field type
@@ -233,7 +283,7 @@ class AutoPromptGenerator:
             current: Current progress
             total: Total fields
             current_config: Currently configured fields (for conditional validation)
-            
+
         Returns:
             User input value
         """
@@ -257,135 +307,164 @@ class AutoPromptGenerator:
 
         choices = metadata.get("choices")
         if choices:
-            return self._handle_choice_selection(description, default, choices, metadata, current, total)
+            return self._handle_choice_selection(
+                description, default, choices, metadata, current, total
+            )
 
         # Enhance description with conditional hints
         enhanced_description = self._enhance_description_with_hints(
             description, metadata, current_config
         )
-        
+
         # Conditional validation loop
-        validation = metadata.get('validation', {})
+        validation = metadata.get("validation", {})
         while True:
             # Call specific input handler (basic validation)
             handler = self.type_handlers.get(field_type)
             if handler:
                 value = handler(enhanced_description, default, metadata, current, total)
             else:
-                value = self._handle_string(enhanced_description, default, metadata, current, total)
-            
+                value = self._handle_string(
+                    enhanced_description, default, metadata, current, total
+                )
+
             # If conditional validation type, perform conditional validation
-            if validation.get('type') == 'conditional' and value:
+            if validation.get("type") == "conditional" and value:
                 errors = self._validate_conditional_value(
                     name, value, validation, current_config
                 )
-                
+
                 if errors:
                     # Display errors and continue loop for re-input
                     for error in errors:
                         console.print(f"{ICONS['error']} {error}")
                     continue  # Re-input
-            
+
             # Validation passed, return value
             return value
-    
-    def _enhance_description_with_hints(self, description: str, metadata: dict, current_config: dict) -> str:
+
+    def _enhance_description_with_hints(
+        self, description: str, metadata: dict, current_config: dict
+    ) -> str:
         """Enhance description with hints based on conditional validation rules.
-        
+
         Args:
             description: Original description
             metadata: Field metadata
             current_config: Currently configured fields
-            
+
         Returns:
             Enhanced description (with hint information)
         """
-        validation = metadata.get('validation', {})
-        
+        validation = metadata.get("validation", {})
+
         # Not conditional validation, return original description directly
-        if validation.get('type') != 'conditional':
+        if validation.get("type") != "conditional":
             return description
-        
-        depends_on = validation.get('depends_on')
-        rules = validation.get('rules', {})
-        
+
+        depends_on = validation.get("depends_on")
+        rules = validation.get("rules", {})
+
         if not depends_on or not rules:
             return description
-        
+
         # Get current value of dependent field
         depend_value = current_config.get(depends_on)
-        
+
         # If dependent field has value and has corresponding rule
         if depend_value and depend_value in rules:
             rule = rules[depend_value]
-            
+
             # Add hints based on rule type
-            if 'choices' in rule:
+            if "choices" in rule:
                 # choices rule: display available options
                 hint = f" [Options: {', '.join(rule['choices'])}]"
                 return f"{description}{hint}"
-            
-            elif 'pattern' in rule and 'hint' in rule:
+
+            elif "pattern" in rule and "hint" in rule:
                 # pattern rule: display format hint
-                hint = rule['hint']
+                hint = rule["hint"]
                 return f"{description} {hint}"
-        
+
         return description
-    
-    def _validate_conditional_value(self, field_name: str, value: Any, validation: dict, current_config: dict) -> List[str]:
+
+    def _validate_conditional_value(
+        self, field_name: str, value: Any, validation: dict, current_config: dict
+    ) -> List[str]:
         """Validate conditional field value.
-        
+
         Args:
             field_name: Field name
             value: Input value
             validation: Validation rules (metadata['validation'])
             current_config: Currently configured fields
-        
+
         Returns:
             List of errors; empty list means validation passed
         """
         errors = []
-        
-        depends_on = validation.get('depends_on')
-        rules = validation.get('rules', {})
-        
+
+        depends_on = validation.get("depends_on")
+        rules = validation.get("rules", {})
+
         if not depends_on or not rules:
             return errors
-        
+
         # Get value of dependent field
         depend_value = current_config.get(depends_on)
-        
+
         # If dependent field has value and has corresponding rule
         if depend_value and depend_value in rules:
             rule = rules[depend_value]
-            
+
             # choices validation
-            if 'choices' in rule and value not in rule['choices']:
-                msg = rule.get('message', f"Must be one of: {', '.join(rule['choices'])}")
+            if "choices" in rule and value not in rule["choices"]:
+                msg = rule.get(
+                    "message", f"Must be one of: {', '.join(rule['choices'])}"
+                )
                 errors.append(msg)
-            
+
             # pattern validation
-            if 'pattern' in rule:
+            if "pattern" in rule:
                 import re
-                if not re.match(rule['pattern'], value):
-                    msg = rule.get('message', 'Format is incorrect')
+
+                if not re.match(rule["pattern"], value):
+                    msg = rule.get("message", "Format is incorrect")
                     errors.append(msg)
-        
+
         return errors
 
-    def _handle_choice_selection(self, description: str, default: Any, choices: List[Any], field_metadata: Dict[str, Any] = None, current: int = 1, total: int = 1) -> str:
+    def _handle_choice_selection(
+        self,
+        description: str,
+        default: Any,
+        choices: List[Any],
+        field_metadata: Dict[str, Any] = None,
+        current: int = 1,
+        total: int = 1,
+    ) -> str:
         # Handle different types of choice data
-        if isinstance(choices, list) and len(choices) > 0 and isinstance(choices[0], dict):
+        if (
+            isinstance(choices, list)
+            and len(choices) > 0
+            and isinstance(choices[0], dict)
+        ):
             # Handle dictionary format choice items
-            if not default or (default and default not in [choice['value'] for choice in choices]):
-                default = choices[0]['value'] if choices else None
+            if not default or (
+                default and default not in [choice["value"] for choice in choices]
+            ):
+                default = choices[0]["value"] if choices else None
         else:
             # Handle simple list format choice items
             if not default or (default and default not in choices):
                 default = choices[0] if choices else None
 
         # Get field icon (supports metadata specification)
-        icon = self._get_field_icon(description, field_metadata) if field_metadata else ICONS['select']
+        icon = (
+            self._get_field_icon(description, field_metadata)
+            if field_metadata
+            else ICONS["select"]
+        )
 
         # Create choice panel title with integrated progress information
         console.print(f"\n[{current}/{total}] {icon} {description}")
@@ -395,8 +474,14 @@ class AutoPromptGenerator:
         if isinstance(choices, dict):
             choice_descriptions = choices
             choices = list(choices.keys())
-        elif isinstance(choices, list) and len(choices) > 0 and isinstance(choices[0], dict):
-            choice_descriptions = {item["value"]: item.get("description", "") for item in choices}
+        elif (
+            isinstance(choices, list)
+            and len(choices) > 0
+            and isinstance(choices[0], dict)
+        ):
+            choice_descriptions = {
+                item["value"]: item.get("description", "") for item in choices
+            }
             choices = [item["value"] for item in choices]
 
         # Create modern choice menu
@@ -433,7 +518,9 @@ class AutoPromptGenerator:
             except KeyboardInterrupt:
                 raise
             except EOFError:
-                console.print(f"\n{ICONS['warning']} Selection cancelled, using default value")
+                console.print(
+                    f"\n{ICONS['warning']} Selection cancelled, using default value"
+                )
                 return str(default) if default else str(choices[0]) if choices else ""
 
             if user_input.isdigit():
@@ -444,7 +531,9 @@ class AutoPromptGenerator:
                     console.print(f"\n[{COLORS['success']}]»[/] Selected: {selected}\n")
                     return selected
                 else:
-                    console.print(f"{ICONS['error']} Please enter a number between 1-{len(choices)}")
+                    console.print(
+                        f"{ICONS['error']} Please enter a number between 1-{len(choices)}"
+                    )
                     continue
 
             if user_input in choices:
@@ -456,14 +545,29 @@ class AutoPromptGenerator:
                 return default
             else:
                 valid_choices = ", ".join(choices)
-                console.print(f"{ICONS['error']} Invalid choice, please select: {valid_choices}")
+                console.print(
+                    f"{ICONS['error']} Invalid choice, please select: {valid_choices}"
+                )
 
-    def _handle_string(self, description: str, default: Any, field_metadata: Dict[str, Any] = None, current: int = 1, total: int = 1) -> str:
+    def _handle_string(
+        self,
+        description: str,
+        default: Any,
+        field_metadata: Dict[str, Any] = None,
+        current: int = 1,
+        total: int = 1,
+    ) -> str:
         # Get field icon (supports metadata specification)
-        icon = self._get_field_icon(description, field_metadata) if field_metadata else ICONS['input']
+        icon = (
+            self._get_field_icon(description, field_metadata)
+            if field_metadata
+            else ICONS["input"]
+        )
 
         # Get validation rules
-        validation_rules = field_metadata.get('validation', {}) if field_metadata else {}
+        validation_rules = (
+            field_metadata.get("validation", {}) if field_metadata else {}
+        )
 
         while True:
             # Build complete prompt information
@@ -487,33 +591,51 @@ class AutoPromptGenerator:
             # Apply validation rules
             if validation_rules:
                 # Check required
-                if validation_rules.get('required') and (not result or result.strip() == ''):
+                if validation_rules.get("required") and (
+                    not result or result.strip() == ""
+                ):
                     console.print(f"{ICONS['error']} This field cannot be empty")
                     continue
 
                 # Check regex pattern
-                pattern = validation_rules.get('pattern')
+                pattern = validation_rules.get("pattern")
                 if pattern and result:
                     import re
+
                     if not re.match(pattern, result):
-                        error_msg = validation_rules.get('message', 'Input format does not meet requirements')
+                        error_msg = validation_rules.get(
+                            "message", "Input format does not meet requirements"
+                        )
                         console.print(f"{ICONS['error']} {error_msg}")
                         continue
 
             console.print(f"[{COLORS['success']}]»[/] {result}\n")
             return result
 
-    def _handle_int(self, description: str, default: Any, field_metadata: Dict[str, Any] = None, current: int = 1, total: int = 1) -> int:
+    def _handle_int(
+        self,
+        description: str,
+        default: Any,
+        field_metadata: Dict[str, Any] = None,
+        current: int = 1,
+        total: int = 1,
+    ) -> int:
         while True:
             try:
                 # Get field icon (supports metadata specification)
-                icon = self._get_field_icon(description, field_metadata) if field_metadata else ICONS['input']
+                icon = (
+                    self._get_field_icon(description, field_metadata)
+                    if field_metadata
+                    else ICONS["input"]
+                )
 
                 # Build complete prompt information
                 if default is not None:
                     prompt_str = f"\n[{current}/{total}] {icon} {description} (current: {default}) (number): "
                 else:
-                    prompt_str = f"\n[{current}/{total}] {icon} {description} (number): "
+                    prompt_str = (
+                        f"\n[{current}/{total}] {icon} {description} (number): "
+                    )
 
                 # Use input()'s prompt parameter
                 try:
@@ -537,17 +659,30 @@ class AutoPromptGenerator:
             except KeyboardInterrupt:
                 raise
 
-    def _handle_float(self, description: str, default: Any, field_metadata: Dict[str, Any] = None, current: int = 1, total: int = 1) -> float:
+    def _handle_float(
+        self,
+        description: str,
+        default: Any,
+        field_metadata: Dict[str, Any] = None,
+        current: int = 1,
+        total: int = 1,
+    ) -> float:
         while True:
             try:
                 # Get field icon (supports metadata specification)
-                icon = self._get_field_icon(description, field_metadata) if field_metadata else ICONS['input']
+                icon = (
+                    self._get_field_icon(description, field_metadata)
+                    if field_metadata
+                    else ICONS["input"]
+                )
 
                 # Build complete prompt information
                 if default is not None:
                     prompt_str = f"\n[{current}/{total}] {icon} {description} (current: {default}) (number): "
                 else:
-                    prompt_str = f"\n[{current}/{total}] {icon} {description} (number): "
+                    prompt_str = (
+                        f"\n[{current}/{total}] {icon} {description} (number): "
+                    )
 
                 # Use input()'s prompt parameter
                 try:
@@ -571,9 +706,20 @@ class AutoPromptGenerator:
             except KeyboardInterrupt:
                 raise
 
-    def _handle_bool(self, description: str, default: Any, field_metadata: Dict[str, Any] = None, current: int = 1, total: int = 1) -> bool:
+    def _handle_bool(
+        self,
+        description: str,
+        default: Any,
+        field_metadata: Dict[str, Any] = None,
+        current: int = 1,
+        total: int = 1,
+    ) -> bool:
         # Get field icon (supports metadata specification)
-        icon = self._get_field_icon(description, field_metadata) if field_metadata else ICONS['select']
+        icon = (
+            self._get_field_icon(description, field_metadata)
+            if field_metadata
+            else ICONS["select"]
+        )
 
         # Display progress information
         console.print(f"\n[{current}/{total}] {icon} {description}")
@@ -583,13 +729,26 @@ class AutoPromptGenerator:
         console.print(f"[{COLORS['success']}]»[/] Selected: {result_text}\n")
         return result
 
-    def _handle_list(self, description: str, default: Any, field_metadata: Dict[str, Any] = None, current: int = 1, total: int = 1) -> List[str]:
+    def _handle_list(
+        self,
+        description: str,
+        default: Any,
+        field_metadata: Dict[str, Any] = None,
+        current: int = 1,
+        total: int = 1,
+    ) -> List[str]:
         # Get field icon (supports metadata specification)
-        icon = self._get_field_icon(description, field_metadata) if field_metadata else ICONS['list']
+        icon = (
+            self._get_field_icon(description, field_metadata)
+            if field_metadata
+            else ICONS["list"]
+        )
 
         # Display progress information
         console.print(f"\n[{current}/{total}] {icon} {description}")
-        console.print("Enter each item and press Enter; enter an empty line to finish\n")
+        console.print(
+            "Enter each item and press Enter; enter an empty line to finish\n"
+        )
 
         items = []
         counter = 1
@@ -597,7 +756,7 @@ class AutoPromptGenerator:
         while True:
             # Create list item input prompt
             prompt_str = f"  [{current}/{total}] [{counter}] Item: "
-            
+
             try:
                 item = input(prompt_str)
             except KeyboardInterrupt:
@@ -617,9 +776,20 @@ class AutoPromptGenerator:
 
         return items if items else (default if default is not None else [])
 
-    def _handle_dict(self, description: str, default: Any, field_metadata: Dict[str, Any] = None, current: int = 1, total: int = 1) -> Dict[str, str]:
+    def _handle_dict(
+        self,
+        description: str,
+        default: Any,
+        field_metadata: Dict[str, Any] = None,
+        current: int = 1,
+        total: int = 1,
+    ) -> Dict[str, str]:
         # Get field icon (supports metadata specification)
-        icon = self._get_field_icon(description, field_metadata) if field_metadata else ICONS['dict']
+        icon = (
+            self._get_field_icon(description, field_metadata)
+            if field_metadata
+            else ICONS["dict"]
+        )
 
         # Display progress information
         console.print(f"\n[{current}/{total}] {icon} {description}")
@@ -632,7 +802,9 @@ class AutoPromptGenerator:
             console.print("  - LOG_LEVEL=info")
 
         console.print("Input format: KEY=VALUE")
-        console.print("Commands: 'del KEY' to delete, 'list' to view, 'clear' to clear all, empty line to finish\n")
+        console.print(
+            "Commands: 'del KEY' to delete, 'list' to view, 'clear' to clear all, empty line to finish\n"
+        )
 
         result_dict = {}
         if isinstance(default, dict):
@@ -641,7 +813,7 @@ class AutoPromptGenerator:
         while True:
             # Create dictionary input prompt
             prompt_str = f"\n[{current}/{total}] {icon} Variable: "
-            
+
             try:
                 user_input = input(prompt_str)
             except KeyboardInterrupt:
@@ -682,10 +854,12 @@ class AutoPromptGenerator:
             key, value = user_input.split("=", 1)
             key = key.strip()
             value = value.strip()
-            
+
             # Strip surrounding quotes (both single and double quotes)
             if len(value) >= 2:
-                if (value[0] == '"' and value[-1] == '"') or (value[0] == "'" and value[-1] == "'"):
+                if (value[0] == '"' and value[-1] == '"') or (
+                    value[0] == "'" and value[-1] == "'"
+                ):
                     value = value[1:-1]
 
             if not key:
@@ -693,7 +867,9 @@ class AutoPromptGenerator:
                 continue
 
             if not key.replace("_", "").isalnum():
-                console.print("Key name can only contain letters, numbers, and underscores")
+                console.print(
+                    "Key name can only contain letters, numbers, and underscores"
+                )
                 continue
 
             old_value = result_dict.get(key)
@@ -705,14 +881,20 @@ class AutoPromptGenerator:
                 console.print(f"Added: {key}={value}")
 
         if result_dict:
-            console.print(f"\n{ICONS['dict']} Configured {len(result_dict)} variables\n")
+            console.print(
+                f"\n{ICONS['dict']} Configured {len(result_dict)} variables\n"
+            )
         else:
             console.print(f"\n{ICONS['info']} No variables configured\n")
 
         return result_dict if result_dict else (default if default is not None else {})
 
-    def _show_welcome_panel(self, config_name: str, welcome_message: Optional[str] = None,
-                           next_step_hint: Optional[str] = None):
+    def _show_welcome_panel(
+        self,
+        config_name: str,
+        welcome_message: Optional[str] = None,
+        next_step_hint: Optional[str] = None,
+    ):
         """Display welcome panel."""
         # Create title text with ASCII-safe decorators
         # Note: Avoid emojis in Panel titles as they cause alignment issues in some terminals
@@ -732,9 +914,17 @@ class AutoPromptGenerator:
             content.append(f"{welcome_message}\n", style="bold white")
         else:
             content.append("► ", style=f"bold {COLORS['success']}")
-            content.append("Welcome to AgentKit Configuration Wizard\n", style="bold white")
-            content.append("\n  This wizard will help you configure your Agent application.\n", style=COLORS["description"])
-            content.append("  Follow the prompts or press Enter to use default values.\n", style=COLORS["description"])
+            content.append(
+                "Welcome to AgentKit Configuration Wizard\n", style="bold white"
+            )
+            content.append(
+                "\n  This wizard will help you configure your Agent application.\n",
+                style=COLORS["description"],
+            )
+            content.append(
+                "  Follow the prompts or press Enter to use default values.\n",
+                style=COLORS["description"],
+            )
 
         # Add next step hint
         if next_step_hint:
@@ -750,13 +940,15 @@ class AutoPromptGenerator:
             border_style=COLORS["primary"],
             box=box.ROUNDED,
             padding=(1, 2),
-            expand=False
+            expand=False,
         )
 
         console.print(panel)
         console.print()
 
-    def _show_progress(self, current: int, total: int, field_name: str, description: str):
+    def _show_progress(
+        self, current: int, total: int, field_name: str, description: str
+    ):
         """Display progress indicator."""
         # Get field icon (supports metadata specification)
         icon = self._get_field_icon(field_name)
@@ -771,29 +963,40 @@ class AutoPromptGenerator:
         progress_text.append(f"{icon} ", style=STYLES["label"])
         progress_text.append(f"{description}", style="bold white")
         progress_text.append(f"  [{current}/{total}]\n", style=STYLES["description"])
-        progress_text.append(f"    {progress_bar} {current/total*100:.0f}%", style=COLORS["label"])
+        progress_text.append(
+            f"    {progress_bar} {current / total * 100:.0f}%", style=COLORS["label"]
+        )
 
         console.print(progress_text)
         console.print()
 
-    def _show_progress_clean(self, current: int, total: int, field_name: str, description: str):
+    def _show_progress_clean(
+        self, current: int, total: int, field_name: str, description: str
+    ):
         """Display clean progress indicator (no repeated progress bar)."""
         # Get field icon (supports metadata specification)
         icon = self._get_field_icon(field_name)
 
         # Only show progress bar on first field or when field changes
-        if current == 1 or current != getattr(self, '_last_progress', 0):
+        if current == 1 or current != getattr(self, "_last_progress", 0):
             # Create progress bar
             progress_width = 30
             filled_width = int((current / total) * progress_width)
-            progress_bar = f"[{'█' * filled_width}{'░' * (progress_width - filled_width)}]"
+            progress_bar = (
+                f"[{'█' * filled_width}{'░' * (progress_width - filled_width)}]"
+            )
 
             # Create progress information
             progress_text = Text()
             progress_text.append(f"{icon} ", style=STYLES["label"])
             progress_text.append(f"{description}", style="bold white")
-            progress_text.append(f"  [{current}/{total}]\n", style=STYLES["description"])
-            progress_text.append(f"    {progress_bar} {current/total*100:.0f}%", style=COLORS["label"])
+            progress_text.append(
+                f"  [{current}/{total}]\n", style=STYLES["description"]
+            )
+            progress_text.append(
+                f"    {progress_bar} {current / total * 100:.0f}%",
+                style=COLORS["label"],
+            )
 
             console.print(progress_text)
             console.print()
@@ -801,7 +1004,9 @@ class AutoPromptGenerator:
             # Record current progress
             self._last_progress = current
 
-    def _get_field_icon(self, field_name: str, field_metadata: Dict[str, Any] = None) -> str:
+    def _get_field_icon(
+        self, field_name: str, field_metadata: Dict[str, Any] = None
+    ) -> str:
         """Get corresponding icon based on field metadata or field name."""
         # Prioritize icon specified in metadata
         if field_metadata and "icon" in field_metadata:
@@ -820,8 +1025,12 @@ class AutoPromptGenerator:
         }
         return icon_map.get(field_name, ICONS["config"])
 
-    def _show_completion_panel(self, config: Dict[str, Any], completion_message: Optional[str] = None,
-                             next_action_hint: Optional[str] = None):
+    def _show_completion_panel(
+        self,
+        config: Dict[str, Any],
+        completion_message: Optional[str] = None,
+        next_action_hint: Optional[str] = None,
+    ):
         """Display configuration completion panel."""
         # Create title text with ASCII-safe decorators (consistent with welcome panel)
         # Note: Avoid emojis in Panel titles as they cause alignment issues in some terminals
@@ -844,7 +1053,7 @@ class AutoPromptGenerator:
         # Configuration summary (compact format, no redundant header)
         content.append("\n")
         for key, value in config.items():
-            if not key.startswith('_'):  # Skip internal fields
+            if not key.startswith("_"):  # Skip internal fields
                 formatted_key = self._format_field_name(key)
                 if isinstance(value, type(MISSING)) or value is None:
                     formatted_value = "Not set"
@@ -861,7 +1070,9 @@ class AutoPromptGenerator:
         if next_action_hint:
             content.append(next_action_hint, style="dim")
         else:
-            content.append("Run 'agentkit build' to build your application.", style="dim")
+            content.append(
+                "Run 'agentkit build' to build your application.", style="dim"
+            )
 
         # Create panel with consistent styling
         completion_panel = Panel(
@@ -870,7 +1081,7 @@ class AutoPromptGenerator:
             border_style=COLORS["success"],
             box=box.ROUNDED,
             padding=(1, 2),
-            expand=False
+            expand=False,
         )
 
         console.print("\n")
@@ -894,29 +1105,35 @@ class AutoPromptGenerator:
         }
         return name_map.get(field_name, field_name.replace("_", " ").title())
 
+
 auto_prompt = AutoPromptGenerator()
 
-def generate_config_from_dataclass(dataclass_type: type, existing_config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+
+def generate_config_from_dataclass(
+    dataclass_type: type, existing_config: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
     return auto_prompt.generate_config(dataclass_type, existing_config)
 
 
-def create_common_config_interactively(existing_config: Optional[Dict[str, Any]] = None):
+def create_common_config_interactively(
+    existing_config: Optional[Dict[str, Any]] = None,
+):
     """Interactively create CommonConfig (CLI layer specific).
-    
+
     This function is responsible for creating CommonConfig objects through interactive prompts.
     It belongs to the CLI layer and should not exist in the core config layer.
-    
+
     Args:
         existing_config: Existing configuration dictionary for prefilling
-        
+
     Returns:
         CommonConfig: Created configuration object
-        
+
     Example:
         >>> config = create_common_config_interactively({"agent_name": "my-agent"})
     """
     from agentkit.toolkit.config import CommonConfig
-    
+
     existing = CommonConfig.from_dict(existing_config or {})
     config_dict = auto_prompt.generate_config(CommonConfig, existing.to_dict())
     return CommonConfig.from_dict(config_dict)

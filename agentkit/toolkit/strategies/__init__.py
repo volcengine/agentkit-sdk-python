@@ -30,4 +30,4 @@ from .local_strategy import LocalStrategy
 from .cloud_strategy import CloudStrategy
 from .hybrid_strategy import HybridStrategy
 
-__all__ = ['Strategy', 'LocalStrategy', 'CloudStrategy', 'HybridStrategy']
+__all__ = ["Strategy", "LocalStrategy", "CloudStrategy", "HybridStrategy"]

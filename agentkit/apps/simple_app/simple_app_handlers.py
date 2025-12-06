@@ -73,14 +73,10 @@ class InvokeHandler(BaseHandler):
 
             logger.info("Returning non-streaming response")
             safe_json_string = safe_serialize_to_json_string(result)
-            telemetry.trace_agent_finish(
-                safe_json_string, None
-            )
+            telemetry.trace_agent_finish(safe_json_string, None)
         except Exception as e:
             logger.error("Invoke handler function failed: %s", e)
-            telemetry.trace_agent_finish(
-                "", e
-            )
+            telemetry.trace_agent_finish("", e)
             raise e
 
         return Response(safe_json_string, media_type="application/json")
@@ -160,9 +156,7 @@ class InvokeHandler(BaseHandler):
         finally:
             # finish trace span and record metrics
             result = safe_serialize_to_json_string(last_value)
-            telemetry.trace_agent_finish(
-                result, exception
-            )
+            telemetry.trace_agent_finish(result, exception)
 
     async def _stream_with_error_handling(self, generator):
         """Wrap async generator to handle errors and convert to SSE format."""
@@ -184,9 +178,7 @@ class InvokeHandler(BaseHandler):
         finally:
             # finish trace span and record metrics
             result = safe_serialize_to_json_string(last_value)
-            telemetry.trace_agent_finish(
-                result, exception
-            )
+            telemetry.trace_agent_finish(result, exception)
 
 
 class PingHandler(BaseHandler):

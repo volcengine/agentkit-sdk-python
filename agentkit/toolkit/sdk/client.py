@@ -21,7 +21,10 @@ from .deployer import deploy as _deploy
 from .invoker import invoke as _invoke
 from .status import status as _status
 from .lifecycle import launch as _launch, destroy as _destroy, stop as _stop
-from .initializer import init_project as _init_project, get_available_templates as _get_available_templates
+from .initializer import (
+    init_project as _init_project,
+    get_available_templates as _get_available_templates,
+)
 
 from ..models import (
     BuildResult,
@@ -29,48 +32,48 @@ from ..models import (
     InvokeResult,
     StatusResult,
     LifecycleResult,
-    InitResult
+    InitResult,
 )
 
 
 class AgentKitClient:
     """
     AgentKit SDK Client with configuration management.
-    
+
     This client wraps the functional SDK APIs and provides configuration
     reuse across multiple operations. It's recommended for applications
     that need to perform multiple operations on the same agent.
-    
+
     Example:
         >>> from agentkit.toolkit.sdk import AgentKitClient
-        >>> 
+        >>>
         >>> # Create client with configuration
         >>> client = AgentKitClient("agentkit.yaml")
-        >>> 
+        >>>
         >>> # Perform operations without repeating config
         >>> build_result = client.build()
         >>> deploy_result = client.deploy()
         >>> invoke_result = client.invoke({"prompt": "Hello"})
-        >>> 
+        >>>
         >>> # Or use as context manager
         >>> with AgentKitClient("agentkit.yaml") as client:
         ...     client.build()
         ...     client.deploy()
-    
+
     Attributes:
         config_file: Path to configuration file.
         config_dict: Configuration dictionary (overrides config_file).
     """
-    
+
     def __init__(
         self,
-        config: Optional[Union[str, 'AgentConfig']] = None,
+        config: Optional[Union[str, "AgentConfig"]] = None,
         config_file: Optional[str] = None,
         config_dict: Optional[Dict[str, Any]] = None,
     ):
         """
         Initialize AgentKit client.
-        
+
         Args:
             config: Configuration source (recommended parameter):
                 - AgentConfig object: Use SDK config manager
@@ -80,21 +83,21 @@ class AgentKitClient:
                 Ignored if 'config' is provided.
             config_dict: Configuration as dictionary (highest priority).
                 Overrides config/config_file if provided.
-        
+
         Example:
             >>> # Recommended: With AgentConfig object
             >>> from agentkit.toolkit.sdk import AgentConfig
             >>> config = AgentConfig.load("./my_agent")
             >>> client = AgentKitClient(config)
-            >>> 
+            >>>
             >>> # With config file path (string)
             >>> client = AgentKitClient("my-config.yaml")
-            >>> 
+            >>>
             >>> # With config dict
             >>> client = AgentKitClient(config_dict={
             ...     "common": {"agent_name": "my-agent"}
             ... })
-            >>> 
+            >>>
             >>> # With both (dict takes priority)
             >>> client = AgentKitClient(
             ...     config="base-config.yaml",
@@ -103,7 +106,7 @@ class AgentKitClient:
         """
         # Import AgentConfig here to avoid circular import
         from .config import AgentConfig
-        
+
         # Handle the new 'config' parameter
         if isinstance(config, AgentConfig):
             # AgentConfig object provided
@@ -124,14 +127,14 @@ class AgentKitClient:
             raise TypeError(
                 f"config must be AgentConfig, str, or None, got {type(config).__name__}"
             )
-    
+
     @property
-    def config(self) -> 'AgentConfig':
+    def config(self) -> "AgentConfig":
         """Get AgentConfig instance (lazy load).
-        
+
         Returns:
             AgentConfig instance for this client.
-        
+
         Example:
             >>> client = AgentKitClient("agentkit.yaml")
             >>> config = client.config  # Lazy load
@@ -139,62 +142,67 @@ class AgentKitClient:
         """
         if self._agent_config is None and self.config_file:
             from .config import AgentConfig
+
             self._agent_config = AgentConfig.load(self.config_file)
         return self._agent_config
-    
-    def _merge_config(self, overrides: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+
+    def _merge_config(
+        self, overrides: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Merge client configuration with operation-specific overrides.
-        
+
         Args:
             overrides: Operation-specific configuration overrides.
-        
+
         Returns:
             Merged configuration dictionary.
         """
         if overrides is None:
             return self.config_dict
-        
+
         if self.config_dict is None:
             return overrides
-        
+
         # Deep merge: overrides take priority
         merged = self.config_dict.copy()
         for key, value in overrides.items():
-            if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
+            if (
+                key in merged
+                and isinstance(merged[key], dict)
+                and isinstance(value, dict)
+            ):
                 # Merge nested dicts
                 merged[key] = {**merged[key], **value}
             else:
                 merged[key] = value
-        
+
         return merged
-    
+
     def build(
-        self,
-        platform: str = "auto",
-        config_overrides: Optional[Dict[str, Any]] = None
+        self, platform: str = "auto", config_overrides: Optional[Dict[str, Any]] = None
     ) -> BuildResult:
         """
         Build agent image using client configuration.
-        
+
         Args:
             platform: Build platform: "auto", "local", or "cloud".
                 Default is "auto" which selects based on strongly configuration.
             config_overrides: Optional configuration overrides for this operation.
                 These will be merged with the client's base configuration.
-        
+
         Returns:
             BuildResult: Build operation result.
-        
+
         Example:
             >>> client = AgentKitClient("agentkit.yaml")
-            >>> 
+            >>>
             >>> # Simple build
             >>> result = client.build()
-            >>> 
+            >>>
             >>> # Build with platform override
             >>> result = client.build(platform="local")
-            >>> 
+            >>>
             >>> # Build with config overrides
             >>> result = client.build(
             ...     config_overrides={"local": {"image_tag": "dev"}}
@@ -202,52 +210,44 @@ class AgentKitClient:
         """
         merged_config = self._merge_config(config_overrides)
         return _build(
-            config_file=self.config_file,
-            config_dict=merged_config,
-            platform=platform
+            config_file=self.config_file, config_dict=merged_config, platform=platform
         )
-    
-    def deploy(
-        self,
-        config_overrides: Optional[Dict[str, Any]] = None
-    ) -> DeployResult:
+
+    def deploy(self, config_overrides: Optional[Dict[str, Any]] = None) -> DeployResult:
         """
         Deploy agent using client configuration.
-        
+
         Args:
             config_overrides: Optional configuration overrides for this operation.
                 These will be merged with the client's base configuration.
-        
+
         Returns:
             DeployResult: Deploy operation result.
-        
+
         Example:
             >>> client = AgentKitClient("agentkit.yaml")
-            >>> 
+            >>>
             >>> # Simple deploy
             >>> result = client.deploy()
-            >>> 
+            >>>
             >>> # Deploy with config overrides
             >>> result = client.deploy(
             ...     config_overrides={"cloud": {"runtime_name": "prod-v2"}}
             ... )
         """
         merged_config = self._merge_config(config_overrides)
-        return _deploy(
-            config_file=self.config_file,
-            config_dict=merged_config
-        )
-    
+        return _deploy(config_file=self.config_file, config_dict=merged_config)
+
     def invoke(
         self,
         payload: Dict[str, Any],
         headers: Optional[Dict[str, str]] = None,
         apikey: Optional[str] = None,
-        config_overrides: Optional[Dict[str, Any]] = None
+        config_overrides: Optional[Dict[str, Any]] = None,
     ) -> InvokeResult:
         """
         Invoke deployed agent using client configuration.
-        
+
         Args:
             payload: Request payload dictionary to send to agent.
                 Typically contains fields like "prompt", "messages", etc.
@@ -255,23 +255,23 @@ class AgentKitClient:
                 Common headers: {"user_id": "...", "session_id": "..."}
             apikey: Optional API key for authentication.
             config_overrides: Optional configuration overrides for this operation.
-        
+
         Returns:
             InvokeResult: Invocation result.
-        
+
         Example:
             >>> client = AgentKitClient("agentkit.yaml")
-            >>> 
+            >>>
             >>> # Simple invocation
             >>> result = client.invoke({"prompt": "Hello, agent!"})
-            >>> 
+            >>>
             >>> # With headers and API key
             >>> result = client.invoke(
             ...     payload={"prompt": "What's the weather?"},
             ...     headers={"user_id": "user123"},
             ...     apikey=""
             ... )
-            >>> 
+            >>>
             >>> # Handle streaming response
             >>> result = client.invoke({"prompt": "Tell me a story"})
             >>> if result.is_streaming:
@@ -286,28 +286,25 @@ class AgentKitClient:
             config_file=self.config_file,
             config_dict=merged_config,
             headers=headers,
-            apikey=apikey
+            apikey=apikey,
         )
-    
-    def status(
-        self,
-        config_overrides: Optional[Dict[str, Any]] = None
-    ) -> StatusResult:
+
+    def status(self, config_overrides: Optional[Dict[str, Any]] = None) -> StatusResult:
         """
         Query agent status using client configuration.
-        
+
         Args:
             config_overrides: Optional configuration overrides for this operation.
-        
+
         Returns:
             StatusResult: Status query result.
-        
+
         Example:
             >>> client = AgentKitClient("agentkit.yaml")
-            >>> 
+            >>>
             >>> # Query status
             >>> result = client.status()
-            >>> 
+            >>>
             >>> # Check status
             >>> if result.is_running():
             ...     print(f"Agent running at: {result.endpoint_url}")
@@ -315,29 +312,24 @@ class AgentKitClient:
             ...     print(f"Agent status: {result.status.value}")
         """
         merged_config = self._merge_config(config_overrides)
-        return _status(
-            config_file=self.config_file,
-            config_dict=merged_config
-        )
-    
+        return _status(config_file=self.config_file, config_dict=merged_config)
+
     def launch(
-        self,
-        platform: str = "auto",
-        config_overrides: Optional[Dict[str, Any]] = None
+        self, platform: str = "auto", config_overrides: Optional[Dict[str, Any]] = None
     ) -> LifecycleResult:
         """
         Launch agent (build + deploy) using client configuration.
-        
+
         Args:
             platform: Build platform: "auto", "local", or "cloud".
             config_overrides: Optional configuration overrides for this operation.
-        
+
         Returns:
             LifecycleResult: Launch operation result.
-        
+
         Example:
             >>> client = AgentKitClient("agentkit.yaml")
-            >>> 
+            >>>
             >>> # Launch agent
             >>> result = client.launch()
             >>> if result.success:
@@ -345,80 +337,70 @@ class AgentKitClient:
         """
         merged_config = self._merge_config(config_overrides)
         return _launch(
-            config_file=self.config_file,
-            config_dict=merged_config,
-            platform=platform
+            config_file=self.config_file, config_dict=merged_config, platform=platform
         )
-    
+
     def destroy(
-        self,
-        force: bool = False,
-        config_overrides: Optional[Dict[str, Any]] = None
+        self, force: bool = False, config_overrides: Optional[Dict[str, Any]] = None
     ) -> LifecycleResult:
         """
         Destroy agent runtime using client configuration.
-        
+
         Args:
             force: Force destroy even if there are errors.
             config_overrides: Optional configuration overrides for this operation.
-        
+
         Returns:
             LifecycleResult: Destroy operation result.
-        
+
         Example:
             >>> client = AgentKitClient("agentkit.yaml")
-            >>> 
+            >>>
             >>> # Destroy agent
             >>> result = client.destroy()
-            >>> 
+            >>>
             >>> # Force destroy
             >>> result = client.destroy(force=True)
         """
         merged_config = self._merge_config(config_overrides)
         return _destroy(
-            config_file=self.config_file,
-            config_dict=merged_config,
-            force=force
+            config_file=self.config_file, config_dict=merged_config, force=force
         )
-    
+
     def stop(
-        self,
-        config_overrides: Optional[Dict[str, Any]] = None
+        self, config_overrides: Optional[Dict[str, Any]] = None
     ) -> LifecycleResult:
         """
         Stop agent runtime using client configuration.
-        
+
         Args:
             config_overrides: Optional configuration overrides for this operation.
-        
+
         Returns:
             LifecycleResult: Stop operation result.
-        
+
         Example:
             >>> client = AgentKitClient("agentkit.yaml")
-            >>> 
+            >>>
             >>> # Stop agent
             >>> result = client.stop()
         """
         merged_config = self._merge_config(config_overrides)
-        return _stop(
-            config_file=self.config_file,
-            config_dict=merged_config
-        )
-    
+        return _stop(config_file=self.config_file, config_dict=merged_config)
+
     def __enter__(self):
         """Context manager entry - returns self."""
         return self
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         """
         Context manager exit - cleanup if needed.
-        
+
         Currently no cleanup is needed, but this allows for
         future resource management (e.g., connection pooling).
         """
         pass
-    
+
     @staticmethod
     def init_project(
         project_name: str,
@@ -432,10 +414,10 @@ class AgentKitClient:
     ) -> InitResult:
         """
         Initialize a new agent project from template (static method).
-        
+
         This is a static method because project initialization doesn't require
         an existing configuration (it creates the configuration).
-        
+
         Args:
             project_name: Name of the project.
             template: Project template (basic, basic_stream, eino_a2a).
@@ -445,23 +427,23 @@ class AgentKitClient:
             system_prompt: System prompt (optional).
             model_name: Model name (optional).
             tools: Comma-separated tools list (optional).
-        
+
         Returns:
             InitResult: Initialization result.
-        
+
         Example:
             >>> from agentkit.toolkit.sdk import AgentKitClient
-            >>> 
+            >>>
             >>> # Initialize a new project
             >>> result = AgentKitClient.init_project(
             ...     project_name="my-agent",
             ...     template="basic",
             ...     directory="./projects"
             ... )
-            >>> 
+            >>>
             >>> if result.success:
             ...     print(f"Created: {', '.join(result.created_files)}")
-            ...     
+            ...
             ...     # Now create client for the new project
             ...     client = AgentKitClient(
             ...         f"{result.project_path}/agentkit.yaml"
@@ -476,26 +458,26 @@ class AgentKitClient:
             description=description,
             system_prompt=system_prompt,
             model_name=model_name,
-            tools=tools
+            tools=tools,
         )
-    
+
     @staticmethod
     def get_available_templates() -> Dict[str, Dict[str, Any]]:
         """
         Get available project templates (static method).
-        
+
         Returns:
             Dictionary of template configurations.
-        
+
         Example:
             >>> from agentkit.toolkit.sdk import AgentKitClient
-            >>> 
+            >>>
             >>> templates = AgentKitClient.get_available_templates()
             >>> for key, info in templates.items():
             ...     print(f"{key}: {info['name']}")
         """
         return _get_available_templates()
-    
+
     def __repr__(self) -> str:
         """String representation of client."""
         config_source = "dict" if self.config_dict else f"file({self.config_file})"

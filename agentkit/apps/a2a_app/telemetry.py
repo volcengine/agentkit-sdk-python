@@ -46,6 +46,7 @@ _GEN_AI_CLIENT_OPERATION_DURATION_BUCKETS = [
 
 logger = logging.getLogger("agentkit." + __name__)
 
+
 class Telemetry:
     def __init__(self):
         self.tracer = get_tracer("agentkit.a2a_app")
@@ -56,7 +57,6 @@ class Telemetry:
             unit="s",
             explicit_bucket_boundaries_advisory=_GEN_AI_CLIENT_OPERATION_DURATION_BUCKETS,
         )
-
 
     def trace_a2a_agent(
         self,
@@ -69,7 +69,9 @@ class Telemetry:
         """Get current span and set required attributes."""
         trace_id = span.get_span_context().trace_id
         span_id = span.get_span_context().span_id
-        logger.debug(f"Set attributes for span with trace_id={trace_id}, span_id={span_id}")
+        logger.debug(
+            f"Set attributes for span with trace_id={trace_id}, span_id={span_id}"
+        )
 
         # ===============================
         # Set attributes for current span
@@ -87,12 +89,18 @@ class Telemetry:
         if user_id:
             span.set_attribute(key="gen_ai.user.id", value=user_id)
 
-        span.set_attribute(key="gen_ai.input", value=safe_serialize_to_json_string(request.message.parts))
+        span.set_attribute(
+            key="gen_ai.input",
+            value=safe_serialize_to_json_string(request.message.parts),
+        )
 
         span.set_attribute(key="gen_ai.span.kind", value="a2a_agent")
         span.set_attribute(key="gen_ai.operation.name", value="invoke_agent")
         span.set_attribute(key="gen_ai.operation.type", value="a2a_agent")
-        attributes={"gen_ai_operation_name": "invoke_agent", "gen_ai_operation_type": "a2a_agent"}
+        attributes = {
+            "gen_ai_operation_name": "invoke_agent",
+            "gen_ai_operation_type": "a2a_agent",
+        }
 
         if exception:
             self.handle_exception(span, exception)
@@ -116,4 +124,3 @@ class Telemetry:
 
 
 telemetry = Telemetry()
-
