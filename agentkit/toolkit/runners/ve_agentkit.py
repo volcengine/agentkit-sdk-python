@@ -707,6 +707,8 @@ class VeAgentkitRuntimeRunner(Runner):
                     "runtime_apikey_name": config.runtime_apikey_name,
                     "runtime_role_name": config.runtime_role_name,
                     "runtime_auth_type": config.runtime_auth_type,
+                    "runtime_jwt_discovery_url": config.runtime_jwt_discovery_url,
+                    "runtime_jwt_allowed_clients": config.runtime_jwt_allowed_clients,
                     "message": "Runtime created successfully",
                 },
             )
@@ -1130,6 +1132,8 @@ class VeAgentkitRuntimeRunner(Runner):
                     "runtime_apikey_name": config.runtime_apikey_name,
                     "runtime_role_name": config.runtime_role_name,
                     "runtime_auth_type": config.runtime_auth_type,
+                    "runtime_jwt_discovery_url": config.runtime_jwt_discovery_url,
+                    "runtime_jwt_allowed_clients": config.runtime_jwt_allowed_clients,
                     "message": "Runtime update completed",
                 },
             )
