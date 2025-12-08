@@ -27,6 +27,7 @@ from agentkit.sdk.account.types import (
 
 class AgentkitAccountClient(BaseAgentkitClient):
     """AgentKit Account Management Service"""
+
     API_ACTIONS: Dict[str, str] = {
         "ListAccountLinkedServices": "ListAccountLinkedServices",
     }
@@ -46,8 +47,9 @@ class AgentkitAccountClient(BaseAgentkitClient):
             service_name="account",
         )
 
-
-    def list_account_linked_services(self, request: ListAccountLinkedServicesRequest) -> ListAccountLinkedServicesResponse:
+    def list_account_linked_services(
+        self, request: ListAccountLinkedServicesRequest
+    ) -> ListAccountLinkedServicesResponse:
         return self._invoke_api(
             api_action="ListAccountLinkedServices",
             request=request,
@@ -57,10 +59,10 @@ class AgentkitAccountClient(BaseAgentkitClient):
     def get_service_status(self, service_name: str) -> Optional[str]:
         """
         Query the LinkServices status for a specific service.
-        
+
         Args:
             service_name: The name of the service to query (e.g., 'ark', 'vefaas')
-            
+
         Returns:
             The status string ('Enabled' or 'Disabled'), or None if service not found.
         """
@@ -77,10 +79,10 @@ class AgentkitAccountClient(BaseAgentkitClient):
     def get_services_status(self, service_names: List[str]) -> Dict[str, Optional[str]]:
         """
         Query the LinkServices status for multiple services.
-        
+
         Args:
             service_names: List of service names to query (e.g., ['ark', 'vefaas', 'cr'])
-            
+
         Returns:
             A dict mapping service_name -> status ('Enabled'/'Disabled'/None if not found).
         """
@@ -95,7 +97,7 @@ class AgentkitAccountClient(BaseAgentkitClient):
     def has_disabled_services(self) -> List[str]:
         """
         Check if any returned service has a disabled status.
-        
+
         Returns:
             A list of service names that are disabled (status != 'Enabled').
             Returns empty list if all services are enabled.
@@ -107,4 +109,3 @@ class AgentkitAccountClient(BaseAgentkitClient):
                 if svc.status != "Enabled":
                     disabled.append(svc.service_name)
         return disabled
-

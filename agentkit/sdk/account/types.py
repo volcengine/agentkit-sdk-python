@@ -20,12 +20,11 @@ from __future__ import annotations
 from typing import Optional
 from pydantic import BaseModel, Field
 
+
 class AccountBaseModel(BaseModel):
     """AgentKit auto-generated base model"""
-    model_config = {
-        "populate_by_name": True,
-        "arbitrary_types_allowed": True
-    }
+
+    model_config = {"populate_by_name": True, "arbitrary_types_allowed": True}
 
 
 # Data Types
@@ -41,5 +40,6 @@ class ListAccountLinkedServicesRequest(AccountBaseModel):
 
 # ListAccountLinkedServices - Response
 class ListAccountLinkedServicesResponse(AccountBaseModel):
-    service_statuses: Optional[list[ServiceStatusesForListAccountLinkedServices]] = Field(default=None, alias="ServiceStatuses")
-
+    service_statuses: Optional[list[ServiceStatusesForListAccountLinkedServices]] = (
+        Field(default=None, alias="ServiceStatuses")
+    )

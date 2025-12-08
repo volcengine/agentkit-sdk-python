@@ -27,38 +27,42 @@ console = Console()
 
 class ConfigParamHandler:
     """Configuration parameter handler."""
-    
+
     @staticmethod
     def parse_runtime_envs(env_list: Optional[List[str]]) -> Dict[str, str]:
         """Parse environment variables in KEY=VALUE format.
-        
+
         Args:
             env_list: List of environment variables, e.g. ["KEY1=VALUE1", "KEY2=VALUE2"]
-            
+
         Returns:
             Parsed dictionary
         """
         if not env_list:
             return {}
-            
+
         result = {}
         for env in env_list:
-            if '=' not in env:
-                console.print(f"[yellow]Warning: Ignoring invalid environment variable format '{env}' (should be KEY=VALUE)[/yellow]")
+            if "=" not in env:
+                console.print(
+                    f"[yellow]Warning: Ignoring invalid environment variable format '{env}' (should be KEY=VALUE)[/yellow]"
+                )
                 continue
-            
-            key, value = env.split('=', 1)
+
+            key, value = env.split("=", 1)
             key = key.strip()
             value = value.strip()
-            
+
             if not key:
-                console.print(f"[yellow]Warning: Ignoring environment variable with empty key '{env}'[/yellow]")
+                console.print(
+                    f"[yellow]Warning: Ignoring environment variable with empty key '{env}'[/yellow]"
+                )
                 continue
-            
+
             result[key] = value
-        
+
         return result
-    
+
     @staticmethod
     def collect_cli_params(
         agent_name: Optional[str],
@@ -82,105 +86,108 @@ class ConfigParamHandler:
         runtime_apikey_name: Optional[str],
     ) -> Dict[str, Any]:
         """Collect all CLI parameters.
-        
+
         Args:
             language: Programming language (Python/Golang)
             language_version: Language version
             python_version: [Deprecated] Python version (backward compatibility)
-        
+
         Returns:
             Dict with 'common' (CommonConfig params) and 'strategy' (strategy-specific params)
         """
         common_params = {}
         strategy_params = {}
-        
+
         if agent_name is not None:
-            common_params['agent_name'] = agent_name
+            common_params["agent_name"] = agent_name
         if entry_point is not None:
-            common_params['entry_point'] = entry_point
+            common_params["entry_point"] = entry_point
         if description is not None:
-            common_params['description'] = description
-        
+            common_params["description"] = description
+
         if language is not None:
-            common_params['language'] = language
-        
+            common_params["language"] = language
+
         if language_version is not None:
-            common_params['language_version'] = language_version
+            common_params["language_version"] = language_version
         elif python_version is not None:
-            console.print("[yellow]Warning: --python_version is deprecated, use --language_version[/yellow]")
-            common_params['language_version'] = python_version
+            console.print(
+                "[yellow]Warning: --python_version is deprecated, use --language_version[/yellow]"
+            )
+            common_params["language_version"] = python_version
             if language is None:
-                common_params['language'] = 'Python'
-        
+                common_params["language"] = "Python"
+
         if dependencies_file is not None:
-            common_params['dependencies_file'] = dependencies_file
+            common_params["dependencies_file"] = dependencies_file
         if launch_type is not None:
-            common_params['launch_type'] = launch_type
-        
+            common_params["launch_type"] = launch_type
+
         if runtime_envs is not None:
-            common_params['runtime_envs'] = ConfigParamHandler.parse_runtime_envs(runtime_envs)
-        
+            common_params["runtime_envs"] = ConfigParamHandler.parse_runtime_envs(
+                runtime_envs
+            )
+
         if strategy_runtime_envs is not None:
-            strategy_params['runtime_envs'] = ConfigParamHandler.parse_runtime_envs(strategy_runtime_envs)
+            strategy_params["runtime_envs"] = ConfigParamHandler.parse_runtime_envs(
+                strategy_runtime_envs
+            )
         if region is not None:
-            strategy_params['region'] = region
+            strategy_params["region"] = region
         if tos_bucket is not None:
-            strategy_params['tos_bucket'] = tos_bucket
+            strategy_params["tos_bucket"] = tos_bucket
         if image_tag is not None:
-            strategy_params['image_tag'] = image_tag
+            strategy_params["image_tag"] = image_tag
         if cr_instance_name is not None:
-            strategy_params['cr_instance_name'] = cr_instance_name
+            strategy_params["cr_instance_name"] = cr_instance_name
         if cr_namespace_name is not None:
-            strategy_params['cr_namespace_name'] = cr_namespace_name
+            strategy_params["cr_namespace_name"] = cr_namespace_name
         if cr_repo_name is not None:
-            strategy_params['cr_repo_name'] = cr_repo_name
+            strategy_params["cr_repo_name"] = cr_repo_name
         if runtime_name is not None:
-            strategy_params['runtime_name'] = runtime_name
+            strategy_params["runtime_name"] = runtime_name
         if runtime_role_name is not None:
-            strategy_params['runtime_role_name'] = runtime_role_name
+            strategy_params["runtime_role_name"] = runtime_role_name
         if runtime_apikey_name is not None:
-            strategy_params['runtime_apikey_name'] = runtime_apikey_name
-        
-        return {
-            'common': common_params,
-            'strategy': strategy_params
-        }
-    
+            strategy_params["runtime_apikey_name"] = runtime_apikey_name
+
+        return {"common": common_params, "strategy": strategy_params}
+
     @staticmethod
     def has_cli_params(params: Dict[str, Any]) -> bool:
         """Check if CLI parameters exist."""
-        return bool(params['common']) or bool(params['strategy'])
+        return bool(params["common"]) or bool(params["strategy"])
 
 
 class NonInteractiveConfigHandler:
     """Non-interactive configuration handler."""
-    
+
     def __init__(self, config_path: Optional[str] = None):
         self.config_manager = get_config(config_path=config_path)
         self.validator = ConfigValidator()
-    
+
     def update_config(
         self,
         common_params: Dict[str, Any],
         strategy_params: Dict[str, Any],
-        dry_run: bool = False
+        dry_run: bool = False,
     ) -> bool:
         """Update configuration.
-        
+
         Args:
             common_params: CommonConfig parameters
             strategy_params: Strategy-specific parameters
             dry_run: Preview mode without saving
-            
+
         Returns:
             Success status
         """
         common_config = self.config_manager.get_common_config()
         old_config_dict = common_config.to_dict()
-        
+
         for key, value in common_params.items():
             if hasattr(common_config, key):
-                if key == 'runtime_envs' and isinstance(value, dict):
+                if key == "runtime_envs" and isinstance(value, dict):
                     existing_envs = getattr(common_config, key, {})
                     if isinstance(existing_envs, dict):
                         existing_envs.update(value)
@@ -190,54 +197,66 @@ class NonInteractiveConfigHandler:
                 else:
                     setattr(common_config, key, value)
             else:
-                console.print(f"[yellow]Warning: Unknown configuration item '{key}'[/yellow]")
-        
+                console.print(
+                    f"[yellow]Warning: Unknown configuration item '{key}'[/yellow]"
+                )
+
         errors = self.validator.validate_common_config(common_config)
         if errors:
             console.print("[red]Configuration validation failed:[/red]")
             for error in errors:
                 console.print(f"  [red]✗[/red] {error}")
             return False
-        
+
         new_config_dict = common_config.to_dict()
-        self._show_config_changes(old_config_dict, new_config_dict, "Common Configuration")
-        
+        self._show_config_changes(
+            old_config_dict, new_config_dict, "Common Configuration"
+        )
+
         new_strategy_config = None
         if strategy_params:
             strategy_name = common_config.launch_type
             old_strategy_config = self.config_manager.get_strategy_config(strategy_name)
             new_strategy_config = old_strategy_config.copy()
-            
+
             for key, value in strategy_params.items():
-                if key == 'runtime_envs' and isinstance(value, dict):
-                    existing_envs = new_strategy_config.get('runtime_envs', {})
+                if key == "runtime_envs" and isinstance(value, dict):
+                    existing_envs = new_strategy_config.get("runtime_envs", {})
                     if isinstance(existing_envs, dict):
                         existing_envs.update(value)
-                        new_strategy_config['runtime_envs'] = existing_envs
+                        new_strategy_config["runtime_envs"] = existing_envs
                     else:
-                        new_strategy_config['runtime_envs'] = value
+                        new_strategy_config["runtime_envs"] = value
                 else:
                     new_strategy_config[key] = value
-            
-            self._show_config_changes(old_strategy_config, new_strategy_config, f"{strategy_name} Mode Configuration")
-        
+
+            self._show_config_changes(
+                old_strategy_config,
+                new_strategy_config,
+                f"{strategy_name} Mode Configuration",
+            )
+
         if dry_run:
             console.print("\n[yellow]Preview mode: Configuration not saved[/yellow]")
             return True
-        
+
         self.config_manager.update_common_config(common_config)
-        
+
         if new_strategy_config is not None:
-            self.config_manager.update_strategy_config(strategy_name, new_strategy_config)
-        
+            self.config_manager.update_strategy_config(
+                strategy_name, new_strategy_config
+            )
+
         console.print("\n[green]✅ Configuration updated successfully![/green]")
         console.print(f"Configuration file: {self.config_manager.get_config_path()}")
-        
+
         return True
-    
-    def _show_config_changes(self, old_config: Dict[str, Any], new_config: Dict[str, Any], title: str):
+
+    def _show_config_changes(
+        self, old_config: Dict[str, Any], new_config: Dict[str, Any], title: str
+    ):
         """Display configuration changes.
-        
+
         Args:
             old_config: Old configuration
             new_config: New configuration
@@ -245,39 +264,39 @@ class NonInteractiveConfigHandler:
         """
         changes = []
         all_keys = set(old_config.keys()) | set(new_config.keys())
-        
+
         for key in all_keys:
-            if key.startswith('_'):
+            if key.startswith("_"):
                 continue
-            
+
             old_value = old_config.get(key)
             new_value = new_config.get(key)
-            
+
             if old_value != new_value:
                 changes.append((key, old_value, new_value))
-        
+
         if not changes:
             return
-        
+
         console.print(f"\n[bold cyan]{title} - Changes:[/bold cyan]")
         table = Table(show_header=True, header_style="bold magenta", box=box.ROUNDED)
         table.add_column("Config Item", style="cyan", width=25)
         table.add_column("Old Value", style="yellow", width=30)
         table.add_column("New Value", style="green", width=30)
-        
+
         for key, old_value, new_value in changes:
             old_str = self._format_value(old_value)
             new_str = self._format_value(new_value)
-            
-            if old_value is None or old_value == '':
+
+            if old_value is None or old_value == "":
                 old_str = "[dim](not set)[/dim]"
-            if new_value is None or new_value == '':
+            if new_value is None or new_value == "":
                 new_str = "[dim](not set)[/dim]"
-            
+
             table.add_row(key, old_str, new_str)
-        
+
         console.print(table)
-    
+
     def _format_value(self, value: Any) -> str:
         """Format value for display."""
         if value is None:
@@ -298,36 +317,40 @@ class NonInteractiveConfigHandler:
                 result += f" ... (total {len(value)} items)"
             return result
         return str(value)
-    
+
     def show_current_config(self):
         """Display current configuration."""
         common_config = self.config_manager.get_common_config()
-        
+
         console.print("\n[bold cyan]Current Configuration:[/bold cyan]")
-        
+
         table = Table(show_header=True, header_style="bold magenta", box=box.ROUNDED)
         table.add_column("Config Item", style="cyan", width=25)
         table.add_column("Value", style="green", width=50)
-        
+
         config_dict = common_config.to_dict()
         for key, value in config_dict.items():
-            if not key.startswith('_'):
+            if not key.startswith("_"):
                 table.add_row(key, self._format_value(value))
-        
+
         console.print(table)
-        
+
         strategy_name = common_config.launch_type
         if strategy_name:
             strategy_config = self.config_manager.get_strategy_config(strategy_name)
             if strategy_config:
-                console.print(f"\n[bold cyan]{strategy_name} Mode Configuration:[/bold cyan]")
-                
-                config_table = Table(show_header=True, header_style="bold magenta", box=box.ROUNDED)
+                console.print(
+                    f"\n[bold cyan]{strategy_name} Mode Configuration:[/bold cyan]"
+                )
+
+                config_table = Table(
+                    show_header=True, header_style="bold magenta", box=box.ROUNDED
+                )
                 config_table.add_column("Config Item", style="cyan", width=25)
                 config_table.add_column("Value", style="green", width=50)
-                
+
                 for key, value in strategy_config.items():
-                    if not key.startswith('_'):
+                    if not key.startswith("_"):
                         config_table.add_row(key, self._format_value(value))
-                
+
                 console.print(config_table)

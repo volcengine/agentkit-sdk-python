@@ -29,37 +29,39 @@ from agentkit.toolkit.cli.console_reporter import ConsoleReporter
 
 try:
     from pyfiglet import Figlet
+
     HAS_PYFIGLET = True
 except ImportError:
     HAS_PYFIGLET = False
 
 console = Console()
 
+
 def show_logo():
     """Display AgentKit logo"""
     console.print()
-    
+
     if HAS_PYFIGLET:
         # Try different fonts in order of preference
-        fonts_to_try = ['slant', 'speed', 'banner3', 'big', 'standard']
+        fonts_to_try = ["slant", "speed", "banner3", "big", "standard"]
         figlet = None
-        
+
         for font in fonts_to_try:
             try:
                 figlet = Figlet(font=font)
                 break
-            except:
+            except Exception:
                 continue
-        
+
         if figlet is None:
             figlet = Figlet()  # Use default font
-        
-        logo_text = figlet.renderText('AgentKit')
-        
+
+        logo_text = figlet.renderText("AgentKit")
+
         # Apply gradient color effect - more vibrant colors
-        lines = logo_text.split('\n')
+        lines = logo_text.split("\n")
         colors = ["bright_magenta", "magenta", "bright_blue", "cyan", "bright_cyan"]
-        
+
         for i, line in enumerate(lines):
             if line.strip():  # Skip empty lines
                 # Create a gradient effect
@@ -68,17 +70,28 @@ def show_logo():
                 console.print(Text(line, style=f"bold {color}"))
     else:
         # Fallback: beautiful box logo if pyfiglet is not installed
-        console.print(Text("  ╔══════════════════════════════════════╗", style="bold bright_cyan"))
-        console.print(Text("  ║                                      ║", style="bold bright_cyan"))
-        console.print(Text("  ║   ", style="bold bright_cyan") + 
-                     Text("🚀  A G E N T K I T  🤖", style="bold bright_magenta") +
-                     Text("   ║", style="bold bright_cyan"))
-        console.print(Text("  ║                                      ║", style="bold bright_cyan"))
-        console.print(Text("  ╚══════════════════════════════════════╝", style="bold bright_cyan"))
-    
+        console.print(
+            Text("  ╔══════════════════════════════════════╗", style="bold bright_cyan")
+        )
+        console.print(
+            Text("  ║                                      ║", style="bold bright_cyan")
+        )
+        console.print(
+            Text("  ║   ", style="bold bright_cyan")
+            + Text("🚀  A G E N T K I T  🤖", style="bold bright_magenta")
+            + Text("   ║", style="bold bright_cyan")
+        )
+        console.print(
+            Text("  ║                                      ║", style="bold bright_cyan")
+        )
+        console.print(
+            Text("  ╚══════════════════════════════════════╝", style="bold bright_cyan")
+        )
+
     # Add tagline with emoji
     console.print(Text("     ✨ Build AI Agents with Ease ✨", style="bold yellow"))
     console.print()
+
 
 # Get templates from Executor layer
 def _get_templates():
@@ -90,8 +103,10 @@ def _get_templates():
 def display_templates():
     """Display available templates."""
     templates = _get_templates()
-    
-    table = Table(title="Available Templates", show_header=True, header_style="bold magenta")
+
+    table = Table(
+        title="Available Templates", show_header=True, header_style="bold magenta"
+    )
     table.add_column("ID", style="cyan", width=6)
     table.add_column("Key", style="bright_cyan", width=20)
     table.add_column("Name", style="green", width=25)
@@ -106,7 +121,7 @@ def display_templates():
             template["name"],
             template["type"],
             template["language"],
-            template["description"]
+            template["description"],
         )
 
     console.print(table)
@@ -115,7 +130,7 @@ def display_templates():
 def select_template(template_key: Optional[str] = None) -> str:
     """Select a template via CLI option or interactive prompt."""
     templates = _get_templates()
-    
+
     if template_key:
         # From CLI option
         # 1) direct key match
@@ -136,13 +151,17 @@ def select_template(template_key: Optional[str] = None) -> str:
         console.print(f"[red]Error: Unknown template '{template_key}'[/red]")
         all_keys = list(templates.keys())
         console.print(f"[yellow]Available keys: {', '.join(all_keys)}[/yellow]")
-        console.print(f"[yellow]Or use ID 1-{len(all_keys)} as shown in the list, or the template Name.[/yellow]")
+        console.print(
+            f"[yellow]Or use ID 1-{len(all_keys)} as shown in the list, or the template Name.[/yellow]"
+        )
         raise typer.Exit(1)
-    
+
     # Interactive selection
     display_templates()
-    console.print(f"\n[bold cyan]Please select a template by entering ID/Key/Name (ID range: 1-{len(templates)}):[/bold cyan]")
-    
+    console.print(
+        f"\n[bold cyan]Please select a template by entering ID/Key/Name (ID range: 1-{len(templates)}):[/bold cyan]"
+    )
+
     while True:
         try:
             choice = input("Template (ID/Key/Name): ").strip()
@@ -151,9 +170,13 @@ def select_template(template_key: Optional[str] = None) -> str:
                 choice_idx = int(choice) - 1
                 if 0 <= choice_idx < len(templates):
                     selected_key = list(templates.keys())[choice_idx]
-                    console.print(f"[green]Selected: {templates[selected_key]['name']}[/green]")
+                    console.print(
+                        f"[green]Selected: {templates[selected_key]['name']}[/green]"
+                    )
                     return selected_key
-                console.print(f"[red]Invalid ID. Please enter a number between 1 and {len(templates)}[/red]")
+                console.print(
+                    f"[red]Invalid ID. Please enter a number between 1 and {len(templates)}[/red]"
+                )
                 continue
             # Key
             if choice in templates:
@@ -165,7 +188,9 @@ def select_template(template_key: Optional[str] = None) -> str:
                 if t.get("name", "").lower() == lowered:
                     console.print(f"[green]Selected: {t['name']}[/green]")
                     return k
-            console.print("[red]Invalid input. Please enter a valid ID, Key, or Name.[/red]")
+            console.print(
+                "[red]Invalid input. Please enter a valid ID, Key, or Name.[/red]"
+            )
         except ValueError:
             console.print("[red]Invalid input. Please enter a number[/red]")
         except typer.Abort:
@@ -175,26 +200,66 @@ def select_template(template_key: Optional[str] = None) -> str:
 
 def init_command(
     project_name: Optional[str] = typer.Argument(None, help="Project name"),
-    template: Optional[str] = typer.Option(None, "--template", "-t", help="Project template (accepts ID/Key/Name). Keys: basic, basic_stream"),
+    template: Optional[str] = typer.Option(
+        None,
+        "--template",
+        "-t",
+        help="Project template (accepts ID/Key/Name). Keys: basic, basic_stream",
+    ),
     directory: Optional[str] = typer.Option(".", help="Target directory"),
-    agent_name: Optional[str] = typer.Option(None, "--agent-name", help="Agent name (default: 'Agent')"),
-    description: Optional[str] = typer.Option(None, "--description", help="Agent description (uses a common default description if not provided), this will be helpful in A2A scenario."),
-    system_prompt: Optional[str] = typer.Option(None, "--system-prompt", help="Agent system prompt (uses a common default system prompt if not provided)"),
-    model_name: Optional[str] = typer.Option(None, "--model-name", help="Model name in volcengine ARK platform (default: 'doubao-seed-1-6-250615')"),
-    tools: Optional[str] = typer.Option(None, "--tools", help="Comma-separated list of tools to include (e.g., web_search,run_code)"),
+    agent_name: Optional[str] = typer.Option(
+        None, "--agent-name", help="Agent name (default: 'Agent')"
+    ),
+    description: Optional[str] = typer.Option(
+        None,
+        "--description",
+        help="Agent description (uses a common default description if not provided), this will be helpful in A2A scenario.",
+    ),
+    system_prompt: Optional[str] = typer.Option(
+        None,
+        "--system-prompt",
+        help="Agent system prompt (uses a common default system prompt if not provided)",
+    ),
+    model_name: Optional[str] = typer.Option(
+        None,
+        "--model-name",
+        help="Model name in volcengine ARK platform (default: 'doubao-seed-1-6-250615')",
+    ),
+    tools: Optional[str] = typer.Option(
+        None,
+        "--tools",
+        help="Comma-separated list of tools to include (e.g., web_search,run_code)",
+    ),
     # New parameters for wrapping existing Agent files
-    from_agent: Optional[str] = typer.Option(None, "--from-agent", "-f", help="Path to existing Python file containing veadk Agent definition"),
-    agent_var: Optional[str] = typer.Option(None, "--agent-var", help="Variable name of the Agent object in the file (default: auto-detect)"),
-    wrapper_type: Optional[str] = typer.Option("basic", "--wrapper-type", help="Type of wrapper to generate: basic or stream (default: basic)"),
-    list_templates: bool = typer.Option(False, "--list-templates", help="List available templates (ID, Key, Name) and exit"),
+    from_agent: Optional[str] = typer.Option(
+        None,
+        "--from-agent",
+        "-f",
+        help="Path to existing Python file containing veadk Agent definition",
+    ),
+    agent_var: Optional[str] = typer.Option(
+        None,
+        "--agent-var",
+        help="Variable name of the Agent object in the file (default: auto-detect)",
+    ),
+    wrapper_type: Optional[str] = typer.Option(
+        "basic",
+        "--wrapper-type",
+        help="Type of wrapper to generate: basic or stream (default: basic)",
+    ),
+    list_templates: bool = typer.Option(
+        False,
+        "--list-templates",
+        help="List available templates (ID, Key, Name) and exit",
+    ),
 ):
     """
     Initialize a new Agent project with templates or wrap an existing Agent.
-    
+
     This command provides two modes:
     1. Template mode: Create a new project from built-in templates
     2. Wrapper mode: Wrap an existing Agent definition file for deployment
-    
+
     It delegates business logic to InitService while handling all UI interactions.
     """
     # ===== UI Layer: Display logo =====
@@ -204,14 +269,14 @@ def init_command(
     if list_templates:
         display_templates()
         raise typer.Exit(0)
-    
+
     # ===== Mode Detection: Template or Wrapper mode =====
     executor = InitExecutor(reporter=ConsoleReporter())
-    
+
     if from_agent:
         # ===== WRAPPER MODE: Wrap existing Agent file =====
         console.print("[bold cyan]🔄 Wrapping existing Agent file[/bold cyan]\n")
-        
+
         # Generate project name from Agent file if not provided
         if not project_name:
             # Extract filename without extension and add agentkit- prefix
@@ -219,7 +284,7 @@ def init_command(
             final_project_name = f"agentkit-{agent_file_stem}"
         else:
             final_project_name = project_name
-        
+
         # Display wrapping info
         console.print(f"[bold green]Project name: {final_project_name}[/bold green]")
         console.print(f"[bold blue]Agent file: {from_agent}[/bold blue]")
@@ -227,31 +292,33 @@ def init_command(
         if agent_var:
             console.print(f"[bold blue]Agent variable: {agent_var}[/bold blue]")
         console.print()
-        
+
         # Call wrapper executor
         result = executor.init_from_agent_file(
             project_name=final_project_name,
             agent_file_path=from_agent,
             agent_var_name=agent_var,
             wrapper_type=wrapper_type,
-            directory=directory
+            directory=directory,
         )
     else:
         # ===== TEMPLATE MODE: Create from template =====
-        
+
         # ===== UI Layer: Interactive template selection =====
         template_key = select_template(template)
-        
+
         # Get template info for UI display
         templates = _get_templates()
         template_info = templates[template_key]
-        
+
         # ===== UI Layer: Display creation info =====
         final_project_name = project_name or "simple_agent"
-        console.print(f"[bold green]Creating project: {final_project_name}[/bold green]")
+        console.print(
+            f"[bold green]Creating project: {final_project_name}[/bold green]"
+        )
         console.print(f"[bold blue]Using template: {template_info['name']}[/bold blue]")
         console.print()
-        
+
         # ===== Business Logic: Call Executor layer =====
         result = executor.init_project(
             project_name=final_project_name,
@@ -261,61 +328,86 @@ def init_command(
             description=description,
             system_prompt=system_prompt,
             model_name=model_name,
-            tools=tools
+            tools=tools,
         )
-    
+
     # ===== UI Layer: Display results =====
     if result.success:
         # Success output
         console.print("[bold blue]✨ Project initialized successfully![/bold blue]")
-        console.print(f"[blue]Template: {result.metadata.get('template_name', 'N/A')}[/blue]")
-        console.print(f"[blue]Entry point: {result.metadata.get('entry_point', 'N/A')}[/blue]")
-        console.print(f"[blue]Language: {result.metadata.get('language', 'N/A')} {result.metadata.get('language_version', '')}[/blue]")
-        
+        console.print(
+            f"[blue]Template: {result.metadata.get('template_name', 'N/A')}[/blue]"
+        )
+        console.print(
+            f"[blue]Entry point: {result.metadata.get('entry_point', 'N/A')}[/blue]"
+        )
+        console.print(
+            f"[blue]Language: {result.metadata.get('language', 'N/A')} {result.metadata.get('language_version', '')}[/blue]"
+        )
+
         # Display wrapper-specific info
-        if from_agent and 'agent_file' in result.metadata:
-            console.print(f"[blue]Agent file: {result.metadata.get('agent_file', 'N/A')}[/blue]")
-            console.print(f"[blue]Agent variable: {result.metadata.get('agent_var', 'N/A')}[/blue]")
-        
+        if from_agent and "agent_file" in result.metadata:
+            console.print(
+                f"[blue]Agent file: {result.metadata.get('agent_file', 'N/A')}[/blue]"
+            )
+            console.print(
+                f"[blue]Agent variable: {result.metadata.get('agent_var', 'N/A')}[/blue]"
+            )
+
         # Display created files
         if result.created_files:
             console.print("\n[bold cyan]Created files:[/bold cyan]")
             for file in result.created_files:
                 console.print(f"  [green]✓[/green] {file}")
-        
+
         # Display global config info if exists
         from agentkit.toolkit.config import global_config_exists, get_global_config
+
         if global_config_exists():
             try:
                 global_cfg = get_global_config()
                 has_config = False
-                
+
                 # Check if any relevant config is set
                 config_items = []
                 if global_cfg.cr.instance_name:
-                    config_items.append(f"CR Instance: [yellow]{global_cfg.cr.instance_name}[/yellow]")
+                    config_items.append(
+                        f"CR Instance: [yellow]{global_cfg.cr.instance_name}[/yellow]"
+                    )
                     has_config = True
                 if global_cfg.cr.namespace_name:
-                    config_items.append(f"CR Namespace: [yellow]{global_cfg.cr.namespace_name}[/yellow]")
+                    config_items.append(
+                        f"CR Namespace: [yellow]{global_cfg.cr.namespace_name}[/yellow]"
+                    )
                     has_config = True
                 if global_cfg.tos.bucket:
-                    config_items.append(f"TOS Bucket: [yellow]{global_cfg.tos.bucket}[/yellow]")
+                    config_items.append(
+                        f"TOS Bucket: [yellow]{global_cfg.tos.bucket}[/yellow]"
+                    )
                     has_config = True
                 if global_cfg.tos.prefix:
-                    config_items.append(f"TOS Prefix: [yellow]{global_cfg.tos.prefix}[/yellow]")
+                    config_items.append(
+                        f"TOS Prefix: [yellow]{global_cfg.tos.prefix}[/yellow]"
+                    )
                     has_config = True
                 if global_cfg.tos.region:
-                    config_items.append(f"TOS Region: [yellow]{global_cfg.tos.region}[/yellow]")
+                    config_items.append(
+                        f"TOS Region: [yellow]{global_cfg.tos.region}[/yellow]"
+                    )
                     has_config = True
-                
+
                 if has_config:
-                    console.print("\n[cyan]ℹ️  Detected global configuration. The following fields will use global defaults:[/cyan]")
+                    console.print(
+                        "\n[cyan]ℹ️  Detected global configuration. The following fields will use global defaults:[/cyan]"
+                    )
                     for item in config_items:
                         console.print(f"  • {item}")
-                    console.print("[dim]  To override, provide explicit values in agentkit.yaml[/dim]")
+                    console.print(
+                        "[dim]  To override, provide explicit values in agentkit.yaml[/dim]"
+                    )
             except Exception:
                 pass  # Silently ignore if global config loading fails
-        
+
         # Next steps guidance
         console.print("\n[bold cyan]Next steps:[/bold cyan]")
         console.print("  1. Review and modify the generated files")

@@ -39,19 +39,18 @@ _ACCOUNT_CACHE: Dict[str, Any] = {}
 P_VAR = re.compile(r"\{\{([^}]+)\}\}")
 
 
-
 def _get_builtin_variables() -> Dict[str, str]:
     """Return builtin variables that do not require external calls."""
     import uuid
-    
+
     now = datetime.now()
-    
+
     variables = {
-        'timestamp': now.strftime('%Y%m%d%H%M%S'),
-        'date': now.strftime('%Y%m%d'),
-        'random_id': uuid.uuid4().hex[:8],
+        "timestamp": now.strftime("%Y%m%d%H%M%S"),
+        "date": now.strftime("%Y%m%d"),
+        "random_id": uuid.uuid4().hex[:8],
     }
-    
+
     return variables
 
 
@@ -62,29 +61,29 @@ def get_account_id() -> str:
         ValueError: when account id cannot be retrieved
     """
     # Return from cache if available
-    if 'account_id' in _ACCOUNT_CACHE:
+    if "account_id" in _ACCOUNT_CACHE:
         logger.debug(f"Account ID from cache: {_ACCOUNT_CACHE['account_id']}")
-        return _ACCOUNT_CACHE['account_id']
-    
+        return _ACCOUNT_CACHE["account_id"]
+
     try:
         # Query STS API for caller identity
         from agentkit.toolkit.volcengine.sts import VeSTS
-        
+
         logger.debug("Fetching account info via STS API...")
         sts = VeSTS()
         account_id = sts.get_account_id()
-        
+
         if not account_id:
             raise ValueError("STS GetCallerIdentity returned empty account_id")
-        
+
         account_id = str(account_id)
-        
+
         # Cache result
-        _ACCOUNT_CACHE['account_id'] = account_id
+        _ACCOUNT_CACHE["account_id"] = account_id
         logger.debug(f"Retrieved account_id: {account_id}")
-        
+
         return account_id
-        
+
     except Exception as e:
         # Build explicit error details
         error_type = type(e).__name__
@@ -103,9 +102,11 @@ def clear_cache() -> None:
     logger.debug("Account info cache cleared")
 
 
-def render_template_safe(template_str: str,
-                         fallback: Optional[str] = None,
-                         extra_vars: Optional[Dict[str, str]] = None) -> str:
+def render_template_safe(
+    template_str: str,
+    fallback: Optional[str] = None,
+    extra_vars: Optional[Dict[str, str]] = None,
+) -> str:
     """Render template safely, falling back to provided value on failure."""
     try:
         return render_template(template_str, extra_vars)
@@ -118,33 +119,35 @@ def render_template_safe(template_str: str,
 
 
 # Optimized: fetch account_id only when needed
-def render_template(template_str: str, extra_vars: Optional[Dict[str, str]] = None) -> str:
+def render_template(
+    template_str: str, extra_vars: Optional[Dict[str, str]] = None
+) -> str:
     """Render template string with builtin and optional variables.
 
     Lazily resolves account_id only when referenced.
     """
     # Fast-path: no placeholders
-    if not template_str or '{{' not in template_str:
+    if not template_str or "{{" not in template_str:
         logger.debug("Skip rendering (no placeholders): %r", template_str)
         return template_str
-    
+
     # Extract placeholders
     placeholders = [m.strip() for m in P_VAR.findall(template_str)]
     logger.debug("Render start: raw=%r, placeholders=%s", template_str, placeholders)
 
-    needs_account_id = any(p.replace(' ', '') == 'account_id' for p in placeholders)
+    needs_account_id = any(p.replace(" ", "") == "account_id" for p in placeholders)
     logger.debug("Needs account_id: %s", needs_account_id)
-    
+
     # Build variables
     variables = _get_builtin_variables()
-    
+
     # Fetch account_id only when needed
     if needs_account_id:
         try:
             account_id = get_account_id()
             if not account_id:
                 raise ValueError("get_account_id() returned empty")
-            variables['account_id'] = account_id
+            variables["account_id"] = account_id
         except Exception as e:
             # Build full error with type and detail
             error_type = type(e).__name__
@@ -154,11 +157,11 @@ def render_template(template_str: str, extra_vars: Optional[Dict[str, str]] = No
             # Log full exception chain
             logger.debug("Full exception chain during rendering:", exc_info=True)
             raise ValueError(full_error) from e
-    
+
     # Merge extra variables if provided
     if extra_vars:
         variables.update(extra_vars)
-    
+
     # Render variables
     def replace_var(match):
         var_name = match.group(1).strip()
@@ -167,13 +170,17 @@ def render_template(template_str: str, extra_vars: Optional[Dict[str, str]] = No
         else:
             logger.warning("Unknown template variable: %s", "{{%s}}" % var_name)
             return match.group(0)  # keep original token
-    
+
     rendered = P_VAR.sub(replace_var, template_str)
 
     # Warn if unresolved placeholders remain
     unresolved = [m.strip() for m in P_VAR.findall(rendered)]
     if unresolved:
-        logger.warning("Unresolved placeholders after rendering: %s; rendered=%r", unresolved, rendered)
-    
+        logger.warning(
+            "Unresolved placeholders after rendering: %s; rendered=%r",
+            unresolved,
+            rendered,
+        )
+
     logger.debug("Render done: %r -> %r", template_str, rendered)
     return rendered

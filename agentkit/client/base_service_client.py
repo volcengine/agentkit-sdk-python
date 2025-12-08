@@ -28,18 +28,19 @@ from volcengine.ServiceInfo import ServiceInfo
 
 from agentkit.utils.ve_sign import get_volc_ak_sk_region
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 @dataclass
 class ApiConfig:
     """Configuration for a single API endpoint."""
+
     action: str
     method: str = "POST"
     path: str = "/"
     form: Optional[Dict[str, Any]] = None
     header: Optional[Dict[str, Any]] = None
-    
+
     def __post_init__(self):
         if self.form is None:
             self.form = {}
@@ -50,20 +51,20 @@ class ApiConfig:
 class BaseServiceClient(Service):
     """
     Base class for all Volcengine service clients.
-    
+
     This class provides:
     1. Unified interface for all Volcengine services (AgentKit, IAM, etc.)
     2. Common implementation using volcengine.base.Service
     3. Shared credential management and API invocation logic
-    
+
     Subclasses should:
     1. Override API_ACTIONS with their API action configurations
     2. Implement _get_service_config() to provide service-specific configuration
     """
-    
+
     # Subclasses should override this with their API action configurations
     API_ACTIONS: Dict[str, Union[str, ApiConfig]] = {}
-    
+
     def __init__(
         self,
         access_key: str = "",
@@ -76,7 +77,7 @@ class BaseServiceClient(Service):
     ) -> None:
         """
         Initialize the service client.
-        
+
         Args:
             access_key: Volcengine access key
             secret_key: Volcengine secret key
@@ -87,28 +88,30 @@ class BaseServiceClient(Service):
         """
         # Validate and get credentials
         if not any([access_key, secret_key, region]):
-            access_key, secret_key, region = get_volc_ak_sk_region(credential_env_prefix)
+            access_key, secret_key, region = get_volc_ak_sk_region(
+                credential_env_prefix
+            )
         else:
             if not all([access_key, secret_key, region]):
                 raise ValueError(
                     f"Error creating {service_name} instance: "
                     "missing access key, secret key or region"
                 )
-        
+
         # Store credentials and service info
         self.access_key = access_key
         self.secret_key = secret_key
         self.region = region
         self.session_token = session_token
         self.service_name = service_name
-        
+
         # Get service-specific configuration from subclass
         config = self._get_service_config()
-        self.host = config['host']
-        self.api_version = config['api_version']
-        self.service = config['service']
-        self.scheme = config.get('scheme', 'https')
-        
+        self.host = config["host"]
+        self.api_version = config["api_version"]
+        self.service = config["service"]
+        self.scheme = config.get("scheme", "https")
+
         # Create ServiceInfo
         self.service_info = ServiceInfo(
             host=self.host,
@@ -124,35 +127,35 @@ class BaseServiceClient(Service):
             socket_timeout=30,
             scheme=self.scheme,
         )
-        
+
         # Generate ApiInfo for all actions
         self.api_info = self._build_api_info()
-        
+
         # Initialize parent Service class
         Service.__init__(self, service_info=self.service_info, api_info=self.api_info)
-    
+
     def _get_service_config(self) -> Dict[str, str]:
         """
         Get service-specific configuration.
-        
+
         Subclasses must override this method to provide:
         - host: API endpoint host
         - api_version: API version string
         - service: Service name for signing
-        
+
         Returns:
             Dictionary with 'host', 'api_version', and 'service' keys
         """
         raise NotImplementedError("Subclasses must implement _get_service_config()")
-    
+
     def _build_api_info(self) -> Dict[str, ApiInfo]:
         """
         Build ApiInfo dictionary from API_ACTIONS.
-        
+
         Supports two formats:
         1. Simple string: {"ListItems": "ListItems"} -> POST to / with Action query param
         2. ApiConfig: {"GetItem": ApiConfig(action="GetItem", method="GET", path="/items")}
-        
+
         Returns:
             Dictionary mapping action names to ApiInfo objects
         """
@@ -182,7 +185,7 @@ class BaseServiceClient(Service):
                     f"expected str or ApiConfig, got {type(action_config)}"
                 )
         return api_info
-    
+
     def _invoke_api(
         self,
         api_action: str,
@@ -192,16 +195,16 @@ class BaseServiceClient(Service):
     ) -> T:
         """
         Unified API invocation with error handling.
-        
+
         Args:
             api_action: The API action name (e.g., 'GetUser', 'ListRuntimes')
             request: The request object (Pydantic model)
             response_type: The response type to parse into
             params: Additional query parameters
-            
+
         Returns:
             Typed response object
-            
+
         Raises:
             Exception: If API call fails or returns an error
         """
@@ -210,22 +213,22 @@ class BaseServiceClient(Service):
             res = self.json(
                 api=api_action,
                 params=params or {},
-                body=json.dumps(request.model_dump(by_alias=True, exclude_none=True))
+                body=json.dumps(request.model_dump(by_alias=True, exclude_none=True)),
             )
         except Exception as e:
             raise Exception(f"Failed to {api_action}: {str(e)}")
-        
+
         if not res:
             raise Exception(f"Empty response from {api_action} request.")
-        
+
         # Parse response
         response_data = json.loads(res)
-        
+
         # Check for errors
         metadata = response_data.get("ResponseMetadata", {})
         if metadata.get("Error"):
             error_msg = metadata.get("Error", {}).get("Message", "Unknown error")
             raise Exception(f"Failed to {api_action}: {error_msg}")
-        
+
         # Return typed response
-        return response_type(**response_data.get('Result', {}))
+        return response_type(**response_data.get("Result", {}))

@@ -7,9 +7,11 @@ repos:
     - id: ruff-check
       types_or: [ python, pyi ]
       args: [ --fix ]
+      exclude: ^agentkit/toolkit/resources/samples/
     # Run the formatter.
     - id: ruff-format
       types_or: [ python, pyi ]
+      exclude: ^agentkit/toolkit/resources/samples/
 - repo: https://github.com/gitleaks/gitleaks
   rev: v8.24.2
   hooks:

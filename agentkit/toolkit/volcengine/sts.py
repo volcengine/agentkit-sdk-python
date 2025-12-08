@@ -32,24 +32,22 @@ logger = logging.getLogger(__name__)
 
 class GetCallerIdentityResponse(BaseModel):
     """Response for GetCallerIdentity API"""
+
     account_id: Optional[int] = Field(None, alias="AccountId")
     trn: Optional[str] = Field(None, alias="Trn")
     identity_type: Optional[str] = Field(None, alias="IdentityType")
     identity_id: Optional[str] = Field(None, alias="IdentityId")
-    model_config = {
-        "populate_by_name": True,
-        "arbitrary_types_allowed": True
-    }
+    model_config = {"populate_by_name": True, "arbitrary_types_allowed": True}
 
 
 class VeSTS(BaseServiceClient):
     """Volcengine STS Service Client"""
-    
+
     # Define all API actions for this service
     API_ACTIONS: Dict[str, ApiConfig] = {
         "GetCallerIdentity": ApiConfig(action="GetCallerIdentity", method="GET"),
     }
-    
+
     def __init__(
         self,
         access_key: str = "",
@@ -65,7 +63,7 @@ class VeSTS(BaseServiceClient):
             service_name="sts",
             credential_env_prefix="STS",
         )
-    
+
     def _get_service_config(self) -> Dict[str, str]:
         """Get STS service configuration"""
         return {
@@ -73,30 +71,24 @@ class VeSTS(BaseServiceClient):
             "api_version": "2018-01-01",
             "service": "sts",
         }
-    
+
     def get_caller_identity(self) -> Optional[GetCallerIdentityResponse]:
         """
         Get the identity of the caller.
-        
+
         Returns:
             GetCallerIdentityResponse containing account_id, trn, identity_type, and identity_id
         """
-        res = self.request(
-            "GetCallerIdentity",
-            params={},
-            data="{}"
-        )
+        res = self.request("GetCallerIdentity", params={}, data="{}")
         response_data = json.loads(res)
-        return GetCallerIdentityResponse(**response_data.get('Result', {}))
-    
+        return GetCallerIdentityResponse(**response_data.get("Result", {}))
+
     def get_account_id(self) -> Optional[int]:
         """
         Get the account ID of the caller.
-        
+
         Returns:
             Account ID as integer, or None if not available
         """
         identity = self.get_caller_identity()
         return identity.account_id if identity else None
-
-
