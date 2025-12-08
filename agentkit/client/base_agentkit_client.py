@@ -26,20 +26,20 @@ from agentkit.utils.ve_sign import get_volc_agentkit_host_info
 class BaseAgentkitClient(BaseServiceClient):
     """
     Base client for all AgentKit services.
-
+    
     This class provides:
     1. Common credential initialization
     2. Unified API invocation logic with error handling
     3. Automatic ApiInfo generation with flexible configuration
-
+    
     Subclasses should override API_ACTIONS with either:
     - Simple dict mapping: {"ActionName": "ActionName"}
     - Detailed ApiConfig: {"ActionName": ApiConfig(action="ActionName", method="GET", path="/custom")}
     """
-
+    
     # Subclasses should override this with their API action configurations
     API_ACTIONS: Dict[str, Union[str, ApiConfig]] = {}
-
+    
     def __init__(
         self,
         access_key: str = "",
@@ -50,7 +50,7 @@ class BaseAgentkitClient(BaseServiceClient):
     ) -> None:
         """
         Initialize the AgentKit client.
-
+        
         Args:
             access_key: Volcengine access key
             secret_key: Volcengine secret key
@@ -64,23 +64,23 @@ class BaseAgentkitClient(BaseServiceClient):
             region=region,
             session_token=session_token,
             service_name=service_name,
-            credential_env_prefix="AGENTKIT",
+            credential_env_prefix='AGENTKIT',
         )
-
+    
     def _get_service_config(self) -> Dict[str, str]:
         """
         Get AgentKit service configuration.
-
+        
         Returns:
             Dictionary with host, api_version, and service
         """
         host, api_version, service = get_volc_agentkit_host_info()
         return {
-            "host": host,
-            "api_version": api_version,
-            "service": service,
+            'host': host,
+            'api_version': api_version,
+            'service': service,
         }
-
+    
     def _get(self, api_action: str, params: Dict[str, Any] = None) -> str:
         """Legacy method for GET requests."""
         try:

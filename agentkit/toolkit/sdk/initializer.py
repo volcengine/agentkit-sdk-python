@@ -33,10 +33,10 @@ def init_project(
 ) -> InitResult:
     """
     Initialize a new agent project from template.
-
+    
     This function creates a new AgentKit project with the specified template,
     including project files, configuration, and dependencies.
-
+    
     Args:
         project_name: Name of the project. Must contain only letters, numbers,
             hyphens, and underscores.
@@ -50,7 +50,7 @@ def init_project(
         system_prompt: System prompt for the agent (optional).
         model_name: Model name to use (optional, default: doubao-seed-1-6-250615).
         tools: Comma-separated list of tools to include (optional).
-
+    
     Returns:
         InitResult: Initialization result containing:
             - success: Whether initialization succeeded
@@ -58,16 +58,16 @@ def init_project(
             - project_path: Path to the project directory
             - created_files: List of created files
             - error: Error message if failed
-
+    
     Example:
         >>> from agentkit.toolkit import sdk
-        >>>
+        >>> 
         >>> # Simple initialization
         >>> result = sdk.init_project("my-agent")
         >>> if result.success:
         ...     print(f"Created project at: {result.project_path}")
         ...     print(f"Files: {', '.join(result.created_files)}")
-        >>>
+        >>> 
         >>> # With custom configuration
         >>> result = sdk.init_project(
         ...     project_name="smart-assistant",
@@ -78,13 +78,13 @@ def init_project(
         ...     model_name="doubao-1.5-pro",
         ...     tools="web_search,run_code"
         ... )
-        >>>
+        >>> 
         >>> # Check available templates
         >>> from agentkit.toolkit.sdk import get_available_templates
         >>> templates = get_available_templates()
         >>> for key, info in templates.items():
         ...     print(f"{key}: {info['name']}")
-
+    
     Raises:
         No exceptions are raised. All errors are captured in InitResult.error.
     """
@@ -97,32 +97,32 @@ def init_project(
         description=description,
         system_prompt=system_prompt,
         model_name=model_name,
-        tools=tools,
+        tools=tools
     )
 
 
 def get_available_templates() -> Dict[str, Dict[str, Any]]:
     """
     Get available project templates.
-
+    
     Returns a dictionary of template configurations, where each template
     includes name, language, description, and type information.
-
+    
     Returns:
         Dictionary mapping template keys to template information.
-
+    
     Example:
         >>> from agentkit.toolkit import sdk
-        >>>
+        >>> 
         >>> templates = sdk.get_available_templates()
-        >>>
+        >>> 
         >>> # List all templates
         >>> for key, info in templates.items():
         ...     print(f"{key}:")
         ...     print(f"  Name: {info['name']}")
         ...     print(f"  Language: {info['language']}")
         ...     print(f"  Description: {info['description']}")
-        >>>
+        >>> 
         >>> # Check if template exists
         >>> if "basic" in templates:
         ...     print("Basic template available")

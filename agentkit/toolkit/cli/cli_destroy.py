@@ -29,21 +29,21 @@ def destroy_command(
 ):
     """Destroy running Agent runtime."""
     from agentkit.toolkit import sdk
-
+    
     console.print("[red]Destroying current runtime...[/red]")
     if not force:
         typer.confirm("Are you sure you want to destroy?", abort=True)
-
+    
     try:
         # Call SDK
         result = sdk.destroy(config_file=str(config_file), force=force)
-
+        
         if result.success:
             console.print("[green]✅ Destruction completed successfully![/green]")
         else:
             console.print(f"[red]❌ Destruction failed: {result.error}[/red]")
             raise typer.Exit(1)
-
+        
     except Exception as e:
         console.print(f"[red]Destruction failed: {e}[/red]")
         raise typer.Exit(1)

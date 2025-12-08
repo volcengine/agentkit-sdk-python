@@ -23,7 +23,6 @@ DEFAULT_CR_INSTANCE_NAME = "agentkit-platform-instance"
 DEFAULT_CR_NAMESPACE_NAME = "agenkit-platform-namespace"
 DEFAULT_CR_REPO_NAME = "agentkit-platform-repo"
 
-
 class VeCR:
     def __init__(self, access_key: str, secret_key: str, region: str = "cn-beijing"):
         self.ak = access_key
@@ -217,7 +216,7 @@ class VeCR:
                     f"Error create cr repo {repo_name}: {error_code} {error_message}"
                 )
         return repo_name
-
+    
     def _get_authorization_token(self, instance_name: str):
         """
         get cr authorization token
@@ -246,12 +245,8 @@ class VeCR:
                 f"Error get cr authorization token: {error_code} {error_message}"
             )
         # print(json.dumps(response, indent=2))
-        return (
-            response["Result"]["Username"],
-            response["Result"]["Token"],
-            response["Result"]["ExpireTime"],
-        )
-
+        return response['Result']['Username'], response['Result']['Token'], response['Result']['ExpireTime']
+    
     # GetPublicEndpoint
     def _get_public_endpoint(self, instance_name: str = DEFAULT_CR_INSTANCE_NAME):
         """
@@ -273,11 +268,14 @@ class VeCR:
         if "Error" in response["ResponseMetadata"]:
             error_code = response["ResponseMetadata"]["Error"]["Code"]
             error_message = response["ResponseMetadata"]["Error"]["Message"]
-            logger.error(f"Error get cr public endpoint: {error_code} {error_message}")
+            logger.error(
+                f"Error get cr public endpoint: {error_code} {error_message}"
+            )
             raise ValueError(
                 f"Error get cr public endpoint: {error_code} {error_message}"
             )
         return response["Result"]
+    
 
     def _update_public_endpoint(self, instance_name: str, enabled: bool):
         """
@@ -308,13 +306,8 @@ class VeCR:
             )
         return None
 
-    def _create_endpoint_acl_policies(
-        self,
-        instance_name: str = DEFAULT_CR_INSTANCE_NAME,
-        acl_policies: list = [],
-        policy_type: str = "Public",
-        description: str = "",
-    ):
+
+    def _create_endpoint_acl_policies(self, instance_name: str = DEFAULT_CR_INSTANCE_NAME, acl_policies: list = [], policy_type: str = "Public", description: str = ""):
         """
         create endpoint acl policies
         """
@@ -323,7 +316,7 @@ class VeCR:
                 "Registry": instance_name,
                 "Type": policy_type,
                 "Entries": acl_policies,
-                "Description": description,
+                "Description": description
             },
             action="CreateEndpointAclPolicies",
             ak=self.ak,
@@ -334,7 +327,7 @@ class VeCR:
             host=f"cr.{self.region}.volcengineapi.com",
         )
         logger.debug(f"create endpoint acl policies: {response}")
-
+        
         if "Error" in response["ResponseMetadata"]:
             error_code = response["ResponseMetadata"]["Error"]["Code"]
             error_message = response["ResponseMetadata"]["Error"]["Message"]
@@ -345,6 +338,8 @@ class VeCR:
                 f"Error create endpoint acl policies: {error_code} {error_message}"
             )
         return None
+
+    
 
     def _list_domains(self, instance_name: str = DEFAULT_CR_INSTANCE_NAME):
         """
@@ -366,10 +361,14 @@ class VeCR:
         if "Error" in response["ResponseMetadata"]:
             error_code = response["ResponseMetadata"]["Error"]["Code"]
             error_message = response["ResponseMetadata"]["Error"]["Message"]
-            logger.error(f"Error list cr domains: {error_code} {error_message}")
-            raise ValueError(f"Error list cr domains: {error_code} {error_message}")
+            logger.error(
+                f"Error list cr domains: {error_code} {error_message}"
+            )
+            raise ValueError(
+                f"Error list cr domains: {error_code} {error_message}"
+            )
         return response["Result"]["Items"]
-
+    
     def _get_default_domain(self, instance_name: str = DEFAULT_CR_INSTANCE_NAME):
         """
         get default cr domain
@@ -379,3 +378,6 @@ class VeCR:
             if domain["Default"] == True:
                 return domain["Domain"]
         return None
+    
+
+

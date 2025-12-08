@@ -19,30 +19,23 @@ Local build: LocalDockerBuilder
 Cloud build: VeCPCRBuilder (Volcano Engine)
 """
 
-
 def __getattr__(name):
     if name == "Builder":
         from .base import Builder
-
         return Builder
     elif name == "LocalDockerBuilder":
         from .local_docker import LocalDockerBuilder
-
         return LocalDockerBuilder
     elif name == "LocalDockerBuilderConfig":
         from .local_docker import LocalDockerBuilderConfig
-
         return LocalDockerBuilderConfig
     elif name == "VeCPCRBuilder":
         from .ve_pipeline import VeCPCRBuilder
-
         return VeCPCRBuilder
     elif name == "VeCPCRBuilderConfig":
         from .ve_pipeline import VeCPCRBuilderConfig
-
         return VeCPCRBuilderConfig
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-
 
 __all__ = [
     "Builder",

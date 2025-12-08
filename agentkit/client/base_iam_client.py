@@ -25,25 +25,25 @@ from agentkit.client.base_service_client import BaseServiceClient, ApiConfig
 class BaseIAMClient(BaseServiceClient):
     """
     Base client for IAM services.
-
+    
     This class provides the same interface as BaseAgentkitClient but for IAM services:
     1. Common credential initialization
     2. Unified API invocation logic with error handling
     3. Automatic ApiInfo generation with flexible configuration
-
+    
     Subclasses should override API_ACTIONS with either:
     - Simple dict mapping: {"ActionName": "ActionName"}
     - Detailed ApiConfig: {"ActionName": ApiConfig(action="ActionName", method="GET", path="/custom")}
     """
-
+    
     # Subclasses should override this with their API action configurations
     API_ACTIONS: Dict[str, Union[str, ApiConfig]] = {}
-
+    
     # IAM service specific configuration
     IAM_API_VERSION = "2018-01-01"
     IAM_SERVICE_CODE = "iam"
-    IAM_HOST = "open.volcengineapi.com"
-
+    IAM_HOST ="open.volcengineapi.com"
+    
     def __init__(
         self,
         access_key: str = "",
@@ -54,7 +54,7 @@ class BaseIAMClient(BaseServiceClient):
     ) -> None:
         """
         Initialize the IAM client.
-
+        
         Args:
             access_key: Volcengine access key
             secret_key: Volcengine secret key
@@ -68,18 +68,18 @@ class BaseIAMClient(BaseServiceClient):
             region=region,
             session_token=session_token,
             service_name=service_name,
-            credential_env_prefix="IAM",
+            credential_env_prefix='IAM',
         )
-
+    
     def _get_service_config(self) -> Dict[str, str]:
         """
         Get IAM service configuration.
-
+        
         Returns:
             Dictionary with host, api_version, and service
         """
         return {
-            "host": self.IAM_HOST,
-            "api_version": self.IAM_API_VERSION,
-            "service": self.IAM_SERVICE_CODE,
+            'host': self.IAM_HOST,
+            'api_version': self.IAM_API_VERSION,
+            'service': self.IAM_SERVICE_CODE,
         }

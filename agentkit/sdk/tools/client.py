@@ -47,7 +47,6 @@ from agentkit.sdk.tools.types import (
 
 class AgentkitToolsClient(BaseAgentkitClient):
     """AgentKit Tools Management Service"""
-
     API_ACTIONS: Dict[str, str] = {
         "UpdateTool": "UpdateTool",
         "GetSession": "GetSession",
@@ -77,6 +76,7 @@ class AgentkitToolsClient(BaseAgentkitClient):
             service_name="tools",
         )
 
+
     def update_tool(self, request: UpdateToolRequest) -> UpdateToolResponse:
         return self._invoke_api(
             api_action="UpdateTool",
@@ -105,9 +105,7 @@ class AgentkitToolsClient(BaseAgentkitClient):
             response_type=CreateSessionResponse,
         )
 
-    def get_session_logs(
-        self, request: GetSessionLogsRequest
-    ) -> GetSessionLogsResponse:
+    def get_session_logs(self, request: GetSessionLogsRequest) -> GetSessionLogsResponse:
         return self._invoke_api(
             api_action="GetSessionLogs",
             request=request,

@@ -18,35 +18,27 @@ Volcengine - 火山引擎平台集成
 CodePipeline、AgentKit Runtime、容器镜像服务、IAM认证等
 """
 
-
 # 使用延迟导入，避免导入时的依赖问题
 def __getattr__(name):
     if name == "VeCodePipeline":
         from .code_pipeline import VeCodePipeline
-
         return VeCodePipeline
     elif name == "VeCR":
         from .cr import VeCR
-
         return VeCR
     elif name == "VeIAM":
         from .iam import VeIAM
-
         return VeIAM
     elif name == "CRService":
         from .services import CRService
-
         return CRService
     elif name == "CRServiceConfig":
         from .services import CRServiceConfig
-
         return CRServiceConfig
     elif name == "TOSService":
         from .services import TOSService
-
         return TOSService
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-
 
 __all__ = [
     "VeCodePipeline",

@@ -17,4 +17,4 @@
 from .manager import DockerfileManager
 from .metadata import DockerfileMetadata, DockerfileDecision
 
-__all__ = ["DockerfileManager", "DockerfileMetadata", "DockerfileDecision"]
+__all__ = ['DockerfileManager', 'DockerfileMetadata', 'DockerfileDecision']

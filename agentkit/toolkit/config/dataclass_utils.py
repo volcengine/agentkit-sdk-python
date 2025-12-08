@@ -19,21 +19,21 @@ from typing import Any, Dict, Type, TypeVar
 
 logger = logging.getLogger(__name__)
 
-T = TypeVar("T")
-
+T = TypeVar('T')
 
 class DataclassSerializer:
+    
     @staticmethod
     def to_dict(obj: Any) -> Dict[str, Any]:
         return asdict(obj)
-
+    
     @staticmethod
     def from_dict(cls: Type[T], data: Dict[str, Any]) -> T:
         from dataclasses import MISSING
-
-        if not hasattr(cls, "__dataclass_fields__"):
+        
+        if not hasattr(cls, '__dataclass_fields__'):
             raise ValueError(f"{cls} must be a dataclass")
-
+        
         # Temporary map to track field value sources
         _sources: Dict[str, str] = {}
 
@@ -46,68 +46,47 @@ class DataclassSerializer:
             # Prefer direct field in data
             if field_name in data:
                 kwargs[field_name] = data[field_name]
-                _sources[field_name] = "local"
-                logger.debug(
-                    "[DataclassSerializer] source=local field=%s value=%r",
-                    field_name,
-                    kwargs[field_name],
-                )
+                _sources[field_name] = 'local'
+                logger.debug("[DataclassSerializer] source=local field=%s value=%r", field_name, kwargs[field_name])
             else:
                 # Try aliases (backward compatibility)
                 found_in_alias = False
-                aliases = field.metadata.get("aliases", [])
+                aliases = field.metadata.get('aliases', [])
                 for alias in aliases:
                     if alias in data:
                         kwargs[field_name] = data[alias]
                         found_in_alias = True
-                        _sources[field_name] = "local"
-                        logger.debug(
-                            "[DataclassSerializer] source=alias(%s) -> local field=%s value=%r",
-                            alias,
-                            field_name,
-                            kwargs[field_name],
-                        )
+                        _sources[field_name] = 'local'
+                        logger.debug("[DataclassSerializer] source=alias(%s) -> local field=%s value=%r", alias, field_name, kwargs[field_name])
                         break
-
+                
                 # Fallback to default values when not provided in data or aliases
                 if not found_in_alias:
                     if field.default_factory is not MISSING:
                         kwargs[field_name] = field.default_factory()
-                        _sources[field_name] = "default"
-                        logger.debug(
-                            "[DataclassSerializer] source=default_factory field=%s value=%r",
-                            field_name,
-                            kwargs[field_name],
-                        )
+                        _sources[field_name] = 'default'
+                        logger.debug("[DataclassSerializer] source=default_factory field=%s value=%r", field_name, kwargs[field_name])
                     elif field.default is not MISSING:
                         kwargs[field_name] = field.default
-                        _sources[field_name] = "default"
-                        logger.debug(
-                            "[DataclassSerializer] source=default field=%s value=%r",
-                            field_name,
-                            kwargs[field_name],
-                        )
+                        _sources[field_name] = 'default'
+                        logger.debug("[DataclassSerializer] source=default field=%s value=%r", field_name, kwargs[field_name])
                     else:
                         kwargs[field_name] = None
                         # No source
-                        logger.debug(
-                            "[DataclassSerializer] source=none field=%s value=None",
-                            field_name,
-                        )
-
+                        logger.debug("[DataclassSerializer] source=none field=%s value=None", field_name)
+        
         # Create instance (no class-level render skipping is used anymore)
         instance = cls(**kwargs)
 
         # Attach sources to the instance for later writeback decisions
         try:
-            if not hasattr(instance, "_value_sources"):
+            if not hasattr(instance, '_value_sources'):
                 instance._value_sources = {}
             instance._value_sources.update(_sources)
         except Exception:
             pass
 
         return instance
-
 
 class AutoSerializableMixin:
     """Mixin for configuration dataclasses.
@@ -119,10 +98,10 @@ class AutoSerializableMixin:
     - Render template fields and validate unresolved placeholders
     - Produce persistable dict based on value sources
     """
-
+    
     def to_dict(self) -> Dict[str, Any]:
         return DataclassSerializer.to_dict(self)
-
+    
     @classmethod
     def from_dict(cls: Type[T], data: Dict[str, Any], skip_render: bool = False) -> T:
         """Create a config instance from a dict.
@@ -135,80 +114,52 @@ class AutoSerializableMixin:
         """
         # Construct first, so global defaults can be applied before any rendering
         logger = logging.getLogger(f"{__name__}.{cls.__name__}")
-        logger.debug(
-            "from_dict: start, skip_render=%s for %s", skip_render, cls.__name__
-        )
+        logger.debug("from_dict: start, skip_render=%s for %s", skip_render, cls.__name__)
         data = dict(data)
-
+        
         # 2) Create instance without rendering
         try:
             instance = DataclassSerializer.from_dict(cls, data)
-            logger.debug(
-                "from_dict: instance created without rendering for %s", cls.__name__
-            )
+            logger.debug("from_dict: instance created without rendering for %s", cls.__name__)
         except Exception as e:
-            logger.debug(
-                "from_dict: failed to create instance for %s: %s", cls.__name__, e
-            )
+            logger.debug("from_dict: failed to create instance for %s: %s", cls.__name__, e)
             raise
-
+        
         # Apply global defaults using original project data (pre-render)
         try:
             from .global_config import apply_global_config_defaults
-
             before = instance.to_dict()
             logger.debug("from_dict: before globals for %s -> %r", cls.__name__, before)
             instance = apply_global_config_defaults(instance, data)
             after = instance.to_dict()
             if before != after:
                 # Compute diff of updated fields
-                diff = {
-                    k: (before.get(k), after.get(k))
-                    for k in after.keys()
-                    if before.get(k) != after.get(k)
-                }
-                logger.debug(
-                    "from_dict: applied global defaults for %s; changes=%r",
-                    cls.__name__,
-                    diff,
-                )
+                diff = {k: (before.get(k), after.get(k)) for k in after.keys() if before.get(k) != after.get(k)}
+                logger.debug("from_dict: applied global defaults for %s; changes=%r", cls.__name__, diff)
             else:
-                logger.debug(
-                    "from_dict: applied global defaults for %s; no changes",
-                    cls.__name__,
-                )
+                logger.debug("from_dict: applied global defaults for %s; no changes", cls.__name__)
         except ImportError:
             # Global config module unavailable
-            logger.debug(
-                "from_dict: global_config not available; skipped applying globals for %s",
-                cls.__name__,
-            )
+            logger.debug("from_dict: global_config not available; skipped applying globals for %s", cls.__name__)
         except Exception:
             # Global defaults application should not break overall flow
-            logger.debug(
-                "from_dict: apply_global_config_defaults raised; ignored for %s",
-                cls.__name__,
-            )
-
+            logger.debug("from_dict: apply_global_config_defaults raised; ignored for %s", cls.__name__)
+        
         # Render template fields after globals/defaults. Skipped if skip_render is True.
         if not skip_render:
             try:
                 # Ensure instance-level skip flag is cleared
-                if hasattr(instance, "_skip_render"):
-                    setattr(instance, "_skip_render", False)
-                logger.debug(
-                    "from_dict: start rendering template fields for %s", cls.__name__
-                )
+                if hasattr(instance, '_skip_render'):
+                    setattr(instance, '_skip_render', False)
+                logger.debug("from_dict: start rendering template fields for %s", cls.__name__)
                 instance._render_template_fields()
                 logger.debug("from_dict: rendered template fields for %s", cls.__name__)
             except Exception:
-                logger.debug(
-                    "from_dict: rendering failed for %s; re-raising", cls.__name__
-                )
+                logger.debug("from_dict: rendering failed for %s; re-raising", cls.__name__)
                 raise
-
+        
         return instance
-
+    
     def _render_template_fields(self):
         """Render fields whose metadata has render_template=True.
 
@@ -219,38 +170,28 @@ class AutoSerializableMixin:
         """
 
         # Only meaningful for dataclasses
-        if not hasattr(self, "__dataclass_fields__"):
+        if not hasattr(self, '__dataclass_fields__'):
             logger.debug("_render_template_fields: not a dataclass, skipping")
             return
-
+        
         # Skip when explicitly requested on the instance (e.g., status-only flows)
-        inst_skip = getattr(self, "_skip_render", False)
+        inst_skip = getattr(self, '_skip_render', False)
         if inst_skip:
-            logger.debug(
-                "_render_template_fields: skip rendering for %s, skip_render=%s",
-                self.__class__.__name__,
-                inst_skip,
-            )
+            logger.debug("_render_template_fields: skip rendering for %s, skip_render=%s", self.__class__.__name__, inst_skip)
             return
-
+        
         try:
             from agentkit.utils.template_utils import render_template
             from agentkit.toolkit.config.utils import is_invalid_config
-
             cfg_name = self.__class__.__name__
-
+            
             # Initialize original template map
-            if not hasattr(self, "_template_originals"):
+            if not hasattr(self, '_template_originals'):
                 self._template_originals = {}
-
+            
             for field_info in fields(self):
                 # Process only fields marked for template rendering
-                logger.debug(
-                    "[%s] [template] checking field: name=%s, render_template=%s",
-                    cfg_name,
-                    field_info.name,
-                    field_info.metadata.get("render_template"),
-                )
+                logger.debug("[%s] [template] checking field: name=%s, render_template=%s", cfg_name, field_info.name, field_info.metadata.get("render_template"))
                 if field_info.metadata.get("render_template"):
                     field_value = getattr(self, field_info.name)
                     logger.debug(
@@ -258,12 +199,9 @@ class AutoSerializableMixin:
                         cfg_name,
                         field_info.name,
                         field_value,
-                        (
-                            isinstance(field_value, str)
-                            and ("{{" in field_value and "}}" in field_value)
-                        ),
+                        (isinstance(field_value, str) and ('{{' in field_value and '}}' in field_value))
                     )
-
+                    
                     # Handle invalid values (None/""/Auto) via default_template when available
                     if is_invalid_config(field_value):
                         default_template = field_info.metadata.get("default_template")
@@ -279,37 +217,26 @@ class AutoSerializableMixin:
                             self._template_originals[field_info.name] = default_template
                             # Mark value source
                             try:
-                                if not hasattr(self, "_value_sources"):
+                                if not hasattr(self, '_value_sources'):
                                     self._value_sources = {}
-                                self._value_sources[field_info.name] = (
-                                    "default_template"
-                                )
+                                self._value_sources[field_info.name] = 'default_template'
                             except Exception:
                                 pass
                             # Set template value first so there is a visible value even if rendering fails
                             setattr(self, field_info.name, default_template)
                         else:
                             # No default_template; skip
-                            logger.debug(
-                                "[%s] [template] field %s is Auto/empty and has no default_template -> skip",
-                                cfg_name,
-                                field_info.name,
-                            )
+                            logger.debug("[%s] [template] field %s is Auto/empty and has no default_template -> skip", cfg_name, field_info.name)
                             continue
-
+                    
                     # Render non-empty value
                     if field_value:
                         # Save original template string only if placeholders are present
-                        if "{{" in str(field_value) and "}}" in str(field_value):
+                        if '{{' in str(field_value) and '}}' in str(field_value):
                             if field_info.name not in self._template_originals:
                                 self._template_originals[field_info.name] = field_value
-                                logger.debug(
-                                    "[%s] [template] save original template for %s: %r",
-                                    cfg_name,
-                                    field_info.name,
-                                    field_value,
-                                )
-
+                                logger.debug("[%s] [template] save original template for %s: %r", cfg_name, field_info.name, field_value)
+                        
                         try:
                             rendered = render_template(field_value)
                             logger.debug(
@@ -320,44 +247,36 @@ class AutoSerializableMixin:
                                 rendered,
                             )
                             # Fail if unresolved placeholders remain
-                            if "{{" in str(rendered) and "}}" in str(rendered):
+                            if '{{' in str(rendered) and '}}' in str(rendered):
                                 error_msg = (
                                     f"Config field '{field_info.name}' template variables were not fully rendered: "
                                     f"'{field_value}' -> '{rendered}'"
                                 )
                                 logger.error(f"[{cfg_name}] {error_msg}")
                                 raise ValueError(error_msg)
-
+                            
                             if rendered != field_value:
-                                logger.debug(
-                                    "[%s] [template] apply rendered value for %s",
-                                    cfg_name,
-                                    field_info.name,
-                                )
+                                logger.debug("[%s] [template] apply rendered value for %s", cfg_name, field_info.name)
                                 setattr(self, field_info.name, rendered)
                             # Extra logging for image_tag
                             if field_info.name == "image_tag":
-                                logger.info(
-                                    "[%s] [template] image_tag final value: %r",
-                                    cfg_name,
-                                    getattr(self, field_info.name),
-                                )
+                                logger.info("[%s] [template] image_tag final value: %r", cfg_name, getattr(self, field_info.name))
                         except Exception as e:
                             # Do not silently fallback on render failures; surface details
                             error_type = type(e).__name__
                             error_detail = str(e)
-
+                            
                             # Build detailed error message
                             error_msg = f"Config field '{field_info.name}' template rendering failed: {field_value}\n"
                             error_msg += f"Error type: {error_type}\n"
                             error_msg += f"Error detail: {error_detail}"
-
-                            if "{{account_id}}" in str(field_value):
+                            
+                            if '{{account_id}}' in str(field_value):
                                 error_msg += (
                                     "\n\nHint: failed to obtain account_id; please check Volcengine AK/SK "
                                     "configuration and IAM permissions."
                                 )
-
+                            
                             logger.error(f"[{cfg_name}] {error_msg}")
                             # Log full stack for debugging
                             logger.debug(
@@ -366,19 +285,11 @@ class AutoSerializableMixin:
                             )
                             raise ValueError(error_msg) from e
                 else:
-                    logger.debug(
-                        "[%s] [template] field %s is not marked for rendering, value: %r",
-                        cfg_name,
-                        field_info.name,
-                        getattr(self, field_info.name),
-                    )
+                    logger.debug("[%s] [template] field %s is not marked for rendering, value: %r", cfg_name, field_info.name, getattr(self, field_info.name))
         except ImportError:
             # If template utils are not available, no-op
-            logger.error(
-                "Template utils not available; skipping template rendering",
-                exc_info=True,
-            )
-
+            logger.error("Template utils not available; skipping template rendering", exc_info=True)
+    
     def to_persist_dict(self) -> Dict[str, Any]:
         """Produce a persistable dict following value-source rules.
 
@@ -390,8 +301,8 @@ class AutoSerializableMixin:
         """
         result = self.to_dict()
 
-        sources = getattr(self, "_value_sources", {}) or {}
-        originals = getattr(self, "_template_originals", {}) or {}
+        sources = getattr(self, '_value_sources', {}) or {}
+        originals = getattr(self, '_template_originals', {}) or {}
 
         # Iterate fields and decide persisted value based on source rules
         for field_info in fields(self):
@@ -400,53 +311,30 @@ class AutoSerializableMixin:
             current_value = getattr(self, name)
             original_tpl = originals.get(name)
 
-            if source == "global":
+            if source == 'global':
                 # Global source: write empty string so project config remains "unset"
                 result[name] = ""
-                logger.debug(
-                    "[persist] field=%s source=global -> write='' (keep local unset)",
-                    name,
-                )
-            elif source == "default_template":
+                logger.debug("[persist] field=%s source=global -> write='' (keep local unset)", name)
+            elif source == 'default_template':
                 # Write back the template instead of rendered value
                 chosen = original_tpl if original_tpl is not None else current_value
                 result[name] = chosen
-                logger.debug(
-                    "[persist] field=%s source=default_template original=%r current=%r -> write=%r",
-                    name,
-                    original_tpl,
-                    current_value,
-                    chosen,
-                )
-            elif source == "default":
+                logger.debug("[persist] field=%s source=default_template original=%r current=%r -> write=%r", name, original_tpl, current_value, chosen)
+            elif source == 'default':
                 # Default source: persist current value
                 result[name] = current_value
-                logger.debug(
-                    "[persist] field=%s source=default -> write=%r", name, current_value
-                )
-            elif source == "local":
+                logger.debug("[persist] field=%s source=default -> write=%r", name, current_value)
+            elif source == 'local':
                 # Local source: if it was a template input, prefer original template
                 if original_tpl is not None:
                     result[name] = original_tpl
-                    logger.debug(
-                        "[persist] field=%s source=local original_tpl exists -> write original=%r",
-                        name,
-                        original_tpl,
-                    )
+                    logger.debug("[persist] field=%s source=local original_tpl exists -> write original=%r", name, original_tpl)
                 else:
                     result[name] = current_value
-                    logger.debug(
-                        "[persist] field=%s source=local no original_tpl -> write current=%r",
-                        name,
-                        current_value,
-                    )
+                    logger.debug("[persist] field=%s source=local no original_tpl -> write current=%r", name, current_value)
             else:
                 # Unknown source: keep current value
                 result[name] = current_value
-                logger.debug(
-                    "[persist] field=%s source=unknown -> write current=%r",
-                    name,
-                    current_value,
-                )
+                logger.debug("[persist] field=%s source=unknown -> write current=%r", name, current_value)
 
         return result

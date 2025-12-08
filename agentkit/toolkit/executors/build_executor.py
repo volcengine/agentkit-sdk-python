@@ -43,13 +43,12 @@ from .base_executor import BaseExecutor
 class BuildOptions:
     """
     Runtime options for build execution (from CLI, not persisted to config file).
-
+    
     These options control single-run build behavior, separate from persistent configuration.
     """
-
     platform: Optional[str] = None
     """Target CPU architecture platform (e.g., linux/amd64, linux/arm64) passed to Docker build"""
-
+    
     regenerate_dockerfile: bool = False
     """Force regenerate Dockerfile even if it already exists"""
 
@@ -57,7 +56,7 @@ class BuildOptions:
 class BuildExecutor(BaseExecutor):
     """
     Build executor orchestrating the build strategy.
-
+    
     All Executor subclasses inherit:
     - Configuration loading from file or dict with priority handling
     - Configuration validation for required fields
@@ -66,26 +65,26 @@ class BuildExecutor(BaseExecutor):
     - Unified error handling and classification
     - Configuration persistence for build metadata
     """
-
+    
     def __init__(self, reporter: Reporter = None):
         """
         Initialize the executor with optional reporter for progress tracking.
-
+        
         Args:
             reporter: Reporter instance for progress reporting. If None, uses SilentReporter.
                      This reporter is passed through to Strategy → Builder chain.
         """
         super().__init__(reporter)
-
+    
     def execute(
         self,
         config_dict: Optional[Dict[str, Any]] = None,
         config_file: Optional[str] = None,
-        options: Optional[BuildOptions] = None,
+        options: Optional[BuildOptions] = None
     ) -> BuildResult:
         """
         Execute the build operation with unified configuration and error handling.
-
+        
         Strategy:
         1. Load and validate configuration (priority: config_dict > config_file > default)
         2. Apply runtime options to configuration (not persisted)
@@ -94,15 +93,15 @@ class BuildExecutor(BaseExecutor):
         5. Execute build via strategy
         6. Apply and persist configuration updates from build result
         7. Log results and return BuildResult
-
+        
         Args:
             config_dict: Configuration dictionary (highest priority, overrides config_file)
             config_file: Path to configuration file (medium priority)
             options: Build runtime options (CLI parameters, not persisted)
-
+            
         Returns:
             BuildResult: Build result returned directly from Strategy without transformation
-
+            
         Raises:
             FileNotFoundError: Configuration file does not exist
             ValueError: Configuration is invalid
@@ -114,45 +113,41 @@ class BuildExecutor(BaseExecutor):
             self.logger.info("Loading configuration...")
             config = self._load_config(config_dict, config_file)
             self._validate_config(config)
-
+            
             # Apply runtime options to configuration (not persisted to file)
             if options.regenerate_dockerfile:
                 self.logger.debug("Runtime option: regenerate_dockerfile=True")
-                config.set_docker_build_runtime_param("regenerate_dockerfile", True)
-
+                config.set_docker_build_runtime_param('regenerate_dockerfile', True)
+            
             if options.platform:
                 self.logger.debug(f"Runtime option: platform={options.platform}")
-                config.set_docker_build_runtime_param("platform", options.platform)
-
+                config.set_docker_build_runtime_param('platform', options.platform)
+            
             common_config = config.get_common_config()
             launch_type = common_config.launch_type
             self.logger.info(f"Build strategy selected: {launch_type}")
-
+            
             strategy = self._get_strategy(launch_type, config_manager=config)
             strategy_config = self._get_strategy_config_object(config, launch_type)
-
+            
             self.logger.info(f"Starting build with {launch_type} strategy...")
             result = strategy.build(common_config, strategy_config)
-
+            
             # Apply configuration updates from build result
             # This persists build metadata (e.g., generated image name, build timestamp)
             if result.success and result.config_updates:
                 self._apply_config_updates(config, launch_type, result.config_updates)
-
+            
             if result.success:
                 if result.image:
-                    self.logger.info(
-                        f"Build completed successfully: {result.image.full_name}"
-                    )
+                    self.logger.info(f"Build completed successfully: {result.image.full_name}")
                 else:
                     self.logger.info("Build completed successfully")
             else:
-                self.logger.error(
-                    f"Build failed: {result.error} (code: {result.error_code})"
-                )
-
+                self.logger.error(f"Build failed: {result.error} (code: {result.error_code})")
+            
             return result
-
+            
         except Exception as e:
             self.logger.exception(f"Build execution error: {e}")
             error_info = self._handle_exception("Build", e)

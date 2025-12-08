@@ -12,21 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .cr_service import (
-    CRService,
-    CRServiceConfig,
-    CRServiceResult,
-    CRConfigCallback,
-    DefaultCRConfigCallback,
-)
+from .cr_service import CRService, CRServiceConfig, CRServiceResult, CRConfigCallback, DefaultCRConfigCallback
 from .tos_service import TOSService, TOSServiceConfig
 
 __all__ = [
-    "CRService",
-    "CRServiceConfig",
-    "CRServiceResult",
-    "CRConfigCallback",
-    "DefaultCRConfigCallback",
-    "TOSService",
-    "TOSServiceConfig",
+    'CRService',
+    'CRServiceConfig', 
+    'CRServiceResult',
+    'CRConfigCallback',
+    'DefaultCRConfigCallback',
+    'TOSService',
+    'TOSServiceConfig'
 ]

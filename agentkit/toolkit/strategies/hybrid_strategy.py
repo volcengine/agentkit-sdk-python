@@ -20,25 +20,18 @@ Builds image locally, pushes to Container Registry, then deploys to VE Runtime.
 
 from typing import Any, Optional
 from agentkit.toolkit.strategies.base_strategy import Strategy
-from agentkit.toolkit.models import (
-    BuildResult,
-    DeployResult,
-    InvokeResult,
-    StatusResult,
-)
+from agentkit.toolkit.models import BuildResult, DeployResult, InvokeResult, StatusResult
 from agentkit.toolkit.config import (
     AUTO_CREATE_VE,
     CommonConfig,
     HybridStrategyConfig,
-    merge_runtime_envs,
+    merge_runtime_envs
 )
 from agentkit.toolkit.builders.local_docker import (
-    LocalDockerBuilder,
-    LocalDockerBuilderConfig,
+    LocalDockerBuilder, LocalDockerBuilderConfig
 )
 from agentkit.toolkit.runners.ve_agentkit import (
-    VeAgentkitRuntimeRunner,
-    VeAgentkitRunnerConfig,
+    VeAgentkitRuntimeRunner, VeAgentkitRunnerConfig
 )
 from agentkit.toolkit.volcengine.services import CRService, CRServiceConfig
 
@@ -46,35 +39,35 @@ from agentkit.toolkit.volcengine.services import CRService, CRServiceConfig
 class HybridStrategy(Strategy):
     """
     Hybrid orchestration strategy combining local build and cloud deployment.
-
+    
     Orchestration flow:
     1. build: LocalDockerBuilder.build() → BuildResult
     2. push: Push image to Container Registry
     3. deploy: VeAgentkitRuntimeRunner.deploy() → DeployResult
     4. invoke: VeAgentkitRuntimeRunner.invoke() → InvokeResult
     5. status: VeAgentkitRuntimeRunner.status() → StatusResult
-
+    
     Characteristics:
     - Combines local build speed with cloud deployment convenience
     - Pure orchestration with no side effects
     - Returns Builder/Runner results directly
     - Exceptions propagate to Executor for handling
     """
-
+    
     def __init__(self, config_manager=None, reporter=None):
         """
         Initialize HybridStrategy.
-
+        
         Args:
             config_manager: Configuration manager (optional).
             reporter: Reporter instance (passed to Builder/Runner).
         """
         super().__init__(config_manager, reporter)
-
+        
         # Lazy initialization to avoid requiring environment variables at init time
         self._builder = None
         self._runner = None
-
+    
     @property
     def builder(self):
         """Lazy-load Builder instance."""
@@ -82,25 +75,24 @@ class HybridStrategy(Strategy):
             project_dir = None
             if self.config_manager:
                 project_dir = self.config_manager.get_project_dir()
-
+            
             self._builder = LocalDockerBuilder(
-                project_dir=project_dir, reporter=self.reporter
+                project_dir=project_dir,
+                reporter=self.reporter
             )
         return self._builder
-
+    
     @property
     def runner(self):
         """Lazy-load Runner instance."""
         if self._runner is None:
             self._runner = VeAgentkitRuntimeRunner(reporter=self.reporter)
         return self._runner
-
-    def build(
-        self, common_config: CommonConfig, strategy_config: HybridStrategyConfig
-    ) -> BuildResult:
+    
+    def build(self, common_config: CommonConfig, strategy_config: HybridStrategyConfig) -> BuildResult:
         """
         Execute hybrid build (local build + push to Container Registry).
-
+        
         Orchestration steps:
         1. Build image locally
         2. Prepare CR configuration (without modifying config object)
@@ -108,37 +100,33 @@ class HybridStrategy(Strategy):
         4. Return BuildResult with ConfigUpdates
         """
         from agentkit.toolkit.models import ConfigUpdates
-
+        
         config_updates = ConfigUpdates()
-
+        
         builder_config = self._to_builder_config(common_config, strategy_config)
         result = self.builder.build(builder_config)
-
+        
         if not result.success:
             return result
-
-        cr_repo_name = self._prepare_cr_config(
-            strategy_config.cr_repo_name, common_config.agent_name
-        )
+        
+        cr_repo_name = self._prepare_cr_config(strategy_config.cr_repo_name, common_config.agent_name)
         if cr_repo_name != strategy_config.cr_repo_name:
-            config_updates.add("cr_repo_name", cr_repo_name)
-
+            config_updates.add('cr_repo_name', cr_repo_name)
+        
         should_push, reason = self._should_push_to_cr(strategy_config, cr_repo_name)
         if should_push:
             cr_updates = self._handle_cr_push(result, strategy_config, cr_repo_name)
             config_updates.merge(cr_updates)
         else:
             self._report_cr_skip_reason(reason, strategy_config)
-
+        
         result.config_updates = config_updates if config_updates.has_updates() else None
         return result
-
-    def deploy(
-        self, common_config: CommonConfig, strategy_config: HybridStrategyConfig
-    ) -> DeployResult:
+    
+    def deploy(self, common_config: CommonConfig, strategy_config: HybridStrategyConfig) -> DeployResult:
         """
         Execute hybrid deployment to VE Runtime.
-
+        
         Orchestration steps:
         1. Validate CR image URL
         2. Convert configuration
@@ -146,52 +134,41 @@ class HybridStrategy(Strategy):
         4. Return DeployResult with ConfigUpdates
         """
         from agentkit.toolkit.models import ConfigUpdates
-
+        
         validation_result = self._validate_cr_image_url(strategy_config)
         if not validation_result.success:
             return validation_result
-
+        
         runner_config = self._to_runner_config(common_config, strategy_config)
-
+        
         result = self.runner.deploy(runner_config)
-
+        
         # Extract and track configuration updates from deployment result
         config_updates = ConfigUpdates()
         if result.success:
             if result.service_id:
-                config_updates.add("runtime_id", result.service_id)
+                config_updates.add('runtime_id', result.service_id)
             if result.endpoint_url:
-                config_updates.add("runtime_endpoint", result.endpoint_url)
+                config_updates.add('runtime_endpoint', result.endpoint_url)
             if result.metadata:
-                if "runtime_apikey" in result.metadata:
-                    config_updates.add(
-                        "runtime_apikey", result.metadata["runtime_apikey"]
-                    )
-                if "runtime_name" in result.metadata:
-                    config_updates.add("runtime_name", result.metadata["runtime_name"])
-                if "runtime_apikey_name" in result.metadata:
-                    config_updates.add(
-                        "runtime_apikey_name", result.metadata["runtime_apikey_name"]
-                    )
-                if "runtime_role_name" in result.metadata:
-                    config_updates.add(
-                        "runtime_role_name", result.metadata["runtime_role_name"]
-                    )
-
+                if 'runtime_apikey' in result.metadata:
+                    config_updates.add('runtime_apikey', result.metadata['runtime_apikey'])
+                if 'runtime_name' in result.metadata:
+                    config_updates.add('runtime_name', result.metadata['runtime_name'])
+                if 'runtime_apikey_name' in result.metadata:
+                    config_updates.add('runtime_apikey_name', result.metadata['runtime_apikey_name'])
+                if 'runtime_role_name' in result.metadata:
+                    config_updates.add('runtime_role_name', result.metadata['runtime_role_name'])
+        
         result.config_updates = config_updates if config_updates.has_updates() else None
         return result
-
-    def invoke(
-        self,
-        common_config: CommonConfig,
-        strategy_config: HybridStrategyConfig,
-        payload: Any,
-        headers: Optional[dict] = None,
-        stream: Optional[bool] = None,
-    ) -> InvokeResult:
+    
+    def invoke(self, common_config: CommonConfig, strategy_config: HybridStrategyConfig,
+               payload: Any, headers: Optional[dict] = None,
+               stream: Optional[bool] = None) -> InvokeResult:
         """
         Invoke the deployed service.
-
+        
         Orchestration steps:
         1. Convert configuration
         2. Call VeAgentkitRuntimeRunner.invoke()
@@ -199,13 +176,11 @@ class HybridStrategy(Strategy):
         """
         runner_config = self._to_runner_config(common_config, strategy_config)
         return self.runner.invoke(runner_config, payload, headers, stream)
-
-    def status(
-        self, common_config: CommonConfig, strategy_config: HybridStrategyConfig
-    ) -> StatusResult:
+    
+    def status(self, common_config: CommonConfig, strategy_config: HybridStrategyConfig) -> StatusResult:
         """
         Query service status.
-
+        
         Orchestration steps:
         1. Convert configuration
         2. Call VeAgentkitRuntimeRunner.status()
@@ -213,16 +188,11 @@ class HybridStrategy(Strategy):
         """
         runner_config = self._to_runner_config(common_config, strategy_config)
         return self.runner.status(runner_config)
-
-    def destroy(
-        self,
-        common_config: CommonConfig,
-        strategy_config: HybridStrategyConfig,
-        force: bool = False,
-    ) -> bool:
+    
+    def destroy(self, common_config: CommonConfig, strategy_config: HybridStrategyConfig, force: bool = False) -> bool:
         """
         Destroy the VE Runtime.
-
+        
         Orchestration steps:
         1. Convert configuration
         2. Call VeAgentkitRuntimeRunner.destroy()
@@ -230,172 +200,153 @@ class HybridStrategy(Strategy):
         runner_config = self._to_runner_config(common_config, strategy_config)
         success = self.runner.destroy(runner_config)
         return success
-
+    
     def _prepare_cr_config(self, current_cr_repo_name: str, agent_name: str) -> str:
         """
         Prepare CR configuration by auto-filling repository name if needed.
-
+        
         Args:
             current_cr_repo_name: Current CR repository name.
             agent_name: Agent name to use as default.
-
+            
         Returns:
             Prepared CR repository name.
         """
         if not current_cr_repo_name:
             return agent_name or "agentkit-app"
         return current_cr_repo_name
-
-    def _should_push_to_cr(
-        self, strategy_config: HybridStrategyConfig, cr_repo_name: str
-    ) -> tuple:
+    
+    def _should_push_to_cr(self, strategy_config: HybridStrategyConfig, cr_repo_name: str) -> tuple:
         """
         Determine whether to push image to Container Registry.
-
+        
         Args:
             strategy_config: Strategy configuration.
             cr_repo_name: Prepared CR repository name.
-
+            
         Returns:
             Tuple of (should_push: bool, reason: str).
         """
         if not strategy_config.cr_instance_name:
             return False, "CR instance name is empty"
-
+        
         if strategy_config.cr_instance_name == AUTO_CREATE_VE:
             return False, "CR instance name is 'Auto'"
-
-        if "{{" in strategy_config.cr_instance_name:
+        
+        if '{{' in strategy_config.cr_instance_name:
             return False, "CR instance name contains unrendered template variables"
-
+        
         if not cr_repo_name:
             return False, "CR repository name is empty"
-
+        
         return True, ""
-
-    def _handle_cr_push(
-        self,
-        result: BuildResult,
-        strategy_config: HybridStrategyConfig,
-        cr_repo_name: str,
-    ) -> "ConfigUpdates":
+    
+    def _handle_cr_push(self, result: BuildResult, strategy_config: HybridStrategyConfig,
+                        cr_repo_name: str) -> 'ConfigUpdates':
         """
         Handle pushing image to Container Registry.
-
+        
         Steps:
         1. Push image to CR
         2. Update result.metadata with CR image URL
         3. Return ConfigUpdates for configuration tracking
         4. Report success message
-
+        
         Args:
             result: Build result containing local image.
             strategy_config: Strategy configuration.
             cr_repo_name: Prepared CR repository name.
-
+            
         Returns:
             ConfigUpdates object with CR image URL.
         """
         from agentkit.toolkit.models import ConfigUpdates
-
+        
         config_updates = ConfigUpdates()
-
+        
         local_image = result.image.full_name if result.image else None
         if not local_image:
             return config_updates
-
+        
         cr_image_url = self._push_to_cr(
             local_image,
             strategy_config.cr_instance_name,
             strategy_config.cr_namespace_name,
             cr_repo_name,
-            strategy_config.image_tag,
+            strategy_config.image_tag
         )
-
-        config_updates.add("cr_image_full_url", cr_image_url)
-
+        
+        config_updates.add('cr_image_full_url', cr_image_url)
+        
         if not result.metadata:
             result.metadata = {}
-        result.metadata["cr_image_url"] = cr_image_url
-
+        result.metadata['cr_image_url'] = cr_image_url
+        
         self.reporter.success(f"CR image URL: {cr_image_url}")
-
+        
         return config_updates
-
-    def _report_cr_skip_reason(
-        self, reason: str, strategy_config: HybridStrategyConfig
-    ) -> None:
+    
+    def _report_cr_skip_reason(self, reason: str, strategy_config: HybridStrategyConfig) -> None:
         """Report reason for skipping CR push."""
-        if "{{" in strategy_config.cr_instance_name:
-            self.reporter.warning(
-                f"⚠️  CR instance name contains unrendered template variables: {strategy_config.cr_instance_name}"
-            )
-            self.reporter.warning(
-                "⚠️  Ensure volcenginesdkcore is installed to render template variables"
-            )
+        if '{{' in strategy_config.cr_instance_name:
+            self.reporter.warning(f"⚠️  CR instance name contains unrendered template variables: {strategy_config.cr_instance_name}")
+            self.reporter.warning("⚠️  Ensure volcenginesdkcore is installed to render template variables")
         elif strategy_config.cr_instance_name == AUTO_CREATE_VE:
             self.reporter.warning("⚠️  CR instance name is 'Auto', skipping push to CR")
-            self.reporter.warning(
-                "⚠️  Use 'agentkit config' to configure a valid CR instance name"
-            )
+            self.reporter.warning("⚠️  Use 'agentkit config' to configure a valid CR instance name")
         else:
-            self.reporter.warning(
-                f"⚠️  Invalid CR configuration, skipping push to CR: {reason}"
-            )
-
-    def _validate_cr_image_url(
-        self, strategy_config: HybridStrategyConfig
-    ) -> DeployResult:
+            self.reporter.warning(f"⚠️  Invalid CR configuration, skipping push to CR: {reason}")
+    
+    def _validate_cr_image_url(self, strategy_config: HybridStrategyConfig) -> DeployResult:
         """
         Validate CR image URL is available.
-
+        
         Hybrid mode requires a CR image. Returns failure if no valid CR image URL exists.
         """
         image_url = strategy_config.cr_image_full_url
-
+        
         if image_url:
             return DeployResult(success=True)
-
-        if "{{" in strategy_config.cr_instance_name:
+        
+        if '{{' in strategy_config.cr_instance_name:
             error_msg = (
                 f"CR instance name contains unrendered template variables: {strategy_config.cr_instance_name}\n"
                 f"Ensure volcenginesdkcore is installed to render template variables."
             )
-        elif (
-            strategy_config.cr_instance_name == AUTO_CREATE_VE
-            or not strategy_config.cr_instance_name
-        ):
+        elif strategy_config.cr_instance_name == AUTO_CREATE_VE or not strategy_config.cr_instance_name:
             error_msg = (
                 f"Hybrid mode requires valid CR configuration. Current cr_instance_name='{strategy_config.cr_instance_name}' is invalid.\n"
                 f"Use 'agentkit config' to configure a valid CR instance name, or switch to local/cloud mode."
             )
         else:
-            error_msg = "CR image URL not found. Run 'agentkit build' to build and push the image to CR."
-
+            error_msg = (
+                "CR image URL not found. Run 'agentkit build' to build and push the image to CR."
+            )
+        
         return DeployResult(
-            success=False, error=error_msg, error_code="INVALID_IMAGE_URL"
+            success=False,
+            error=error_msg,
+            error_code="INVALID_IMAGE_URL"
         )
-
-    def _to_builder_config(
-        self, common_config: CommonConfig, strategy_config: HybridStrategyConfig
-    ) -> LocalDockerBuilderConfig:
+    
+    def _to_builder_config(self, common_config: CommonConfig,
+                           strategy_config: HybridStrategyConfig) -> LocalDockerBuilderConfig:
         """
         Convert HybridVeAgentkitConfig to LocalDockerBuilderConfig.
         """
         return LocalDockerBuilderConfig(
             common_config=common_config,
             image_name=common_config.agent_name or "agentkit-app",
-            image_tag=strategy_config.image_tag,
+            image_tag=strategy_config.image_tag
         )
-
-    def _to_runner_config(
-        self, common_config: CommonConfig, strategy_config: HybridStrategyConfig
-    ) -> VeAgentkitRunnerConfig:
+    
+    def _to_runner_config(self, common_config: CommonConfig,
+                          strategy_config: HybridStrategyConfig) -> VeAgentkitRunnerConfig:
         """
         Convert HybridVeAgentkitConfig to VeAgentkitRunnerConfig.
         """
         merged_envs = merge_runtime_envs(common_config, strategy_config.to_dict())
-
+        
         return VeAgentkitRunnerConfig(
             common_config=common_config,
             runtime_id=strategy_config.runtime_id or AUTO_CREATE_VE,
@@ -403,61 +354,51 @@ class HybridStrategy(Strategy):
             runtime_role_name=strategy_config.runtime_role_name,
             runtime_apikey=strategy_config.runtime_apikey,
             runtime_apikey_name=strategy_config.runtime_apikey_name,
-            runtime_auth_type=strategy_config.runtime_auth_type,
-            runtime_jwt_discovery_url=strategy_config.runtime_jwt_discovery_url,
-            runtime_jwt_allowed_clients=strategy_config.runtime_jwt_allowed_clients,
             runtime_endpoint=strategy_config.runtime_endpoint,
             runtime_envs=merged_envs,
-            image_url=strategy_config.cr_image_full_url,
+            image_url=strategy_config.cr_image_full_url
         )
-
-    def _push_to_cr(
-        self,
-        local_image: str,
-        cr_instance: str,
-        cr_namespace: str,
-        cr_repo: str,
-        tag: str,
-    ) -> str:
+    
+    def _push_to_cr(self, local_image: str, cr_instance: str, 
+                    cr_namespace: str, cr_repo: str, tag: str) -> str:
         """
         Push local image to Container Registry.
-
+        
         Args:
             local_image: Local image name (e.g., agentkit-app:v1.0).
             cr_instance: CR instance name.
             cr_namespace: CR namespace.
             cr_repo: CR repository name.
             tag: Image tag.
-
+            
         Returns:
             Full CR image URL.
-
+            
         Raises:
             Exception: If image push fails. Exceptions are handled by Executor.
         """
         cr_config = CRServiceConfig(
-            instance_name=cr_instance, namespace_name=cr_namespace, repo_name=cr_repo
+            instance_name=cr_instance,
+            namespace_name=cr_namespace,
+            repo_name=cr_repo
         )
-
+        
         cr_service = CRService(reporter=self.reporter)
-
+        
         import docker
-
         client = docker.from_env()
         image = client.images.get(local_image)
         image_id = image.id
-
-        self.reporter.info(
-            f"Pushing image to CR: {cr_instance}/{cr_namespace}/{cr_repo}:{tag}"
-        )
+        
+        self.reporter.info(f"Pushing image to CR: {cr_instance}/{cr_namespace}/{cr_repo}:{tag}")
         success, result = cr_service.login_and_push_image(
             cr_config=cr_config,
             image_id=image_id,
             image_tag=tag,
-            namespace=cr_namespace,
+            namespace=cr_namespace
         )
-
+        
         if not success:
             raise Exception(f"Image push failed: {result}")
-
+        
         return result

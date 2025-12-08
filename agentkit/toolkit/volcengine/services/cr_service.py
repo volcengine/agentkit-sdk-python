@@ -27,11 +27,9 @@ import time
 
 logger = logging.getLogger(__name__)
 
-
 @dataclass
 class CRServiceConfig(AutoSerializableMixin):
     """Configuration for Container Registry service."""
-
     instance_name: str = AUTO_CREATE_VE
     namespace_name: str = AUTO_CREATE_VE
     repo_name: str = AUTO_CREATE_VE
@@ -40,11 +38,9 @@ class CRServiceConfig(AutoSerializableMixin):
     subnet_id: str = field(default=AUTO_CREATE_VE, metadata={"system": True})
     image_full_url: str = field(default=None, metadata={"system": True})
 
-
 @dataclass
 class CRServiceResult:
     """Result of Container Registry service operations."""
-
     success: bool = False
     error: Optional[str] = None
     instance_name: Optional[str] = None
@@ -56,30 +52,30 @@ class CRServiceResult:
 
 class CRErrorHandler:
     """Unified error handler for Container Registry operations."""
-
+    
     @staticmethod
     def is_quota_exceeded(error: Exception) -> bool:
         return "QuotaExceeded" in str(error)
-
+    
     @staticmethod
     def is_already_exists(error: Exception) -> bool:
         return "AlreadyExists" in str(error)
-
+    
     @staticmethod
     def handle_auto_create_error(
         error: Exception,
         resource_type: str,
         result: CRServiceResult,
-        reporter: Reporter,
+        reporter: Reporter
     ) -> bool:
         """Handle errors during automatic resource creation.
-
+        
         Args:
             error: The exception object.
             resource_type: Type of resource (e.g., "instance", "namespace", "repository").
             result: Result object to store error information.
             reporter: Reporter interface for logging.
-
+            
         Returns:
             False to indicate creation failure and stop further processing.
         """
@@ -87,10 +83,10 @@ class CRErrorHandler:
             result.error = f"Failed to create CR {resource_type}: account quota exceeded. Please upgrade your account quota or clean up unused CR {resource_type}s."
         else:
             result.error = f"Failed to create CR {resource_type}: {str(error)}"
-
+        
         reporter.error(result.error)
         return False
-
+    
     @staticmethod
     def handle_existing_resource_error(
         error: Exception,
@@ -98,10 +94,10 @@ class CRErrorHandler:
         resource_name: str,
         result: CRServiceResult,
         reporter: Reporter,
-        status: str = "",
+        status: str = ""
     ) -> bool:
         """Handle errors when using existing resource names.
-
+        
         Args:
             error: The exception object.
             resource_type: Type of resource.
@@ -109,7 +105,7 @@ class CRErrorHandler:
             result: Result object to store error information.
             reporter: Reporter interface for logging.
             status: Resource status (used for instance status checks).
-
+            
         Returns:
             True if operation can continue, False if it should stop.
         """
@@ -117,128 +113,108 @@ class CRErrorHandler:
             result.error = f"Failed to create CR {resource_type}: account quota exceeded. Please upgrade your account quota or clean up unused CR {resource_type}s."
             reporter.error(result.error)
             return False
-
+        
         if CRErrorHandler.is_already_exists(error):
             reporter.success(f"CR {resource_type} already exists: {resource_name}")
-
+            
             # Edge case: instance status is NONEXIST but AlreadyExists error occurs.
             # This typically indicates a naming conflict or configuration issue.
             if status == "NONEXIST":
-                reporter.error(
-                    f"Instance name is already taken. Please check your configuration: {resource_name}"
-                )
+                reporter.error(f"Instance name is already taken. Please check your configuration: {resource_name}")
                 return False
-
+            
             return True
-
+        
         result.error = f"Failed to operate on CR {resource_type}: {str(error)}"
         reporter.error(result.error)
         return False
 
 
+
 class CRConfigCallback:
     """Interface for Container Registry configuration updates."""
-
     def on_config_update(self, cr_config: Dict[str, Any]) -> None:
         pass
 
-
 class DefaultCRConfigCallback(CRConfigCallback):
     """Default implementation of CR configuration callback."""
-
     def __init__(self, config_updater=None):
         self.config_updater = config_updater
-
+    
     def on_config_update(self, cr_config: Dict[str, Any]) -> None:
         """Notify config updater of CR configuration changes."""
         if self.config_updater:
             self.config_updater("cr_service", cr_config)
 
-
 class CRService:
     """Unified Container Registry service for resource management."""
-
-    def __init__(
-        self,
-        config_callback: Optional[CRConfigCallback] = None,
-        reporter: Optional[Reporter] = None,
-    ):
+    
+    def __init__(self, config_callback: Optional[CRConfigCallback] = None, reporter: Optional[Reporter] = None):
         """Initialize the Container Registry service.
-
+        
         Args:
             config_callback: Callback for configuration updates.
             reporter: Reporter interface for logging. If None, uses Reporter from ExecutionContext.
         """
         self.config_callback = config_callback or DefaultCRConfigCallback()
-        self.reporter = (
-            reporter if reporter is not None else ExecutionContext.get_reporter()
-        )
+        self.reporter = reporter if reporter is not None else ExecutionContext.get_reporter()
         self._vecr_client = None
         self._init_client()
-
+    
     def _init_client(self) -> None:
         """Initialize the CR client with credentials from environment."""
         try:
-            ak, sk, region = get_volc_ak_sk_region("CR")
+            ak, sk, region = get_volc_ak_sk_region('CR')
             self._vecr_client = ve_cr.VeCR(access_key=ak, secret_key=sk, region=region)
         except Exception as e:
             logger.error(f"Failed to initialize CR client: {str(e)}")
             raise
-
-    def ensure_cr_resources(
-        self,
-        cr_config: CRServiceConfig,
-        common_config: Optional[config.CommonConfig] = None,
-    ) -> CRServiceResult:
+    
+    def ensure_cr_resources(self, cr_config: CRServiceConfig, 
+                           common_config: Optional[config.CommonConfig] = None) -> CRServiceResult:
         """Ensure all required CR resources exist or are created.
-
+        
         Creates instance, namespace, and repository as needed, then retrieves the registry URL.
-
+        
         Args:
             cr_config: Container Registry service configuration.
             common_config: Common configuration (used to retrieve agent_name, etc.).
-
+            
         Returns:
             CRServiceResult: Operation result with resource details and registry URL.
         """
         try:
             result = CRServiceResult()
-
+            
             if not self._ensure_cr_instance(cr_config, result):
                 return result
-
+            
             if not self._ensure_cr_namespace(cr_config, result):
                 return result
-
+            
             if not self._ensure_cr_repo(cr_config, result, common_config):
                 return result
-
-            registry_url = self._vecr_client._get_default_domain(
-                instance_name=cr_config.instance_name
-            )
+            
+            registry_url = self._vecr_client._get_default_domain(instance_name=cr_config.instance_name)
             result.registry_url = registry_url
-
+            
             result.success = True
             return result
-
+            
         except Exception as e:
             result.error = f"Failed to ensure CR resources: {str(e)}"
             logger.error(result.error)
             return result
-
-    def _ensure_cr_instance(
-        self, cr_config: CRServiceConfig, result: CRServiceResult
-    ) -> bool:
+    
+    def _ensure_cr_instance(self, cr_config: CRServiceConfig, result: CRServiceResult) -> bool:
         """Ensure a CR instance exists, creating one if needed."""
         instance_name = cr_config.instance_name
-
+        
         if not instance_name or instance_name == AUTO_CREATE_VE:
             # Auto-generate instance name when not configured
             instance_name = CRService.generate_cr_instance_name()
-            self.reporter.info(
-                f"No CR instance configured. Creating new instance: {instance_name}"
-            )
-
+            self.reporter.info(f"No CR instance configured. Creating new instance: {instance_name}")
+            
             try:
                 created_instance = self._vecr_client._create_instance(instance_name)
                 cr_config.instance_name = created_instance
@@ -246,97 +222,73 @@ class CRService:
                 self._notify_config_update(cr_config)
                 self.reporter.success(f"CR instance created: {created_instance}")
             except Exception as e:
-                return CRErrorHandler.handle_auto_create_error(
-                    e, "instance", result, self.reporter
-                )
+                return CRErrorHandler.handle_auto_create_error(e, "instance", result, self.reporter)
         else:
             # Use existing instance name
             status = ""
             try:
                 status = self._vecr_client._check_instance(instance_name)
-
+                
                 if status == "NONEXIST":
-                    self.reporter.warning(
-                        f"CR instance does not exist. Creating: {instance_name}"
-                    )
+                    self.reporter.warning(f"CR instance does not exist. Creating: {instance_name}")
                     self._vecr_client._create_instance(instance_name)
                     self.reporter.success(f"CR instance created: {instance_name}")
                 elif status == "Running":
-                    self.reporter.success(
-                        f"CR instance exists and is running: {instance_name}"
-                    )
+                    self.reporter.success(f"CR instance exists and is running: {instance_name}")
                 else:
-                    self.reporter.warning(
-                        f"CR instance status: {status}. Waiting for it to be ready..."
-                    )
-
+                    self.reporter.warning(f"CR instance status: {status}. Waiting for it to be ready...")
+                    
             except Exception as e:
                 if not CRErrorHandler.handle_existing_resource_error(
                     e, "instance", instance_name, result, self.reporter, status
                 ):
                     return False
-
+        
         result.instance_name = cr_config.instance_name
         return True
-
-    def _ensure_cr_namespace(
-        self, cr_config: CRServiceConfig, result: CRServiceResult
-    ) -> bool:
+    
+    def _ensure_cr_namespace(self, cr_config: CRServiceConfig, result: CRServiceResult) -> bool:
         """Ensure a CR namespace exists, creating one if needed."""
         namespace_name = cr_config.namespace_name
-
+        
         if not namespace_name or namespace_name == AUTO_CREATE_VE:
             # Auto-generate namespace name with random suffix
             namespace_name = f"agentkit-{generate_random_id(4)}"
-            self.reporter.info(
-                f"No CR namespace configured. Creating new namespace: {namespace_name}"
-            )
-
+            self.reporter.info(f"No CR namespace configured. Creating new namespace: {namespace_name}")
+            
             try:
-                created_namespace = self._vecr_client._create_namespace(
-                    cr_config.instance_name, namespace_name
-                )
+                created_namespace = self._vecr_client._create_namespace(cr_config.instance_name, namespace_name)
                 cr_config.namespace_name = created_namespace
                 result.namespace_name = created_namespace
                 self._notify_config_update(cr_config)
                 self.reporter.success(f"CR namespace created: {created_namespace}")
             except Exception as e:
-                return CRErrorHandler.handle_auto_create_error(
-                    e, "namespace", result, self.reporter
-                )
+                return CRErrorHandler.handle_auto_create_error(e, "namespace", result, self.reporter)
         else:
             # Use existing namespace name
             try:
-                self._vecr_client._create_namespace(
-                    cr_config.instance_name, namespace_name
-                )
+                self._vecr_client._create_namespace(cr_config.instance_name, namespace_name)
                 self.reporter.success(f"CR namespace already exists: {namespace_name}")
             except Exception as e:
                 if not CRErrorHandler.handle_existing_resource_error(
                     e, "namespace", namespace_name, result, self.reporter
                 ):
                     return False
-
+        
         result.namespace_name = cr_config.namespace_name
         return True
-
-    def _ensure_cr_repo(
-        self,
-        cr_config: CRServiceConfig,
-        result: CRServiceResult,
-        common_config: Optional[config.CommonConfig] = None,
-    ) -> bool:
+    
+    def _ensure_cr_repo(self, cr_config: CRServiceConfig, result: CRServiceResult, 
+                       common_config: Optional[config.CommonConfig] = None) -> bool:
         """Ensure a CR repository exists, creating one if needed."""
         repo_name = cr_config.repo_name
-
+        
         if not repo_name or repo_name == AUTO_CREATE_VE:
             # Auto-generate repository name based on agent name
             agent_name = common_config.agent_name if common_config else "agentkit"
             repo_name = f"{agent_name}-{generate_random_id(4)}"
-            self.reporter.info(
-                f"No CR repository configured. Creating new repository: {repo_name}"
-            )
-
+            self.reporter.info(f"No CR repository configured. Creating new repository: {repo_name}")
+            
             try:
                 created_repo = self._vecr_client._create_repo(
                     cr_config.instance_name, cr_config.namespace_name, repo_name
@@ -346,9 +298,7 @@ class CRService:
                 self._notify_config_update(cr_config)
                 self.reporter.success(f"CR repository created: {created_repo}")
             except Exception as e:
-                return CRErrorHandler.handle_auto_create_error(
-                    e, "repository", result, self.reporter
-                )
+                return CRErrorHandler.handle_auto_create_error(e, "repository", result, self.reporter)
         else:
             # Use existing repository name
             try:
@@ -361,65 +311,52 @@ class CRService:
                     e, "repository", repo_name, result, self.reporter
                 ):
                     return False
-
+        
         result.repo_name = cr_config.repo_name
         return True
-
+    
     def ensure_public_endpoint(self, cr_config: CRServiceConfig) -> CRServiceResult:
         """Enable public endpoint access for the CR instance if not already enabled."""
         result = CRServiceResult()
         try:
-            public_endpoint = self._vecr_client._get_public_endpoint(
-                instance_name=cr_config.instance_name
-            )
+            public_endpoint = self._vecr_client._get_public_endpoint(instance_name=cr_config.instance_name)
             if public_endpoint["Enabled"] == False:
-                self.reporter.warning(
-                    "CR public endpoint is not enabled. Enabling now..."
-                )
-                self._vecr_client._update_public_endpoint(
-                    instance_name=cr_config.instance_name, enabled=True
-                )
-                self._vecr_client._create_endpoint_acl_policies(
-                    instance_name=cr_config.instance_name, acl_policies=["0.0.0.0/0"]
-                )
-
+                self.reporter.warning("CR public endpoint is not enabled. Enabling now...")
+                self._vecr_client._update_public_endpoint(instance_name=cr_config.instance_name, enabled=True)
+                self._vecr_client._create_endpoint_acl_policies(instance_name=cr_config.instance_name, acl_policies=["0.0.0.0/0"])
+                
                 # Wait up to 120 seconds for the endpoint to be ready
                 timeout = 120
                 while timeout > 0:
-                    public_endpoint = self._vecr_client._get_public_endpoint(
-                        instance_name=cr_config.instance_name
-                    )
+                    public_endpoint = self._vecr_client._get_public_endpoint(instance_name=cr_config.instance_name)
                     if public_endpoint["Status"] == "Enabled":
                         break
                     timeout -= 1
                     time.sleep(1)
                 if timeout <= 0:
-                    result.error = (
-                        "Timeout waiting for CR public endpoint to be enabled"
-                    )
+                    result.error = "Timeout waiting for CR public endpoint to be enabled"
                     self.reporter.error(result.error)
                     return result
                 self.reporter.success("CR public endpoint enabled successfully")
-
+            
             result.success = True
             return result
-
+            
         except Exception as e:
             result.error = f"Failed to configure public endpoint: {str(e)}"
             self.reporter.error(result.error)
             return result
-
-    def login_and_push_image(
-        self, cr_config: CRServiceConfig, image_id: str, image_tag: str, namespace: str
-    ) -> Tuple[bool, str]:
+    
+    def login_and_push_image(self, cr_config: CRServiceConfig, image_id: str, 
+                            image_tag: str, namespace: str) -> Tuple[bool, str]:
         """Login to CR and push a Docker image to the registry.
-
+        
         Args:
             cr_config: Container Registry service configuration.
             image_id: Local Docker image ID.
             image_tag: Tag for the remote image.
             namespace: Namespace in the registry.
-
+            
         Returns:
             Tuple of (success: bool, remote_image_url_or_error_message: str).
         """
@@ -429,32 +366,28 @@ class CRService:
             error_msg = "Docker dependencies are not installed"
             self.reporter.error(error_msg)
             return False, error_msg
-
+            
         docker_manager = DockerManager()
-
+        
         # Retrieve login credentials
-        registry_url = self._vecr_client._get_default_domain(
-            instance_name=cr_config.instance_name
-        )
-        username, token, expires = self._vecr_client._get_authorization_token(
-            instance_name=cr_config.instance_name
-        )
-        self.reporter.success(
-            f"Retrieved CR credentials: username={username}, expires={expires}"
-        )
-
+        registry_url = self._vecr_client._get_default_domain(instance_name=cr_config.instance_name)   
+        username, token, expires = self._vecr_client._get_authorization_token(instance_name=cr_config.instance_name)
+        self.reporter.success(f"Retrieved CR credentials: username={username}, expires={expires}")
+        
         # Login to registry
         success, message = docker_manager.login_to_registry(
-            registry_url=registry_url, username=username, password=token
+            registry_url=registry_url,
+            username=username,
+            password=token
         )
-
+        
         if not success:
             error_msg = f"Failed to login to CR: {message}"
             self.reporter.error(error_msg)
             return False, error_msg
-
+        
         self.reporter.success("Successfully logged in to registry")
-
+        
         # Push image
         self.reporter.info(f"Pushing image {image_id[:12]} to {registry_url}")
         success, remote_image_full_url = docker_manager.push_image(
@@ -462,9 +395,9 @@ class CRService:
             registry_url=registry_url,
             namespace=namespace,
             remote_image_name=cr_config.repo_name,
-            remote_tag=image_tag,
+            remote_tag=image_tag
         )
-
+        
         if success:
             self.reporter.success(f"Image pushed successfully: {remote_image_full_url}")
             cr_config.image_full_url = remote_image_full_url
@@ -474,7 +407,7 @@ class CRService:
             error_msg = f"Failed to push image: {remote_image_full_url}"
             self.reporter.error(error_msg)
             return False, error_msg
-
+    
     def _notify_config_update(self, cr_config: CRServiceConfig) -> None:
         """Notify the config callback of CR configuration changes."""
         try:
@@ -482,12 +415,12 @@ class CRService:
             self.config_callback.on_config_update(config_dict)
         except Exception as e:
             logger.warning(f"Failed to notify config update: {str(e)}")
-
+    
     def get_cr_config(self) -> Dict[str, Any]:
         """Get CR configuration for pipeline template rendering."""
         if not self._vecr_client:
             return {}
-
+        
         try:
             return {
                 "cr_domain": self._vecr_client._get_default_domain(instance_name=""),
@@ -496,7 +429,7 @@ class CRService:
         except Exception as e:
             logger.warning(f"Failed to retrieve CR configuration: {str(e)}")
             return {}
-
+    
     @staticmethod
     def default_cr_instance_name_template():
         return "agentkit-cli-{{account_id}}"
@@ -505,7 +438,7 @@ class CRService:
     def generate_cr_instance_name() -> str:
         """Generate a CR instance name from the default template."""
         from agentkit.utils.template_utils import render_template
-
         cr_instance_name_template = CRService.default_cr_instance_name_template()
         rendered = render_template(cr_instance_name_template)
         return rendered
+

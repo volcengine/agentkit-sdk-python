@@ -44,11 +44,11 @@ from .base_executor import BaseExecutor
 
 class InvokeExecutor(BaseExecutor):
     """Orchestrates agent invocation across different deployment platforms.
-
+    
     This executor provides a unified interface for invoking agents regardless of their
     deployment platform. It handles configuration loading, strategy selection, and
     error handling while delegating platform-specific invocation logic to the Strategy.
-
+    
     Inherited Capabilities (from BaseExecutor):
     - Configuration loading with priority: config_dict > config_file > default
     - Strategy selection based on launch_type
@@ -56,26 +56,26 @@ class InvokeExecutor(BaseExecutor):
     - Unified error classification and handling
     - Structured logging with context
     """
-
+    
     def __init__(self, reporter: Reporter = None):
         """Initialize InvokeExecutor.
-
+        
         Args:
             reporter: Reporter instance for progress reporting. Passed through
                 Strategy → Runner chain for unified progress tracking.
         """
         super().__init__(reporter)
-
+    
     def execute(
         self,
         payload: Dict[str, Any],
         config_dict: Optional[Dict[str, Any]] = None,
         config_file: Optional[str] = None,
         headers: Optional[Dict[str, str]] = None,
-        stream: Optional[bool] = None,
+        stream: Optional[bool] = None
     ) -> InvokeResult:
         """Execute an invoke operation on a deployed agent.
-
+        
         Orchestrates the complete invocation strategy:
         1. Load configuration from multiple sources (priority: config_dict > config_file > default)
         2. Extract common configuration and determine launch_type
@@ -83,18 +83,18 @@ class InvokeExecutor(BaseExecutor):
         4. Retrieve strongly-typed strategy configuration object
         5. Execute invocation through Strategy.invoke()
         6. Log results and return InvokeResult directly
-
+        
         Args:
             payload: Request payload containing agent input data
             config_dict: Configuration dictionary (highest priority). Overrides config_file.
             config_file: Path to configuration file. Used if config_dict is not provided.
             headers: Optional HTTP headers for the invocation request
             stream: Optional flag to enable streaming response
-
+            
         Returns:
             InvokeResult: Invocation result returned directly from Strategy without transformation.
                 Contains success flag, response data, error information, and streaming status.
-
+                
         Raises:
             ConfigurationError: If configuration is invalid or missing required fields
             StrategyError: If strategy selection or execution fails
@@ -103,25 +103,25 @@ class InvokeExecutor(BaseExecutor):
         try:
             self.logger.info("Loading configuration...")
             config = self._load_config(config_dict, config_file)
-
+            
             common_config = config.get_common_config()
             launch_type = common_config.launch_type
             self.logger.info(f"Invoke strategy selected: {launch_type}")
-
+            
             # Select strategy with reporter injection for progress tracking
             strategy = self._get_strategy(launch_type, config_manager=config)
-
+            
             strategy_config = self._get_strategy_config_object(config, launch_type)
-
+            
             self.logger.info(f"Starting invocation with {launch_type} strategy...")
             result = strategy.invoke(
                 common_config=common_config,
                 strategy_config=strategy_config,
                 payload=payload,
                 headers=headers,
-                stream=stream,
+                stream=stream
             )
-
+            
             if result.success:
                 if result.is_streaming:
                     self.logger.info("Invocation completed successfully (streaming)")
@@ -130,16 +130,14 @@ class InvokeExecutor(BaseExecutor):
             else:
                 # Log error details for debugging; CLI layer handles user-facing messages
                 # to avoid duplication and ensure consistent error presentation
-                self.logger.error(
-                    f"Invocation failed: {result.error} (code: {result.error_code})"
-                )
-
+                self.logger.error(f"Invocation failed: {result.error} (code: {result.error_code})")
+            
             return result
-
+            
         except Exception as e:
             # Log exception for debugging; CLI layer handles user-facing error messages
             # to maintain separation of concerns and avoid duplicate error reporting
             self.logger.exception(f"Invocation execution error: {e}")
-
+            
             error_info = self._handle_exception("Invoke", e)
             return InvokeResult(**error_info)

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
+'''
 Financial Analyst Agent
 Before Running:
 1. Set the following environment variables:
@@ -22,7 +22,7 @@ Before Running:
     - TOOL_EMAIL_URL
 2. Run the following command:
     - python financial_analyst.py
-"""
+'''
 
 import logging
 from datetime import datetime
@@ -49,8 +49,8 @@ app = AgentkitSimpleApp()
 
 # 1. memory and knowledge
 short_term_memory = ShortTermMemory(backend="local")
-long_term_memory = LongTermMemory(backend="viking", app_name="financial")
-knowledge_base = KnowledgeBase(backend="viking", app_name="financial")
+long_term_memory = LongTermMemory(backend="viking", app_name='financial')
+knowledge_base = KnowledgeBase(backend="viking", app_name='financial')
 
 # 2. tools
 tools = []
@@ -61,20 +61,16 @@ tools.append(code_sandbox)
 # akshare 数据查询
 ak_share_url = getenv("TOOL_AKSHARE_URL")
 if ak_share_url is not None and ak_share_url != "":
-    tools.append(
-        MCPToolset(
-            connection_params=get_mcp_params(url=ak_share_url),
-        )
-    )
+    tools.append(MCPToolset(
+        connection_params=get_mcp_params(url=ak_share_url),
+    ))
 
 # 邮件发送
 email_share_url = getenv("TOOL_EMAIL_URL")
 if email_share_url is not None and email_share_url != "":
-    tools.append(
-        MCPToolset(
-            connection_params=get_mcp_params(url=email_share_url),
-        )
-    )
+    tools.append(MCPToolset(
+        connection_params=get_mcp_params(url=email_share_url),
+    ))
 
 
 # 获取当前时间

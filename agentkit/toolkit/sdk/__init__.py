@@ -22,10 +22,10 @@ Two API styles are available:
 
 1. Client API (Recommended for multiple operations):
     >>> from agentkit.toolkit.sdk import AgentKitClient
-    >>>
+    >>> 
     >>> # Create client with configuration
     >>> client = AgentKitClient("agentkit.yaml")
-    >>>
+    >>> 
     >>> # Perform operations without repeating config
     >>> client.build()
     >>> client.deploy()
@@ -33,7 +33,7 @@ Two API styles are available:
 
 2. Functional API (Good for simple scripts):
     >>> from agentkit.toolkit import sdk
-    >>>
+    >>> 
     >>> # Each operation specifies config
     >>> sdk.build(config_file="agentkit.yaml")
     >>> sdk.deploy(config_file="agentkit.yaml")

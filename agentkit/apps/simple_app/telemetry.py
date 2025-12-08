@@ -92,9 +92,7 @@ class Telemetry:
         trace_id = span.get_span_context().trace_id
         span_id = span.get_span_context().span_id
 
-        logger.debug(
-            f"Set attributes for span with trace_id={trace_id}, span_id={span_id}"
-        )
+        logger.debug(f"Set attributes for span with trace_id={trace_id}, span_id={span_id}")
 
         # ===============================
         # Set attributes for current span
@@ -114,9 +112,7 @@ class Telemetry:
         if user_id:
             span.set_attribute(key="gen_ai.user.id", value=user_id)
 
-        span.set_attribute(
-            key="gen_ai.input", value=safe_serialize_to_json_string(payload)
-        )
+        span.set_attribute(key="gen_ai.input", value=safe_serialize_to_json_string(payload))
 
         span.set_attribute(key="gen_ai.span.kind", value="workflow")
         span.set_attribute(key="gen_ai.operation.name", value="invoke_agent")
@@ -132,10 +128,7 @@ class Telemetry:
 
         if span and span.is_recording():
             span.set_attribute(key="gen_ai.output", value=func_result)
-            attributes = {
-                "gen_ai_operation_name": "invoke_agent",
-                "gen_ai_operation_type": "agent",
-            }
+            attributes={"gen_ai_operation_name": "invoke_agent", "gen_ai_operation_type": "agent"}
             if exception:
                 self.handle_exception(span, exception)
                 attributes["error_type"] = exception.__class__.__name__

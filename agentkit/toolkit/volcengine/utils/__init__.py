@@ -14,4 +14,8 @@
 
 from .project_archiver import ProjectArchiver, ArchiveConfig, create_project_archive
 
-__all__ = ["ProjectArchiver", "ArchiveConfig", "create_project_archiver"]
+__all__ = [
+    'ProjectArchiver',
+    'ArchiveConfig',
+    'create_project_archiver'
+]

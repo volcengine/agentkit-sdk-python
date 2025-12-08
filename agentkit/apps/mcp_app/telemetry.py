@@ -44,7 +44,6 @@ _GEN_AI_CLIENT_OPERATION_DURATION_BUCKETS = [
 
 logger = logging.getLogger("agentkit." + __name__)
 
-
 class Telemetry:
     def __init__(self):
         self.tracer = get_tracer("agentkit.mcp_app")
@@ -57,22 +56,20 @@ class Telemetry:
         )
 
     def trace_tool(
-        self,
-        func: Callable,
-        span: Span,
-        args: dict,
-        func_result: any,
-        operation_type: str,
-        exception: Exception,
+            self,
+            func: Callable,
+            span: Span,
+            args: dict,
+            func_result: any,
+            operation_type: str,
+            exception: Exception,
     ) -> None:
         """Get current span and set required attributes."""
 
         trace_id = span.get_span_context().trace_id
         span_id = span.get_span_context().span_id
 
-        logger.debug(
-            f"Set attributes for span with trace_id={trace_id}, span_id={span_id}"
-        )
+        logger.debug(f"Set attributes for span with trace_id={trace_id}, span_id={span_id}")
 
         # ===============================
         # Set attributes for current span
@@ -82,19 +79,14 @@ class Telemetry:
 
         span.set_attribute(key="gen_ai.func_name", value=func.__name__)
 
-        span.set_attribute(
-            key="gen_ai.input", value=safe_serialize_to_json_string(args)
-        )
+        span.set_attribute(key="gen_ai.input", value=safe_serialize_to_json_string(args))
         safe_result = safe_serialize_to_json_string(func_result)
         span.set_attribute(key="gen_ai.output", value=safe_result)
 
         span.set_attribute(key="gen_ai.span.kind", value="tool")
         span.set_attribute(key="gen_ai.operation.name", value="tool")
         span.set_attribute(key="gen_ai.operation.type", value=operation_type)
-        attributes = {
-            "gen_ai_operation_name": "tool",
-            "gen_ai_operation_type": operation_type,
-        }
+        attributes = {"gen_ai_operation_name": "tool", "gen_ai_operation_type": operation_type}
 
         if exception:
             self.handle_exception(span, exception)
@@ -118,3 +110,4 @@ class Telemetry:
 
 
 telemetry = Telemetry()
+

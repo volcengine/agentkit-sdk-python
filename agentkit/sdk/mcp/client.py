@@ -51,7 +51,6 @@ from .types import (
 
 class AgentkitMCPClient(BaseAgentkitClient):
     """AgentKit MCP (Model Context Protocol) Management Service"""
-
     API_ACTIONS: Dict[str, str] = {
         "UpdateMCPToolset": "UpdateMCPToolset",
         "CreateMCPService": "CreateMCPService",
@@ -83,27 +82,22 @@ class AgentkitMCPClient(BaseAgentkitClient):
             service_name="mcp",
         )
 
-    def update_mcp_toolset(
-        self, request: UpdateMCPToolsetRequest
-    ) -> UpdateMCPToolsetResponse:
+
+    def update_mcp_toolset(self, request: UpdateMCPToolsetRequest) -> UpdateMCPToolsetResponse:
         return self._invoke_api(
             api_action="UpdateMCPToolset",
             request=request,
             response_type=UpdateMCPToolsetResponse,
         )
 
-    def create_mcp_service(
-        self, request: CreateMCPServiceRequest
-    ) -> CreateMCPServiceResponse:
+    def create_mcp_service(self, request: CreateMCPServiceRequest) -> CreateMCPServiceResponse:
         return self._invoke_api(
             api_action="CreateMCPService",
             request=request,
             response_type=CreateMCPServiceResponse,
         )
 
-    def list_mcp_toolsets(
-        self, request: ListMCPToolsetsRequest
-    ) -> ListMCPToolsetsResponse:
+    def list_mcp_toolsets(self, request: ListMCPToolsetsRequest) -> ListMCPToolsetsResponse:
         return self._invoke_api(
             api_action="ListMCPToolsets",
             request=request,
@@ -117,9 +111,7 @@ class AgentkitMCPClient(BaseAgentkitClient):
             response_type=ListMCPToolsResponse,
         )
 
-    def create_mcp_toolset(
-        self, request: CreateMCPToolsetRequest
-    ) -> CreateMCPToolsetResponse:
+    def create_mcp_toolset(self, request: CreateMCPToolsetRequest) -> CreateMCPToolsetResponse:
         return self._invoke_api(
             api_action="CreateMCPToolset",
             request=request,
@@ -133,9 +125,7 @@ class AgentkitMCPClient(BaseAgentkitClient):
             response_type=GetMCPToolsResponse,
         )
 
-    def delete_mcp_service(
-        self, request: DeleteMCPServiceRequest
-    ) -> DeleteMCPServiceResponse:
+    def delete_mcp_service(self, request: DeleteMCPServiceRequest) -> DeleteMCPServiceResponse:
         return self._invoke_api(
             api_action="DeleteMCPService",
             request=request,
@@ -149,36 +139,28 @@ class AgentkitMCPClient(BaseAgentkitClient):
             response_type=GetMCPToolsetResponse,
         )
 
-    def list_mcp_services(
-        self, request: ListMCPServicesRequest
-    ) -> ListMCPServicesResponse:
+    def list_mcp_services(self, request: ListMCPServicesRequest) -> ListMCPServicesResponse:
         return self._invoke_api(
             api_action="ListMCPServices",
             request=request,
             response_type=ListMCPServicesResponse,
         )
 
-    def delete_mcp_toolset(
-        self, request: DeleteMCPToolsetRequest
-    ) -> DeleteMCPToolsetResponse:
+    def delete_mcp_toolset(self, request: DeleteMCPToolsetRequest) -> DeleteMCPToolsetResponse:
         return self._invoke_api(
             api_action="DeleteMCPToolset",
             request=request,
             response_type=DeleteMCPToolsetResponse,
         )
 
-    def update_mcp_tools(
-        self, request: UpdateMCPToolsRequest
-    ) -> UpdateMCPToolsResponse:
+    def update_mcp_tools(self, request: UpdateMCPToolsRequest) -> UpdateMCPToolsResponse:
         return self._invoke_api(
             api_action="UpdateMCPTools",
             request=request,
             response_type=UpdateMCPToolsResponse,
         )
 
-    def update_mcp_service(
-        self, request: UpdateMCPServiceRequest
-    ) -> UpdateMCPServiceResponse:
+    def update_mcp_service(self, request: UpdateMCPServiceRequest) -> UpdateMCPServiceResponse:
         return self._invoke_api(
             api_action="UpdateMCPService",
             request=request,

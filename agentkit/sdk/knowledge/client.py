@@ -37,7 +37,6 @@ from agentkit.sdk.knowledge.types import (
 
 class AgentkitKnowledgeClient(BaseAgentkitClient):
     """AgentKit Knowledge Base Management Service"""
-
     API_ACTIONS: Dict[str, str] = {
         "UpdateKnowledgeBase": "UpdateKnowledgeBase",
         "ListKnowledgeBases": "ListKnowledgeBases",
@@ -62,54 +61,43 @@ class AgentkitKnowledgeClient(BaseAgentkitClient):
             service_name="knowledge",
         )
 
-    def update_knowledge_base(
-        self, request: UpdateKnowledgeBaseRequest
-    ) -> UpdateKnowledgeBaseResponse:
+
+    def update_knowledge_base(self, request: UpdateKnowledgeBaseRequest) -> UpdateKnowledgeBaseResponse:
         return self._invoke_api(
             api_action="UpdateKnowledgeBase",
             request=request,
             response_type=UpdateKnowledgeBaseResponse,
         )
 
-    def list_knowledge_bases(
-        self, request: ListKnowledgeBasesRequest
-    ) -> ListKnowledgeBasesResponse:
+    def list_knowledge_bases(self, request: ListKnowledgeBasesRequest) -> ListKnowledgeBasesResponse:
         return self._invoke_api(
             api_action="ListKnowledgeBases",
             request=request,
             response_type=ListKnowledgeBasesResponse,
         )
 
-    def add_knowledge_base(
-        self, request: AddKnowledgeBaseRequest
-    ) -> AddKnowledgeBaseResponse:
+    def add_knowledge_base(self, request: AddKnowledgeBaseRequest) -> AddKnowledgeBaseResponse:
         return self._invoke_api(
             api_action="AddKnowledgeBase",
             request=request,
             response_type=AddKnowledgeBaseResponse,
         )
 
-    def get_knowledge_connection_info(
-        self, request: GetKnowledgeConnectionInfoRequest
-    ) -> GetKnowledgeConnectionInfoResponse:
+    def get_knowledge_connection_info(self, request: GetKnowledgeConnectionInfoRequest) -> GetKnowledgeConnectionInfoResponse:
         return self._invoke_api(
             api_action="GetKnowledgeConnectionInfo",
             request=request,
             response_type=GetKnowledgeConnectionInfoResponse,
         )
 
-    def get_knowledge_base(
-        self, request: GetKnowledgeBaseRequest
-    ) -> GetKnowledgeBaseResponse:
+    def get_knowledge_base(self, request: GetKnowledgeBaseRequest) -> GetKnowledgeBaseResponse:
         return self._invoke_api(
             api_action="GetKnowledgeBase",
             request=request,
             response_type=GetKnowledgeBaseResponse,
         )
 
-    def delete_knowledge_base(
-        self, request: DeleteKnowledgeBaseRequest
-    ) -> DeleteKnowledgeBaseResponse:
+    def delete_knowledge_base(self, request: DeleteKnowledgeBaseRequest) -> DeleteKnowledgeBaseResponse:
         return self._invoke_api(
             api_action="DeleteKnowledgeBase",
             request=request,

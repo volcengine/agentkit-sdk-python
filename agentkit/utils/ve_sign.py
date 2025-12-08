@@ -201,7 +201,6 @@ def ve_request(
     except Exception as e:
         raise e
 
-
 def check_error(response: dict) -> None:
     if "Error" in response["ResponseMetadata"]:
         error_code = response["ResponseMetadata"]["Error"]["Code"]
@@ -211,27 +210,26 @@ def check_error(response: dict) -> None:
             f"Error when ve_request {action}: {error_code} {error_message}, res: {response}"
         )
 
-
 def get_volc_ak_sk_region(service: str = ""):
     """获取火山引擎凭证
-
+    
     优先级：
     1. 服务特定环境变量（VOLCENGINE_CR_ACCESS_KEY 等）
     2. 通用环境变量（VOLCENGINE_ACCESS_KEY 等）
     3. 全局配置文件（~/.agentkit/config.yaml）
     4. 抛出异常
-
+    
     Args:
         service: 服务名称（CR/AGENTKIT/TOS/IAM等），用于查找特定环境变量
-
+        
     Returns:
         (access_key, secret_key, region) 元组
-
+        
     Raises:
         ValueError: 如果无法获取有效的凭证
     """
     ak, sk, region = "", "", ""
-
+    
     # 1. 尝试服务特定环境变量
     if service.upper() == "CR":
         # 优先使用新的 VOLCENGINE_* 环境变量，兼容旧的 VOLC_* 环境变量
@@ -240,34 +238,27 @@ def get_volc_ak_sk_region(service: str = ""):
         region = os.getenv("VOLCENGINE_CR_REGION") or os.getenv("VOLC_CR_REGION")
     elif service.upper() == "AGENTKIT":
         # 优先使用新的 VOLCENGINE_* 环境变量，兼容旧的 VOLC_* 环境变量
-        ak = os.getenv("VOLCENGINE_AGENTKIT_ACCESS_KEY") or os.getenv(
-            "VOLC_AGENTKIT_ACCESSKEY"
-        )
-        sk = os.getenv("VOLCENGINE_AGENTKIT_SECRET_KEY") or os.getenv(
-            "VOLC_AGENTKIT_SECRETKEY"
-        )
-        region = os.getenv("VOLCENGINE_AGENTKIT_REGION") or os.getenv(
-            "VOLC_AGENTKIT_REGION"
-        )
+        ak = os.getenv("VOLCENGINE_AGENTKIT_ACCESS_KEY") or os.getenv("VOLC_AGENTKIT_ACCESSKEY")
+        sk = os.getenv("VOLCENGINE_AGENTKIT_SECRET_KEY") or os.getenv("VOLC_AGENTKIT_SECRETKEY")
+        region = os.getenv("VOLCENGINE_AGENTKIT_REGION") or os.getenv("VOLC_AGENTKIT_REGION")
     elif service.upper() == "TOS":
         # 优先使用新的 VOLCENGINE_* 环境变量，兼容旧的 VOLC_* 环境变量
         ak = os.getenv("VOLCENGINE_TOS_ACCESS_KEY") or os.getenv("VOLC_TOS_ACCESSKEY")
         sk = os.getenv("VOLCENGINE_TOS_SECRET_KEY") or os.getenv("VOLC_TOS_SECRETKEY")
         region = os.getenv("VOLCENGINE_TOS_REGION") or os.getenv("VOLC_TOS_REGION")
-
+    
     # 2. 如果服务特定环境变量不完整，尝试通用环境变量
     if not all([ak, sk, region]):
         # 优先使用新的 VOLCENGINE_* 环境变量，兼容旧的 VOLC_* 环境变量
         ak = ak or os.getenv("VOLCENGINE_ACCESS_KEY") or os.getenv("VOLC_ACCESSKEY")
         sk = sk or os.getenv("VOLCENGINE_SECRET_KEY") or os.getenv("VOLC_SECRETKEY")
         region = region or os.getenv("VOLCENGINE_REGION") or os.getenv("VOLC_REGION")
-
+    
     # 3. 【新增】如果环境变量仍不完整，尝试全局配置
     if not all([ak, sk]):
         try:
             # 延迟导入，避免循环依赖
             from agentkit.toolkit.config.global_config import get_global_config
-
             global_config = get_global_config()
             ak = ak or global_config.volcengine.access_key
             sk = sk or global_config.volcengine.secret_key
@@ -275,49 +266,32 @@ def get_volc_ak_sk_region(service: str = ""):
         except Exception:
             # 全局配置加载失败，继续原有逻辑
             pass
-
+    
     # 4. 设置默认 region
     region = region if region else "cn-beijing"
-
+    
     # 5. 验证必需字段
     if not ak or not sk:
         raise ValueError(
             "未找到火山引擎访问凭证。请设置环境变量 VOLCENGINE_ACCESS_KEY 和 "
             "VOLCENGINE_SECRET_KEY (export VOLCENGINE_ACCESS_KEY=your_access_key; export VOLCENGINE_SECRET_KEY=your_secret_key)，或在全局配置文件 ~/.agentkit/config.yaml 中配置"
         )
-
+    
     return ak, sk, region
 
 
 def get_volc_agentkit_host_info():
     host = os.getenv("VOLCENGINE_AGENTKIT_HOST") or os.getenv("VOLC_AGENTKIT_HOST")
-    api_version = os.getenv("VOLCENGINE_AGENTKIT_API_VERSION") or os.getenv(
-        "VOLC_AGENTKIT_API_VERSION"
-    )
-    service_code = os.getenv("VOLCENGINE_AGENTKIT_SERVICE") or os.getenv(
-        "VOLC_AGENTKIT_SERVICE"
-    )
-    return (
-        host if host else "open.volcengineapi.com",
-        api_version if api_version else "2025-10-30",
-        service_code if service_code else "agentkit",
-    )
+    api_version = os.getenv("VOLCENGINE_AGENTKIT_API_VERSION") or os.getenv("VOLC_AGENTKIT_API_VERSION")
+    service_code = os.getenv("VOLCENGINE_AGENTKIT_SERVICE") or os.getenv("VOLC_AGENTKIT_SERVICE")
+    return host if host else "open.volcengineapi.com", api_version if api_version else "2025-10-30", service_code if service_code else "agentkit"
+
 
 
 def get_identity_host_info():
     host = os.getenv("VOLCENGINE_IDENTITY_HOST") or os.getenv("VOLC_IDENTITY_HOST")
-    api_version = os.getenv("VOLCENGINE_IDENTITY_API_VERSION") or os.getenv(
-        "VOLC_IDENTITY_API_VERSION"
-    )
-    service_code = os.getenv("VOLCENGINE_IDENTITY_SERVICE") or os.getenv(
-        "VOLC_IDENTITY_SERVICE"
-    )
-    region = os.getenv("VOLCENGINE_IDENTITY_REGION") or os.getenv(
-        "VOLC_IDENTITY_REGION"
-    )
-    return (
-        host if host else "open.volcengineapi.com",
-        api_version if api_version else "2023-10-01",
-        service_code if service_code else "cis_test",
-        region if region else "cn-beijing",
-    )
+    api_version = os.getenv("VOLCENGINE_IDENTITY_API_VERSION") or os.getenv("VOLC_IDENTITY_API_VERSION")
+    service_code = os.getenv("VOLCENGINE_IDENTITY_SERVICE") or os.getenv("VOLC_IDENTITY_SERVICE")
+    region = os.getenv("VOLCENGINE_IDENTITY_REGION") or os.getenv("VOLC_IDENTITY_REGION")
+    return host if host else "open.volcengineapi.com", api_version if api_version else "2023-10-01", service_code if service_code else "cis_test", region if region else "cn-beijing"
+
