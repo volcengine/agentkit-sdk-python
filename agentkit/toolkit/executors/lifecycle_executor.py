@@ -19,14 +19,14 @@ Combines Build + Deploy operations to provide launch, stop, and destroy function
 Each operation is a composition of lower-level executors (BuildExecutor, DeployExecutor, StatusExecutor).
 """
 
-from typing import Optional, Dict, Any, Union
+from typing import Optional, Dict, Any, Union, List
 from pathlib import Path
 
 from .base_executor import BaseExecutor
 from .build_executor import BuildExecutor, BuildOptions
 from .deploy_executor import DeployExecutor
 from .status_executor import StatusExecutor
-from agentkit.toolkit.models import LifecycleResult
+from agentkit.toolkit.models import LifecycleResult, PreflightMode, PreflightResult
 from agentkit.toolkit.reporter import Reporter
 
 
@@ -54,23 +54,74 @@ class LifecycleExecutor(BaseExecutor):
         self.deploy_executor = DeployExecutor(reporter=self.reporter)
         self.status_executor = StatusExecutor(reporter=self.reporter)
     
+    def _combined_preflight_check(self, launch_type: str, operations: List[str]) -> PreflightResult:
+        """
+        Perform combined preflight check for multiple operations.
+        
+        Combines required services from multiple operations and checks them all at once.
+        This is more efficient than checking each operation separately.
+        
+        Args:
+            launch_type: Launch type (local/cloud/hybrid)
+            operations: List of operation names to check (e.g., ['build', 'deploy'])
+            
+        Returns:
+            PreflightResult with all missing services combined
+        """
+        strategy_class = self._get_strategy_class(launch_type)
+        
+        # Combine required services from all operations
+        all_required = set()
+        for operation in operations:
+            all_required.update(strategy_class.get_required_services(operation))
+        
+        if not all_required:
+            self.logger.debug(f"No required services for {operations} in {launch_type} mode")
+            return PreflightResult(passed=True, missing_services=[])
+        
+        required_list = list(all_required)
+        self.logger.debug(f"Checking combined services for {operations}: {required_list}")
+        
+        try:
+            from agentkit.sdk.account.client import AgentkitAccountClient
+            
+            client = AgentkitAccountClient()
+            statuses = client.get_services_status(required_list)
+            
+            missing = [name for name, status in statuses.items() if status != "Enabled"]
+            
+            if missing:
+                self.logger.warning(f"Services not enabled: {missing}")
+                return PreflightResult(passed=False, missing_services=missing)
+            
+            self.logger.debug(f"All required services are enabled: {required_list}")
+            return PreflightResult(passed=True, missing_services=[])
+            
+        except Exception as e:
+            # If service check fails, log warning but allow to continue
+            self.logger.warning(f"Failed to check service status: {e}")
+            return PreflightResult(passed=True, missing_services=[])
+    
     def launch(
         self,
         config_dict: Optional[Dict[str, Any]] = None,
         config_file: Optional[Union[str, Path]] = None,
-        platform: str = "auto"
+        platform: str = "auto",
+        preflight_mode: PreflightMode = PreflightMode.PROMPT
     ) -> LifecycleResult:
         """
         Launch an Agent service (build + deploy in one step).
         
         Orchestrates the complete strategy from source code to running service:
-        1. Build the Docker image
-        2. Deploy the service to the target platform
+        1. Preflight check: verify required cloud services for both build and deploy
+        2. Build the Docker image
+        3. Deploy the service to the target platform
         
         Args:
             config_dict: Configuration dictionary (optional)
             config_file: Path to configuration file (optional)
             platform: Build platform: "auto", "local", or "cloud"
+            preflight_mode: How to handle missing cloud services (default: PROMPT)
             
         Returns:
             LifecycleResult: Contains build_result and deploy_result with endpoint information
@@ -82,12 +133,46 @@ class LifecycleExecutor(BaseExecutor):
         try:
             self.reporter.info("🚀 Starting launch operation...")
             
+            # Preflight check: verify required cloud services for both build and deploy
+            # We do this once at the start for better UX (single prompt for all missing services)
+            # Override preflight_mode from global config defaults if configured
+            try:
+                from agentkit.toolkit.config.global_config import get_global_config
+                gc = get_global_config()
+                gm = getattr(getattr(gc, 'defaults', None), 'preflight_mode', None)
+                if gm:
+                    gm_map = {
+                        'prompt': PreflightMode.PROMPT,
+                        'fail': PreflightMode.FAIL,
+                        'warn': PreflightMode.WARN,
+                        'skip': PreflightMode.SKIP,
+                    }
+                    preflight_mode = gm_map.get(gm.lower(), preflight_mode)
+            except Exception:
+                pass
+            
+            if preflight_mode != PreflightMode.SKIP:
+                # Load config first to get launch_type
+                config = self._load_config(config_dict, config_file)
+                launch_type = config.get_common_config().launch_type
+                
+                preflight_result = self._combined_preflight_check(launch_type, ["build", "deploy"])
+                if not self._handle_preflight_result(preflight_result, preflight_mode):
+                    return LifecycleResult(
+                        success=False,
+                        operation="launch",
+                        error="Launch aborted: required services not enabled",
+                        error_code="PREFLIGHT_ABORTED"
+                    )
+            
             # Step 1: Build the Docker image
+            # Skip preflight in sub-executor since we already checked
             self.reporter.info("📦 Step 1/2: Building image...")
             build_result = self.build_executor.execute(
                 config_dict=config_dict,
                 config_file=config_file,
-                options=BuildOptions(platform=platform)
+                options=BuildOptions(platform=platform),
+                preflight_mode=PreflightMode.SKIP
             )
             
             if not build_result.success:
@@ -104,10 +189,12 @@ class LifecycleExecutor(BaseExecutor):
             self.logger.info(f"Build completed: image={build_result.image.full_name if build_result.image else 'N/A'}")
             
             # Step 2: Deploy the service to target platform
+            # Skip preflight in sub-executor since we already checked
             self.reporter.info("🚢 Step 2/2: Deploying service...")
             deploy_result = self.deploy_executor.execute(
                 config_dict=config_dict,
-                config_file=config_file
+                config_file=config_file,
+                preflight_mode=PreflightMode.SKIP
             )
             
             if not deploy_result.success:

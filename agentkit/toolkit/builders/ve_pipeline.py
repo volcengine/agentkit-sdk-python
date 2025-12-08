@@ -54,6 +54,7 @@ class VeCPCRBuilderConfig(AutoSerializableMixin):
     cr_instance_name: str = field(default=AUTO_CREATE_VE, metadata={"description": "CR instance name", "render_template": True})
     cr_namespace_name: str = field(default=AUTO_CREATE_VE, metadata={"description": "CR namespace", "render_template": True})
     cr_repo_name: str = field(default=AUTO_CREATE_VE, metadata={"description": "CR repository name"})
+    cr_auto_create_instance_type: str = field(default="Micro", metadata={"description": "CR instance type when auto-creating (Micro or Enterprise)"})
     cr_region: str = field(default="cn-beijing", metadata={"description": "CR region"})
     
     cp_workspace_name: str = field(default=DEFAULT_WORKSPACE_NAME, metadata={"description": "Code Pipeline workspace name"})
@@ -224,7 +225,7 @@ class VeCPCRBuilder(Builder):
                 if 'pipeline_id' in resources:
                     builder_config.cp_pipeline_id = resources['pipeline_id']
             
-            error_msg = f"Build failed: {str(e)}"
+            error_msg = str(e)
 
             return BuildResult(
                 success=False,
@@ -679,6 +680,10 @@ class VeCPCRBuilder(Builder):
             return tos_url
             
         except Exception as e:
+            if "AccountDisable" in str(e):
+                raise Exception(f"Tos Service is not enabled, please enable it in the console. Enable services at: https://console.volcengine.com/agentkit/region:agentkit+cn-beijing/auth")
+            if "TooManyBuckets" in str(e):
+                raise Exception(f"You have reached the maximum number of buckets allowed. Please delete some buckets and try again.")
             raise Exception(f"Failed to upload to TOS: {str(e)}")
     
     def _prepare_cr_resources(self, config: VeCPCRBuilderConfig) -> CRServiceConfig:
@@ -698,6 +703,7 @@ class VeCPCRBuilder(Builder):
                 instance_name=config.cr_instance_name,
                 namespace_name=config.cr_namespace_name,
                 repo_name=config.cr_repo_name,
+                auto_create_instance_type=config.cr_auto_create_instance_type,
                 region=config.cr_region
             )
             
@@ -726,18 +732,24 @@ class VeCPCRBuilder(Builder):
             cr_result = cr_service.ensure_cr_resources(cr_config, common_config)
             
             if not cr_result.success:
-                error_msg = f"CR resource preparation failed: {cr_result.error}"
-                self.reporter.error(error_msg)
-                raise Exception(error_msg)
+                raise Exception(cr_result.error)
             
-            # Ensure public endpoint access for image pulls
-            self.reporter.info("Ensuring CR public endpoint access...")
-            public_result = cr_service.ensure_public_endpoint(cr_config)
-            
-            if not public_result.success:
-                error_msg = f"Public endpoint configuration failed: {public_result.error}"
-                self.reporter.error(error_msg)
-                raise Exception(error_msg)
+            # Ensure public endpoint access for image pulls (controlled by global config)
+            try:
+                from agentkit.toolkit.config.global_config import get_global_config
+                gc = get_global_config()
+                do_check = getattr(getattr(gc, 'defaults', None), 'cr_public_endpoint_check', None)
+            except Exception:
+                do_check = None
+            if do_check is False:
+                self.reporter.info("Skipping CR public endpoint check per global config")
+            else:
+                self.reporter.info("Ensuring CR public endpoint access...")
+                public_result = cr_service.ensure_public_endpoint(cr_config)
+                
+                if not public_result.success:
+                    error_msg = f"Public endpoint configuration failed: {public_result.error}"
+                    raise Exception(error_msg)
             
             self.reporter.success("CR resource preparation completed")
             self.reporter.info(f"   Instance: {cr_result.instance_name}")
@@ -937,10 +949,10 @@ class VeCPCRBuilder(Builder):
                         {"Key": "DOCKERFILE_PATH", "Value": "/workspace/agentkit-app/Dockerfile", "Dynamic": True, "Env": True},
                         {"Key": "DOWNLOAD_PATH", "Value": "/workspace", "Dynamic": True, "Env": True},
                         {"Key": "PROJECT_ROOT_DIR", "Value": "/workspace/agentkit-app", "Dynamic": True, "Env": True},
-                        {"Key": "TOS_BUCKET_NAME", "Value": "", "Dynamic": True, "Env": True},
+                        {"Key": "TOS_BUCKET_NAME", "Value": "", "Dynamic": True},
+                        {"Key": "TOS_REGION", "Value": "", "Dynamic": True},
                         {"Key": "TOS_PROJECT_FILE_NAME", "Value": "", "Dynamic": True, "Env": True},
                         {"Key": "TOS_PROJECT_FILE_PATH", "Value": "", "Dynamic": True, "Env": True},
-                        {"Key": "TOS_REGION", "Value": "", "Dynamic": True, "Env": True},
                         {"Key": "CR_NAMESPACE", "Value": "", "Dynamic": True, "Env": True},
                         {"Key": "CR_INSTANCE", "Value": "", "Dynamic": True, "Env": True},
                         {"Key": "CR_DOMAIN", "Value": "", "Dynamic": True, "Env": True},
@@ -1030,9 +1042,9 @@ class VeCPCRBuilder(Builder):
             # Prepare build parameters for pipeline execution
             build_parameters = [
                 {"Key": "TOS_BUCKET_NAME", "Value": config.tos_bucket},
+                {"Key": "TOS_REGION", "Value": config.tos_region},
                 {"Key": "TOS_PROJECT_FILE_NAME", "Value": os.path.basename(config.tos_object_key)},
                 {"Key": "TOS_PROJECT_FILE_PATH", "Value": config.tos_object_key},
-                {"Key": "TOS_REGION", "Value": config.tos_region},
                 {"Key": "PROJECT_ROOT_DIR", "Value": f"/workspace/{agent_name}"},
                 {"Key": "DOWNLOAD_PATH", "Value": "/workspace"},
                 {"Key": "DOCKERFILE_PATH", "Value": f"/workspace/{agent_name}/Dockerfile"},

@@ -72,6 +72,7 @@ class BaseServiceClient(Service):
         session_token: str = "",
         service_name: str = "",
         credential_env_prefix: str = "",
+        header: Optional[Dict[str, Any]] = {"Accept": "application/json"},
     ) -> None:
         """
         Initialize the service client.
@@ -106,11 +107,12 @@ class BaseServiceClient(Service):
         self.host = config['host']
         self.api_version = config['api_version']
         self.service = config['service']
+        self.scheme = config.get('scheme', 'https')
         
         # Create ServiceInfo
         self.service_info = ServiceInfo(
             host=self.host,
-            header={'Accept': 'application/json'},
+            header=header,
             credentials=Credentials(
                 ak=self.access_key,
                 sk=self.secret_key,
@@ -120,7 +122,7 @@ class BaseServiceClient(Service):
             ),
             connection_timeout=30,
             socket_timeout=30,
-            scheme="https",
+            scheme=self.scheme,
         )
         
         # Generate ApiInfo for all actions

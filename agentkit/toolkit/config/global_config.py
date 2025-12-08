@@ -24,7 +24,6 @@ Priority:
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
-import yaml
 import logging
 
 from .utils import is_valid_config
@@ -67,11 +66,17 @@ class CRGlobalConfig:
     """
     instance_name: str = ""
     namespace_name: str = ""
+    auto_create_instance_type: str = "Micro"  # Instance type when auto-creating: "Micro" or "Enterprise"
+    host: str = ""
+    schema: str = "https"
     
     def to_dict(self):
         return {
             "instance_name": self.instance_name,
             "namespace_name": self.namespace_name,
+            "auto_create_instance_type": self.auto_create_instance_type,
+            "host": self.host,
+            "schema": self.schema,
         }
     
     @classmethod
@@ -79,6 +84,9 @@ class CRGlobalConfig:
         return cls(
             instance_name=data.get("instance_name", ""),
             namespace_name=data.get("namespace_name", ""),
+            auto_create_instance_type=data.get("auto_create_instance_type", "Micro"),
+            host=data.get("host", ""),
+            schema=data.get("schema", "https"),
         )
 
 
@@ -117,13 +125,59 @@ class GlobalConfig:
     volcengine: VolcengineCredentials = field(default_factory=VolcengineCredentials)
     cr: CRGlobalConfig = field(default_factory=CRGlobalConfig)
     tos: TOSGlobalConfig = field(default_factory=TOSGlobalConfig)
+    agentkit_host: str = ""
+    agentkit_schema: str = "https"
+    iam_host: str = ""
+    iam_schema: str = "https"
+    
+    @dataclass
+    class Defaults:
+        launch_type: Optional[str] = None
+        preflight_mode: Optional[str] = None
+        cr_public_endpoint_check: Optional[bool] = None
+        iam_role_policies: Optional[list] = None
+        
+        def to_dict(self):
+            data = {}
+            if self.launch_type:
+                data["launch_type"] = self.launch_type
+            if self.preflight_mode:
+                data["preflight_mode"] = self.preflight_mode
+            if self.cr_public_endpoint_check is not None:
+                data["cr_public_endpoint_check"] = self.cr_public_endpoint_check
+            if self.iam_role_policies is not None:
+                data["iam_role_policies"] = self.iam_role_policies
+            return data
+        
+        @classmethod
+        def from_dict(cls, data: dict):
+            return cls(
+                launch_type=data.get("launch_type"),
+                preflight_mode=data.get("preflight_mode"),
+                cr_public_endpoint_check=data.get("cr_public_endpoint_check"),
+                iam_role_policies=data.get("iam_role_policies"),
+            )
+    
+    defaults: 'GlobalConfig.Defaults' = field(default_factory=lambda: GlobalConfig.Defaults())
     
     def to_dict(self):
-        return {
+        base = {
             "volcengine": self.volcengine.to_dict(),
             "cr": self.cr.to_dict(),
             "tos": self.tos.to_dict(),
+            "agentkit": {
+                "host": self.agentkit_host,
+                "schema": self.agentkit_schema,
+            },
+            "iam": {
+                "host": self.iam_host,
+                "schema": self.iam_schema,
+            },
         }
+        defaults_dict = self.defaults.to_dict()
+        if defaults_dict:
+            base["defaults"] = defaults_dict
+        return base
     
     @classmethod
     def from_dict(cls, data: dict):
@@ -131,6 +185,11 @@ class GlobalConfig:
             volcengine=VolcengineCredentials.from_dict(data.get("volcengine", {})),
             cr=CRGlobalConfig.from_dict(data.get("cr", {})),
             tos=TOSGlobalConfig.from_dict(data.get("tos", {})),
+            agentkit_host=(data.get("agentkit", {}) or {}).get("host", ""),
+            agentkit_schema=(data.get("agentkit", {}) or {}).get("schema", "https"),
+            iam_host=(data.get("iam", {}) or {}).get("host", ""),
+            iam_schema=(data.get("iam", {}) or {}).get("schema", "https"),
+            defaults=GlobalConfig.Defaults.from_dict(data.get("defaults", {}) or {}),
         )
 
 
@@ -166,6 +225,7 @@ class GlobalConfigManager:
             return GlobalConfig()
         
         try:
+            import yaml
             with open(self.config_path, 'r', encoding='utf-8') as f:
                 data = yaml.safe_load(f) or {}
             logger.debug(f"Loaded global config from: {self.config_path}")
@@ -185,6 +245,7 @@ class GlobalConfigManager:
         
         # Write YAML config
         with open(self.config_path, 'w', encoding='utf-8') as f:
+            import yaml
             yaml.dump(
                 config.to_dict(), 
                 f, 
@@ -324,6 +385,7 @@ def apply_global_config_defaults(
         field_mappings = {
             'cr_instance_name': ('cr', 'instance_name'),
             'cr_namespace_name': ('cr', 'namespace_name'),
+            'cr_auto_create_instance_type': ('cr', 'auto_create_instance_type'),
         }
         
         # For VeAgentkitConfig, also apply TOS-related settings
@@ -332,6 +394,16 @@ def apply_global_config_defaults(
                 'tos_bucket': ('tos', 'bucket'),
                 'tos_prefix': ('tos', 'prefix'),
                 'tos_region': ('tos', 'region'),
+            })
+        
+        # Region fields (cloud/hybrid) inherit from global volcengine.region when project missing
+        if isinstance(config_obj, (HybridStrategyConfig, CloudStrategyConfig)):
+            field_mappings.update({
+                'region': ('volcengine', 'region'),
+            })
+        if isinstance(config_obj, CloudStrategyConfig):
+            field_mappings.update({
+                'cr_region': ('volcengine', 'region'),
             })
         
         # Apply global config values

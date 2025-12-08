@@ -16,6 +16,7 @@ import os
 import logging
 from dataclasses import dataclass, field
 from agentkit.toolkit.config.dataclass_utils import AutoSerializableMixin
+from agentkit.toolkit.config.constants import DEFAULT_TOS_BUCKET_TEMPLATE_NAME
 
 try:
     import tos
@@ -286,7 +287,7 @@ class TOSService:
         """
         import re
         from agentkit.utils.template_utils import render_template
-        bucket_name = TOSService.default_bucket_name_template()
+        bucket_name = DEFAULT_TOS_BUCKET_TEMPLATE_NAME
         bucket_name = render_template(bucket_name)
         
         # Verify template was fully rendered (no unresolved variables remain)
@@ -303,8 +304,3 @@ class TOSService:
             bucket_name = f"{prefix}-bucket-{generate_random_id(4)}".lower()
             
         return bucket_name
-    
-    @staticmethod
-    def default_bucket_name_template() -> str:
-        """Return the default template for generating bucket names."""
-        return "agentkit-cli-{{account_id}}"

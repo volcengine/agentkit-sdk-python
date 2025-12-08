@@ -200,42 +200,6 @@ class VeIAM(BaseIAMClient):
             region=region,
             service_name="iam",
         )
-    
-    def get_user_by_name(self, user_name: str) -> Optional[GetUserResponse]:
-        """Get user by name"""
-        request = GetUserRequest(user_name=user_name)
-        res = self.request(
-            "GetUser",
-            params=request.model_dump(by_alias=True, exclude_none=True),
-            data="{}"
-        )
-        response_data = json.loads(res)
-        return GetUserResponse(**response_data.get('Result', {}))
-
-    def get_user_by_uid(self, uid: str) -> Optional[GetUserResponse]:
-        """Get user by uid"""
-        request = GetUserRequest(id=uid)
-        res = self.request(
-            "GetUser",
-            params=request.model_dump(by_alias=True, exclude_none=True),
-            data="{}"
-        )
-        response_data = json.loads(res)
-        return GetUserResponse(**response_data.get('Result', {}))
-    
-    def get_user_by_access_key_id(self, access_key_id: str = None) -> Optional[GetUserResponse]:
-        """Get user by access key id"""
-        if access_key_id is None:
-            from agentkit.utils.ve_sign import get_volc_ak_sk_region
-            access_key_id, _, _ = get_volc_ak_sk_region('IAM')
-        request = GetUserRequest(access_key_id=access_key_id)
-        res = self.request(
-            "GetUser",
-            params=request.model_dump(by_alias=True, exclude_none=True),
-            data="{}"
-        )
-        response_data = json.loads(res)
-        return GetUserResponse(**response_data.get('Result', {}))
 
     def list_users(self, limit: int = 10, offset: int = 0, query: str = '') -> Optional[ListUsersResponse]:
         """List users"""
@@ -288,7 +252,13 @@ class VeIAM(BaseIAMClient):
             data="{}"
         )
         response_data = json.loads(res)
-        return CreateRoleResponse(**response_data.get('Result', {}))
+        result_data = response_data.get('Result', {})
+        role_data = result_data.get('Role')
+        if isinstance(role_data, dict):
+            tpd = role_data.get('TrustPolicyDocument')
+            if isinstance(tpd, dict):
+                role_data['TrustPolicyDocument'] = json.dumps(tpd)
+        return CreateRoleResponse(**result_data)
     
 
     def attach_role_policy(self, role_name: str, policy_name: str, policy_type: str) -> Optional[AttachRolePolicyResponse]:
@@ -329,20 +299,31 @@ class VeIAM(BaseIAMClient):
             AgentKitTosAccess
             AgentKitToolAccess
             '''
-            policies = [
-                "ArkReadOnlyAccess",
-                "TLSReadOnlyAccess",
-                "APMPlusServerReadOnlyAccess",
-                "VikingdbReadOnlyAccess",
-                "ESCloudReadOnlyAccess",
-                "LLMShieldProtectSdkAccess",
-                "AgentKitReadOnlyAccess",
-                "TorchlightApiFullAccess",
-                "Mem0ReadOnlyAccess",
-                "IDReadOnlyAccess",
-                "AgentKitTosAccess",
-                "AgentKitToolAccess",
-            ]
-            for policy in policies:
+            try:
+                from agentkit.toolkit.config.global_config import get_global_config
+                gc = get_global_config()
+                defaults = getattr(gc, 'defaults', None)
+                custom_policies = getattr(defaults, 'iam_role_policies', None) if defaults else None
+            except Exception:
+                custom_policies = None
+            
+            if custom_policies and isinstance(custom_policies, list) and len(custom_policies) > 0:
+                to_attach = custom_policies
+            else:
+                to_attach = [
+                    "ArkReadOnlyAccess",
+                    "TLSReadOnlyAccess",
+                    "APMPlusServerReadOnlyAccess",
+                    "VikingdbReadOnlyAccess",
+                    "ESCloudReadOnlyAccess",
+                    "LLMShieldProtectSdkAccess",
+                    "AgentKitReadOnlyAccess",
+                    "TorchlightApiFullAccess",
+                    "Mem0ReadOnlyAccess",
+                    "IDReadOnlyAccess",
+                    "AgentKitTosAccess",
+                    "AgentKitToolAccess",
+                ]
+            for policy in to_attach:
                 self.attach_role_policy(role_name, policy_name=policy, policy_type="System")
         return True

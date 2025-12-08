@@ -20,6 +20,7 @@ Uses the same volcengine.base.Service approach as AgentKit services.
 from typing import Dict, Union
 
 from agentkit.client.base_service_client import BaseServiceClient, ApiConfig
+from agentkit.toolkit.config.global_config import get_global_config
 
 
 class BaseIAMClient(BaseServiceClient):
@@ -42,7 +43,7 @@ class BaseIAMClient(BaseServiceClient):
     # IAM service specific configuration
     IAM_API_VERSION = "2018-01-01"
     IAM_SERVICE_CODE = "iam"
-    IAM_HOST ="open.volcengineapi.com"
+    IAM_HOST = "open.volcengineapi.com"
     
     def __init__(
         self,
@@ -78,8 +79,12 @@ class BaseIAMClient(BaseServiceClient):
         Returns:
             Dictionary with host, api_version, and service
         """
+        gc = get_global_config()
+        scheme = gc.iam_schema or 'https'
+        host = gc.iam_host or self.IAM_HOST
         return {
-            'host': self.IAM_HOST,
+            'host': host,
             'api_version': self.IAM_API_VERSION,
             'service': self.IAM_SERVICE_CODE,
+            'scheme': scheme,
         }

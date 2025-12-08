@@ -17,10 +17,11 @@ Base client for AgentKit services.
 Provides common initialization and API invocation logic.
 """
 
-from typing import Any, Dict, Union
+from typing import Any, Dict, Union, Optional
 
 from agentkit.client.base_service_client import BaseServiceClient, ApiConfig
 from agentkit.utils.ve_sign import get_volc_agentkit_host_info
+from agentkit.toolkit.config.global_config import get_global_config
 
 
 class BaseAgentkitClient(BaseServiceClient):
@@ -47,6 +48,7 @@ class BaseAgentkitClient(BaseServiceClient):
         region: str = "",
         session_token: str = "",
         service_name: str = "",
+        header: Optional[Dict[str, Any]] = {"Accept": "application/json"},
     ) -> None:
         """
         Initialize the AgentKit client.
@@ -65,6 +67,7 @@ class BaseAgentkitClient(BaseServiceClient):
             session_token=session_token,
             service_name=service_name,
             credential_env_prefix='AGENTKIT',
+            header=header,
         )
     
     def _get_service_config(self) -> Dict[str, str]:
@@ -75,10 +78,13 @@ class BaseAgentkitClient(BaseServiceClient):
             Dictionary with host, api_version, and service
         """
         host, api_version, service = get_volc_agentkit_host_info()
+        gc = get_global_config()
+        scheme = gc.agentkit_schema or 'https'
         return {
-            'host': host,
+            'host': gc.agentkit_host or host,
             'api_version': api_version,
             'service': service,
+            'scheme': scheme,
         }
     
     def _get(self, api_action: str, params: Dict[str, Any] = None) -> str:

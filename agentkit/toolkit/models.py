@@ -27,6 +27,7 @@ duplication and unnecessary conversions between layers.
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, List
 from datetime import datetime
+from enum import Enum
 
 
 
@@ -157,6 +158,57 @@ class ConfigUpdates:
     
     def __contains__(self, key: str) -> bool:
         return key in self.updates
+
+
+# ============================================================================
+# Preflight Check Models
+# ============================================================================
+
+class PreflightMode(Enum):
+    """
+    Preflight check behavior mode.
+    
+    Controls how the Executor handles missing cloud services before executing operations.
+    
+    Modes:
+    - PROMPT: Show warning and ask user for confirmation (CLI default)
+    - FAIL: Raise exception if services are not enabled (SDK strict mode)
+    - WARN: Log warning but continue execution (SDK lenient mode)
+    - SKIP: Skip preflight check entirely
+    """
+    PROMPT = "prompt"
+    FAIL = "fail"
+    WARN = "warn"
+    SKIP = "skip"
+
+
+@dataclass
+class PreflightResult:
+    """
+    Result of preflight service status check.
+    
+    Contains information about which cloud services are missing and how to enable them.
+    
+    Attributes:
+        passed: True if all required services are enabled
+        missing_services: List of service names that are not enabled
+        auth_url: URL where users can enable the missing services
+    """
+    passed: bool
+    missing_services: List[str] = field(default_factory=list)
+    auth_url: str = "https://console.volcengine.com/agentkit/region:agentkit+cn-beijing/auth"
+    
+    @property
+    def message(self) -> str:
+        """Human-readable message describing the preflight result."""
+        if self.passed:
+            return "All required services are enabled."
+        services = ", ".join(self.missing_services)
+        return f"The following services are not enabled: {services}"
+    
+    def __bool__(self) -> bool:
+        """Allow using PreflightResult in boolean context."""
+        return self.passed
 
 
 # ============================================================================
@@ -526,6 +578,8 @@ class InitResult:
 
 __all__ = [
     "ConfigUpdates",
+    "PreflightMode",
+    "PreflightResult",
     "ImageInfo",
     "BuildResult",
     "DeployResult",

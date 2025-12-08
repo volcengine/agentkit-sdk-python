@@ -272,6 +272,7 @@ def _handle_global_config(show: bool, set_field: Optional[str], init_global: boo
             console.print("  [dim]CR:[/dim]")
             console.print("    • [green]cr.instance_name[/green]        - CR instance name")
             console.print("    • [green]cr.namespace_name[/green]       - CR namespace")
+            console.print("    • [green]cr.auto_create_instance_type[/green] - Instance type when auto-creating (Micro/Enterprise)")
             console.print("  [dim]TOS:[/dim]")
             console.print("    • [green]tos.bucket[/green]              - Bucket name")
             console.print("    • [green]tos.prefix[/green]              - Object prefix")
@@ -315,6 +316,7 @@ def _init_global_config():
         console.print("\n[bold]📦 CR Configuration[/bold]")
         console.print("  instance_name: ''  # CR instance name")
         console.print("  namespace_name: '' # CR namespace")
+        console.print("  auto_create_instance_type: Micro  # Instance type when auto-creating (Micro/Enterprise)")
         
         console.print("\n[bold]🗂️  TOS Configuration[/bold]")
         console.print("  bucket: ''         # TOS bucket name")
@@ -363,6 +365,7 @@ def _show_global_config():
     console.print("\n[bold]📦 CR Configuration[/bold]")
     console.print(f"  Instance:   [yellow]{config.cr.instance_name or '[dim](not set)[/dim]'}[/yellow]")
     console.print(f"  Namespace:  [yellow]{config.cr.namespace_name or '[dim](not set)[/dim]'}[/yellow]")
+    console.print(f"  Auto-create Type: [yellow]{config.cr.auto_create_instance_type}[/yellow]")
     
     # Display TOS configuration
     console.print("\n[bold]🗂️  TOS Configuration[/bold]")
@@ -395,6 +398,7 @@ def _set_global_field(field_value: str):
         console.print("  • volcengine.secret_key")
         console.print("  • volcengine.region")
         console.print("  • cr.instance_name")
+        console.print("  • cr.auto_create_instance_type")
         console.print("  • cr.namespace_name")
         console.print("  • tos.bucket")
         console.print("  • tos.prefix")
@@ -420,6 +424,59 @@ def _set_global_field(field_value: str):
             if not hasattr(config.tos, field):
                 raise AttributeError(f"tos has no field: {field}")
             setattr(config.tos, field, value)
+        elif section == 'agentkit':
+            if field not in ['host', 'schema']:
+                raise AttributeError(f"agentkit has no field: {field}")
+            if field == 'host':
+                config.agentkit_host = value
+            elif field == 'schema':
+                config.agentkit_schema = value
+        elif section == 'iam':
+            if field not in ['host', 'schema']:
+                raise AttributeError(f"iam has no field: {field}")
+            if field == 'host':
+                config.iam_host = value
+            elif field == 'schema':
+                config.iam_schema = value
+        elif section == 'defaults':
+            if field == 'launch_type':
+                clean_value = value.strip() if value is not None else None
+                if clean_value == "":
+                    clean_value = None
+                config.defaults.launch_type = clean_value
+            elif field == 'preflight_mode':
+                clean_value = value.strip().lower() if value is not None else None
+                if clean_value == "":
+                    clean_value = None
+                # Accept only known modes
+                allowed = {"prompt", "fail", "warn", "skip"}
+                if clean_value and clean_value not in allowed:
+                    raise AttributeError(f"Invalid preflight_mode: {value}. Allowed: prompt|fail|warn|skip")
+                config.defaults.preflight_mode = clean_value
+            elif field == 'cr_public_endpoint_check':
+                clean_value = value.strip().lower() if value is not None else None
+                if clean_value == "":
+                    clean_value = None
+                if clean_value is None:
+                    config.defaults.cr_public_endpoint_check = None
+                else:
+                    truthy = {"true", "1", "yes", "y"}
+                    falsy = {"false", "0", "no", "n"}
+                    if clean_value in truthy:
+                        config.defaults.cr_public_endpoint_check = True
+                    elif clean_value in falsy:
+                        config.defaults.cr_public_endpoint_check = False
+                    else:
+                        raise AttributeError(f"Invalid cr_public_endpoint_check: {value}. Allowed: true|false|1|0|yes|no")
+            elif field == 'iam_role_policies':
+                clean_value = value.strip() if value is not None else None
+                if clean_value == "" or clean_value is None:
+                    config.defaults.iam_role_policies = None
+                else:
+                    policies = [p.strip() for p in clean_value.split(',') if p.strip()]
+                    config.defaults.iam_role_policies = policies
+            else:
+                raise AttributeError(f"defaults has no field: {field}")
         else:
             console.print(f"[red]❌ Unknown config section: {section}[/red]")
             console.print("\nSupported sections: volcengine, cr, tos")

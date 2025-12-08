@@ -34,7 +34,7 @@ NOT Responsible For:
 
 from dataclasses import dataclass
 from typing import Optional, Dict, Any
-from agentkit.toolkit.models import BuildResult
+from agentkit.toolkit.models import BuildResult, PreflightMode
 from agentkit.toolkit.reporter import Reporter
 from .base_executor import BaseExecutor
 
@@ -80,24 +80,27 @@ class BuildExecutor(BaseExecutor):
         self,
         config_dict: Optional[Dict[str, Any]] = None,
         config_file: Optional[str] = None,
-        options: Optional[BuildOptions] = None
+        options: Optional[BuildOptions] = None,
+        preflight_mode: PreflightMode = PreflightMode.PROMPT
     ) -> BuildResult:
         """
         Execute the build operation with unified configuration and error handling.
         
         Strategy:
         1. Load and validate configuration (priority: config_dict > config_file > default)
-        2. Apply runtime options to configuration (not persisted)
-        3. Select strategy based on launch_type
-        4. Get strongly-typed strategy configuration
-        5. Execute build via strategy
-        6. Apply and persist configuration updates from build result
-        7. Log results and return BuildResult
+        2. Preflight check: verify required cloud services are enabled
+        3. Apply runtime options to configuration (not persisted)
+        4. Select strategy based on launch_type
+        5. Get strongly-typed strategy configuration
+        6. Execute build via strategy
+        7. Apply and persist configuration updates from build result
+        8. Log results and return BuildResult
         
         Args:
             config_dict: Configuration dictionary (highest priority, overrides config_file)
             config_file: Path to configuration file (medium priority)
             options: Build runtime options (CLI parameters, not persisted)
+            preflight_mode: How to handle missing cloud services (default: PROMPT)
             
         Returns:
             BuildResult: Build result returned directly from Strategy without transformation
@@ -126,6 +129,16 @@ class BuildExecutor(BaseExecutor):
             common_config = config.get_common_config()
             launch_type = common_config.launch_type
             self.logger.info(f"Build strategy selected: {launch_type}")
+            
+            # Preflight check: verify required cloud services are enabled
+            if preflight_mode != PreflightMode.SKIP:
+                preflight_result = self._preflight_check("build", launch_type)
+                if not self._handle_preflight_result(preflight_result, preflight_mode):
+                    return BuildResult(
+                        success=False,
+                        error="Build aborted: required services not enabled",
+                        error_code="PREFLIGHT_ABORTED"
+                    )
             
             strategy = self._get_strategy(launch_type, config_manager=config)
             strategy_config = self._get_strategy_config_object(config, launch_type)

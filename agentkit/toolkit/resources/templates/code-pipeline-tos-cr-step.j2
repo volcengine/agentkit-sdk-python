@@ -12,8 +12,8 @@ stages:
               displayName: TOS 下载
               component: artifact@1.0.0/tos-download
               inputs:
-                bucketName: {{ bucket_name }}
-                bucketRegion: {{ bucket_region }}
+                bucketName: $(parameters.TOS_BUCKET_NAME)
+                bucketRegion: $(parameters.TOS_REGION)
                 path: $TOS_PROJECT_FILE_PATH
                 targetPath: $DOWNLOAD_PATH
             - step: step-c6

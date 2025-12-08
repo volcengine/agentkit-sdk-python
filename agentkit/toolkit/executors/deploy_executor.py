@@ -28,7 +28,7 @@ Does NOT:
 """
 
 from typing import Optional, Dict, Any
-from agentkit.toolkit.models import DeployResult
+from agentkit.toolkit.models import DeployResult, PreflightMode
 from agentkit.toolkit.reporter import Reporter
 from .base_executor import BaseExecutor
 
@@ -60,22 +60,25 @@ class DeployExecutor(BaseExecutor):
     def execute(
         self,
         config_dict: Optional[Dict[str, Any]] = None,
-        config_file: Optional[str] = None
+        config_file: Optional[str] = None,
+        preflight_mode: PreflightMode = PreflightMode.PROMPT
     ) -> DeployResult:
         """
         Execute deployment operation.
         
         Strategy:
         1. Load and validate configuration (priority: config_dict > config_file > default)
-        2. Extract launch_type from common config
-        3. Instantiate appropriate Strategy with Reporter injection
-        4. Execute deployment via Strategy.deploy()
-        5. Apply any configuration updates returned by Strategy
-        6. Return deployment result
+        2. Preflight check: verify required cloud services are enabled
+        3. Extract launch_type from common config
+        4. Instantiate appropriate Strategy with Reporter injection
+        5. Execute deployment via Strategy.deploy()
+        6. Apply any configuration updates returned by Strategy
+        7. Return deployment result
         
         Args:
             config_dict: Configuration dictionary (highest priority)
             config_file: Path to configuration file
+            preflight_mode: How to handle missing cloud services (default: PROMPT)
             
         Returns:
             DeployResult: Deployment result from Strategy (no transformation applied)
@@ -86,6 +89,21 @@ class DeployExecutor(BaseExecutor):
             Exception: Any exception during deployment is caught and returned as failed result
         """
         try:
+            # Override preflight_mode from global config defaults if configured
+            try:
+                from agentkit.toolkit.config.global_config import get_global_config
+                gc = get_global_config()
+                gm = getattr(getattr(gc, 'defaults', None), 'preflight_mode', None)
+                if gm:
+                    gm_map = {
+                        'prompt': PreflightMode.PROMPT,
+                        'fail': PreflightMode.FAIL,
+                        'warn': PreflightMode.WARN,
+                        'skip': PreflightMode.SKIP,
+                    }
+                    preflight_mode = gm_map.get(gm.lower(), preflight_mode)
+            except Exception:
+                pass
             self.logger.info("Loading configuration...")
             config = self._load_config(config_dict, config_file)
             self._validate_config(config)
@@ -93,6 +111,16 @@ class DeployExecutor(BaseExecutor):
             common_config = config.get_common_config()
             launch_type = common_config.launch_type
             self.logger.info(f"Deployment strategy selected: {launch_type}")
+            
+            # Preflight check: verify required cloud services are enabled
+            if preflight_mode != PreflightMode.SKIP:
+                preflight_result = self._preflight_check("deploy", launch_type)
+                if not self._handle_preflight_result(preflight_result, preflight_mode):
+                    return DeployResult(
+                        success=False,
+                        error="Deployment aborted: required services not enabled",
+                        error_code="PREFLIGHT_ABORTED"
+                    )
             
             strategy = self._get_strategy(launch_type, config_manager=config)
             strategy_config = self._get_strategy_config_object(config, launch_type)

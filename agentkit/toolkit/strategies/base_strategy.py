@@ -14,7 +14,7 @@
 
 
 from abc import ABC, abstractmethod
-from typing import Any, Optional
+from typing import Any, Optional, Dict, List
 from agentkit.toolkit.models import BuildResult, DeployResult, InvokeResult, StatusResult
 from agentkit.toolkit.reporter import Reporter, SilentReporter
 from agentkit.toolkit.config import CommonConfig
@@ -38,7 +38,29 @@ class Strategy(ABC):
     This allows different execution contexts to control progress reporting:
     - CLI: Injects ConsoleReporter for user-visible progress
     - SDK: Injects SilentReporter for programmatic execution
+    
+    Service Requirements:
+    Each concrete Strategy defines REQUIRED_SERVICES - a mapping of operation names
+    to lists of cloud services that must be enabled. This enables preflight checks
+    before executing operations that depend on cloud infrastructure.
     """
+    
+    # Service requirements mapping: operation -> list of required service names
+    # Override in concrete Strategy subclasses
+    REQUIRED_SERVICES: Dict[str, List[str]] = {}
+    
+    @classmethod
+    def get_required_services(cls, operation: str) -> List[str]:
+        """
+        Get the list of cloud services required for an operation.
+        
+        Args:
+            operation: Operation name ('build', 'deploy', etc.)
+            
+        Returns:
+            List of service names that must be enabled (e.g., ['cr', 'tos', 'cp'])
+        """
+        return cls.REQUIRED_SERVICES.get(operation, [])
     
     def __init__(self, config_manager=None, reporter: Reporter = None):
         """

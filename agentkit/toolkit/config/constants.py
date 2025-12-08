@@ -25,9 +25,12 @@ from pathlib import Path
 AUTO_CREATE_VE = "Auto"
 DEFAULT_WORKSPACE_NAME = "agentkit-cli-workspace"
 DEFAULT_CR_NAMESPACE = "agentkit"
+DEFAULT_CR_INSTANCE_TEMPLATE_NAME = "agentkit-platform-{{account_id}}"
+DEFAULT_TOS_BUCKET_TEMPLATE_NAME = "agentkit-platform-{{account_id}}"
 
 # Default image tag placeholder for timestamped builds
 DEFAULT_IMAGE_TAG = "{{timestamp}}"
+DEFAULT_IMAGE_TAG_TEMPLATE = "{{timestamp}}"
 
 # Global configuration constants
 GLOBAL_CONFIG_DIR = Path.home() / ".agentkit"
