@@ -20,12 +20,11 @@ from __future__ import annotations
 from typing import Optional
 from pydantic import BaseModel, Field
 
+
 class RuntimeTypeBaseModel(BaseModel):
     """AgentKit auto-generated base model"""
-    model_config = {
-        "populate_by_name": True,
-        "arbitrary_types_allowed": True
-    }
+
+    model_config = {"populate_by_name": True, "arbitrary_types_allowed": True}
 
 
 # Data Types
@@ -41,8 +40,12 @@ class KeyAuthForGetRuntimeVersion(RuntimeTypeBaseModel):
 
 
 class AuthorizerConfigurationForGetRuntimeVersion(RuntimeTypeBaseModel):
-    custom_jwt_authorizer: Optional[CustomJwtAuthorizerForGetRuntimeVersion] = Field(default=None, alias="CustomJwtAuthorizer")
-    key_auth: Optional[KeyAuthForGetRuntimeVersion] = Field(default=None, alias="KeyAuth")
+    custom_jwt_authorizer: Optional[CustomJwtAuthorizerForGetRuntimeVersion] = Field(
+        default=None, alias="CustomJwtAuthorizer"
+    )
+    key_auth: Optional[KeyAuthForGetRuntimeVersion] = Field(
+        default=None, alias="KeyAuth"
+    )
 
 
 class EnvsForGetRuntimeVersion(RuntimeTypeBaseModel):
@@ -77,7 +80,9 @@ class KeyAuthForListRuntimes(RuntimeTypeBaseModel):
 
 
 class AuthorizerConfigurationForListRuntimes(RuntimeTypeBaseModel):
-    custom_jwt_authorizer: Optional[CustomJwtAuthorizerForListRuntimes] = Field(default=None, alias="CustomJwtAuthorizer")
+    custom_jwt_authorizer: Optional[CustomJwtAuthorizerForListRuntimes] = Field(
+        default=None, alias="CustomJwtAuthorizer"
+    )
     key_auth: Optional[KeyAuthForListRuntimes] = Field(default=None, alias="KeyAuth")
 
 
@@ -87,7 +92,9 @@ class EnvsForListRuntimes(RuntimeTypeBaseModel):
 
 
 class VpcConfigurationForListRuntimes(RuntimeTypeBaseModel):
-    security_group_ids: Optional[list[str]] = Field(default=None, alias="SecurityGroupIds")
+    security_group_ids: Optional[list[str]] = Field(
+        default=None, alias="SecurityGroupIds"
+    )
     subnet_ids: Optional[list[str]] = Field(default=None, alias="SubnetIds")
     vpc_id: Optional[str] = Field(default=None, alias="VpcId")
 
@@ -95,7 +102,9 @@ class VpcConfigurationForListRuntimes(RuntimeTypeBaseModel):
 class NetworkConfigurationsForListRuntimes(RuntimeTypeBaseModel):
     endpoint: Optional[str] = Field(default=None, alias="Endpoint")
     network_type: Optional[str] = Field(default=None, alias="NetworkType")
-    vpc_configuration: Optional[VpcConfigurationForListRuntimes] = Field(default=None, alias="VpcConfiguration")
+    vpc_configuration: Optional[VpcConfigurationForListRuntimes] = Field(
+        default=None, alias="VpcConfiguration"
+    )
 
 
 class TagsForListRuntimes(RuntimeTypeBaseModel):
@@ -107,11 +116,15 @@ class AgentKitRuntimesForListRuntimes(RuntimeTypeBaseModel):
     apmplus_enable: Optional[bool] = Field(default=None, alias="ApmplusEnable")
     artifact_type: Optional[str] = Field(default=None, alias="ArtifactType")
     artifact_url: Optional[str] = Field(default=None, alias="ArtifactUrl")
-    authorizer_configuration: Optional[AuthorizerConfigurationForListRuntimes] = Field(default=None, alias="AuthorizerConfiguration")
+    authorizer_configuration: Optional[AuthorizerConfigurationForListRuntimes] = Field(
+        default=None, alias="AuthorizerConfiguration"
+    )
     command: Optional[str] = Field(default=None, alias="Command")
     cpu_milli: Optional[int] = Field(default=None, alias="CpuMilli")
     created_at: Optional[str] = Field(default=None, alias="CreatedAt")
-    current_version_number: Optional[int] = Field(default=None, alias="CurrentVersionNumber")
+    current_version_number: Optional[int] = Field(
+        default=None, alias="CurrentVersionNumber"
+    )
     description: Optional[str] = Field(default=None, alias="Description")
     envs: Optional[list[EnvsForListRuntimes]] = Field(default=None, alias="Envs")
     knowledge_id: Optional[str] = Field(default=None, alias="KnowledgeId")
@@ -119,7 +132,9 @@ class AgentKitRuntimesForListRuntimes(RuntimeTypeBaseModel):
     memory_id: Optional[str] = Field(default=None, alias="MemoryId")
     memory_mb: Optional[int] = Field(default=None, alias="MemoryMb")
     name: Optional[str] = Field(default=None, alias="Name")
-    network_configurations: Optional[list[NetworkConfigurationsForListRuntimes]] = Field(default=None, alias="NetworkConfigurations")
+    network_configurations: Optional[list[NetworkConfigurationsForListRuntimes]] = (
+        Field(default=None, alias="NetworkConfigurations")
+    )
     project_name: Optional[str] = Field(default=None, alias="ProjectName")
     role_name: Optional[str] = Field(default=None, alias="RoleName")
     runtime_id: Optional[str] = Field(default=None, alias="RuntimeId")
@@ -141,7 +156,9 @@ class KeyAuthForGetRuntime(RuntimeTypeBaseModel):
 
 
 class AuthorizerConfigurationForGetRuntime(RuntimeTypeBaseModel):
-    custom_jwt_authorizer: Optional[CustomJwtAuthorizerForGetRuntime] = Field(default=None, alias="CustomJwtAuthorizer")
+    custom_jwt_authorizer: Optional[CustomJwtAuthorizerForGetRuntime] = Field(
+        default=None, alias="CustomJwtAuthorizer"
+    )
     key_auth: Optional[KeyAuthForGetRuntime] = Field(default=None, alias="KeyAuth")
 
 
@@ -151,7 +168,9 @@ class EnvsForGetRuntime(RuntimeTypeBaseModel):
 
 
 class VpcConfigurationForGetRuntime(RuntimeTypeBaseModel):
-    security_group_ids: Optional[list[str]] = Field(default=None, alias="SecurityGroupIds")
+    security_group_ids: Optional[list[str]] = Field(
+        default=None, alias="SecurityGroupIds"
+    )
     subnet_ids: Optional[list[str]] = Field(default=None, alias="SubnetIds")
     vpc_id: Optional[str] = Field(default=None, alias="VpcId")
 
@@ -159,7 +178,9 @@ class VpcConfigurationForGetRuntime(RuntimeTypeBaseModel):
 class NetworkConfigurationsForGetRuntime(RuntimeTypeBaseModel):
     endpoint: Optional[str] = Field(default=None, alias="Endpoint")
     network_type: Optional[str] = Field(default=None, alias="NetworkType")
-    vpc_configuration: Optional[VpcConfigurationForGetRuntime] = Field(default=None, alias="VpcConfiguration")
+    vpc_configuration: Optional[VpcConfigurationForGetRuntime] = Field(
+        default=None, alias="VpcConfiguration"
+    )
 
 
 class TagsForGetRuntime(RuntimeTypeBaseModel):
@@ -174,7 +195,9 @@ class KeyAuthForListRuntimeVersions(RuntimeTypeBaseModel):
 
 
 class AuthorizerConfigurationForListRuntimeVersions(RuntimeTypeBaseModel):
-    key_auth: Optional[KeyAuthForListRuntimeVersions] = Field(default=None, alias="KeyAuth")
+    key_auth: Optional[KeyAuthForListRuntimeVersions] = Field(
+        default=None, alias="KeyAuth"
+    )
 
 
 class EnvsForListRuntimeVersions(RuntimeTypeBaseModel):
@@ -186,7 +209,9 @@ class AgentKitRuntimeVersionsForListRuntimeVersions(RuntimeTypeBaseModel):
     apmplus_enable: Optional[bool] = Field(default=None, alias="ApmplusEnable")
     artifact_type: Optional[str] = Field(default=None, alias="ArtifactType")
     artifact_url: Optional[str] = Field(default=None, alias="ArtifactUrl")
-    authorizer_configuration: Optional[AuthorizerConfigurationForListRuntimeVersions] = Field(default=None, alias="AuthorizerConfiguration")
+    authorizer_configuration: Optional[
+        AuthorizerConfigurationForListRuntimeVersions
+    ] = Field(default=None, alias="AuthorizerConfiguration")
     command: Optional[str] = Field(default=None, alias="Command")
     cpu_milli: Optional[int] = Field(default=None, alias="CpuMilli")
     created_at: Optional[str] = Field(default=None, alias="CreatedAt")
@@ -202,25 +227,34 @@ class AgentKitRuntimeVersionsForListRuntimeVersions(RuntimeTypeBaseModel):
 
 # UpdateRuntime - Request
 class AuthorizerForUpdateRuntime(RuntimeTypeBaseModel):
-    custom_jwt_authorizer: Optional[AuthorizerCustomJwtAuthorizerForUpdateRuntime] = Field(default=None, alias="CustomJwtAuthorizer")
-    key_auth: Optional[AuthorizerKeyAuthForUpdateRuntime] = Field(default=None, alias="KeyAuth")
+    custom_jwt_authorizer: Optional[AuthorizerCustomJwtAuthorizerForUpdateRuntime] = (
+        Field(default=None, alias="CustomJwtAuthorizer")
+    )
+    key_auth: Optional[AuthorizerKeyAuthForUpdateRuntime] = Field(
+        default=None, alias="KeyAuth"
+    )
+
 
 class AuthorizerCustomJwtAuthorizerForUpdateRuntime(RuntimeTypeBaseModel):
     discovery_url: str = Field(..., alias="DiscoveryUrl")
     allowed_clients: Optional[list[str]] = Field(default=None, alias="AllowedClients")
+
 
 class AuthorizerKeyAuthForUpdateRuntime(RuntimeTypeBaseModel):
     api_key: Optional[str] = Field(default=None, alias="ApiKey")
     api_key_location: Optional[str] = Field(default=None, alias="ApiKeyLocation")
     api_key_name: Optional[str] = Field(default=None, alias="ApiKeyName")
 
+
 class EnvsItemForUpdateRuntime(RuntimeTypeBaseModel):
     key: str = Field(..., alias="Key")
     value: str = Field(..., alias="Value")
 
+
 class TagsItemForUpdateRuntime(RuntimeTypeBaseModel):
     key: str = Field(..., alias="Key")
     value: Optional[str] = Field(default=None, alias="Value")
+
 
 class UpdateRuntimeRequest(RuntimeTypeBaseModel):
     apmplus_enable: Optional[bool] = Field(default=None, alias="ApmplusEnable")
@@ -235,7 +269,9 @@ class UpdateRuntimeRequest(RuntimeTypeBaseModel):
     release_enable: Optional[bool] = Field(default=None, alias="ReleaseEnable")
     runtime_id: str = Field(..., alias="RuntimeId")
     tool_id: Optional[str] = Field(default=None, alias="ToolId")
-    authorizer_configuration: Optional[AuthorizerForUpdateRuntime] = Field(default=None, alias="AuthorizerConfiguration")
+    authorizer_configuration: Optional[AuthorizerForUpdateRuntime] = Field(
+        default=None, alias="AuthorizerConfiguration"
+    )
     envs: Optional[list[EnvsItemForUpdateRuntime]] = Field(default=None, alias="Envs")
     tags: Optional[list[TagsItemForUpdateRuntime]] = Field(default=None, alias="Tags")
 
@@ -256,7 +292,9 @@ class GetRuntimeVersionResponse(RuntimeTypeBaseModel):
     apmplus_enable: Optional[bool] = Field(default=None, alias="ApmplusEnable")
     artifact_type: Optional[str] = Field(default=None, alias="ArtifactType")
     artifact_url: Optional[str] = Field(default=None, alias="ArtifactUrl")
-    authorizer_configuration: Optional[AuthorizerConfigurationForGetRuntimeVersion] = Field(default=None, alias="AuthorizerConfiguration")
+    authorizer_configuration: Optional[AuthorizerConfigurationForGetRuntimeVersion] = (
+        Field(default=None, alias="AuthorizerConfiguration")
+    )
     command: Optional[str] = Field(default=None, alias="Command")
     cpu_milli: Optional[int] = Field(default=None, alias="CpuMilli")
     created_at: Optional[str] = Field(default=None, alias="CreatedAt")
@@ -283,7 +321,9 @@ class ListRuntimeCrRegistriesRequest(RuntimeTypeBaseModel):
 
 # ListRuntimeCrRegistries - Response
 class ListRuntimeCrRegistriesResponse(RuntimeTypeBaseModel):
-    cr_registries: Optional[list[CrRegistriesForListRuntimeCrRegistries]] = Field(default=None, alias="CrRegistries")
+    cr_registries: Optional[list[CrRegistriesForListRuntimeCrRegistries]] = Field(
+        default=None, alias="CrRegistries"
+    )
     page_number: Optional[int] = Field(default=None, alias="PageNumber")
     page_size: Optional[int] = Field(default=None, alias="PageSize")
 
@@ -294,9 +334,11 @@ class FiltersItemForListRuntimes(RuntimeTypeBaseModel):
     name_contains: Optional[str] = Field(default=None, alias="NameContains")
     values: Optional[list[str]] = Field(default=None, alias="Values")
 
+
 class TagFiltersItemForListRuntimes(RuntimeTypeBaseModel):
     key: Optional[str] = Field(default=None, alias="Key")
     values: Optional[list[str]] = Field(default=None, alias="Values")
+
 
 class ListRuntimesRequest(RuntimeTypeBaseModel):
     create_time_after: Optional[str] = Field(default=None, alias="CreateTimeAfter")
@@ -310,13 +352,19 @@ class ListRuntimesRequest(RuntimeTypeBaseModel):
     sort_order: Optional[str] = Field(default=None, alias="SortOrder")
     update_time_after: Optional[str] = Field(default=None, alias="UpdateTimeAfter")
     update_time_before: Optional[str] = Field(default=None, alias="UpdateTimeBefore")
-    filters: Optional[list[FiltersItemForListRuntimes]] = Field(default=None, alias="Filters")
-    tag_filters: Optional[list[TagFiltersItemForListRuntimes]] = Field(default=None, alias="TagFilters")
+    filters: Optional[list[FiltersItemForListRuntimes]] = Field(
+        default=None, alias="Filters"
+    )
+    tag_filters: Optional[list[TagFiltersItemForListRuntimes]] = Field(
+        default=None, alias="TagFilters"
+    )
 
 
 # ListRuntimes - Response
 class ListRuntimesResponse(RuntimeTypeBaseModel):
-    agent_kit_runtimes: Optional[list[AgentKitRuntimesForListRuntimes]] = Field(default=None, alias="AgentKitRuntimes")
+    agent_kit_runtimes: Optional[list[AgentKitRuntimesForListRuntimes]] = Field(
+        default=None, alias="AgentKitRuntimes"
+    )
     page_number: Optional[int] = Field(default=None, alias="PageNumber")
     page_size: Optional[int] = Field(default=None, alias="PageSize")
     total_count: Optional[int] = Field(default=None, alias="TotalCount")
@@ -335,33 +383,50 @@ class ReleaseRuntimeResponse(RuntimeTypeBaseModel):
 
 # CreateRuntime - Request
 class AuthorizerForCreateRuntime(RuntimeTypeBaseModel):
-    custom_jwt_authorizer: Optional[AuthorizerCustomJwtAuthorizerForCreateRuntime] = Field(default=None, alias="CustomJwtAuthorizer")
-    key_auth: Optional[AuthorizerKeyAuthForCreateRuntime] = Field(default=None, alias="KeyAuth")
+    custom_jwt_authorizer: Optional[AuthorizerCustomJwtAuthorizerForCreateRuntime] = (
+        Field(default=None, alias="CustomJwtAuthorizer")
+    )
+    key_auth: Optional[AuthorizerKeyAuthForCreateRuntime] = Field(
+        default=None, alias="KeyAuth"
+    )
+
 
 class AuthorizerCustomJwtAuthorizerForCreateRuntime(RuntimeTypeBaseModel):
     discovery_url: str = Field(..., alias="DiscoveryUrl")
     allowed_clients: Optional[list[str]] = Field(default=None, alias="AllowedClients")
 
+
 class AuthorizerKeyAuthForCreateRuntime(RuntimeTypeBaseModel):
     api_key_location: Optional[str] = Field(default=None, alias="ApiKeyLocation")
     api_key_name: Optional[str] = Field(default=None, alias="ApiKeyName")
 
+
 class NetworkForCreateRuntime(RuntimeTypeBaseModel):
-    vpc_configuration: Optional[NetworkVpcForCreateRuntime] = Field(default=None, alias="VpcConfiguration")
-    enable_private_network: Optional[bool] = Field(default=None, alias="EnablePrivateNetwork")
-    enable_public_network: Optional[bool] = Field(default=None, alias="EnablePublicNetwork")
+    vpc_configuration: Optional[NetworkVpcForCreateRuntime] = Field(
+        default=None, alias="VpcConfiguration"
+    )
+    enable_private_network: Optional[bool] = Field(
+        default=None, alias="EnablePrivateNetwork"
+    )
+    enable_public_network: Optional[bool] = Field(
+        default=None, alias="EnablePublicNetwork"
+    )
+
 
 class NetworkVpcForCreateRuntime(RuntimeTypeBaseModel):
     vpc_id: str = Field(..., alias="VpcId")
     subnet_ids: Optional[list[str]] = Field(default=None, alias="SubnetIds")
 
+
 class EnvsItemForCreateRuntime(RuntimeTypeBaseModel):
     key: str = Field(..., alias="Key")
     value: str = Field(..., alias="Value")
 
+
 class TagsItemForCreateRuntime(RuntimeTypeBaseModel):
     key: str = Field(..., alias="Key")
     value: Optional[str] = Field(default=None, alias="Value")
+
 
 class CreateRuntimeRequest(RuntimeTypeBaseModel):
     apmplus_enable: Optional[bool] = Field(default=None, alias="ApmplusEnable")
@@ -377,9 +442,13 @@ class CreateRuntimeRequest(RuntimeTypeBaseModel):
     project_name: Optional[str] = Field(default=None, alias="ProjectName")
     role_name: str = Field(..., alias="RoleName")
     tool_id: Optional[str] = Field(default=None, alias="ToolId")
-    authorizer_configuration: Optional[AuthorizerForCreateRuntime] = Field(default=None, alias="AuthorizerConfiguration")
+    authorizer_configuration: Optional[AuthorizerForCreateRuntime] = Field(
+        default=None, alias="AuthorizerConfiguration"
+    )
     envs: Optional[list[EnvsItemForCreateRuntime]] = Field(default=None, alias="Envs")
-    network_configuration: Optional[NetworkForCreateRuntime] = Field(default=None, alias="NetworkConfiguration")
+    network_configuration: Optional[NetworkForCreateRuntime] = Field(
+        default=None, alias="NetworkConfiguration"
+    )
     tags: Optional[list[TagsItemForCreateRuntime]] = Field(default=None, alias="Tags")
 
 
@@ -398,11 +467,15 @@ class GetRuntimeResponse(RuntimeTypeBaseModel):
     apmplus_enable: Optional[bool] = Field(default=None, alias="ApmplusEnable")
     artifact_type: Optional[str] = Field(default=None, alias="ArtifactType")
     artifact_url: Optional[str] = Field(default=None, alias="ArtifactUrl")
-    authorizer_configuration: Optional[AuthorizerConfigurationForGetRuntime] = Field(default=None, alias="AuthorizerConfiguration")
+    authorizer_configuration: Optional[AuthorizerConfigurationForGetRuntime] = Field(
+        default=None, alias="AuthorizerConfiguration"
+    )
     command: Optional[str] = Field(default=None, alias="Command")
     cpu_milli: Optional[int] = Field(default=None, alias="CpuMilli")
     created_at: Optional[str] = Field(default=None, alias="CreatedAt")
-    current_version_number: Optional[int] = Field(default=None, alias="CurrentVersionNumber")
+    current_version_number: Optional[int] = Field(
+        default=None, alias="CurrentVersionNumber"
+    )
     description: Optional[str] = Field(default=None, alias="Description")
     envs: Optional[list[EnvsForGetRuntime]] = Field(default=None, alias="Envs")
     failed_log_file_url: Optional[str] = Field(default=None, alias="FailedLogFileUrl")
@@ -412,7 +485,9 @@ class GetRuntimeResponse(RuntimeTypeBaseModel):
     memory_mb: Optional[int] = Field(default=None, alias="MemoryMb")
     model_agent_name: Optional[str] = Field(default=None, alias="ModelAgentName")
     name: Optional[str] = Field(default=None, alias="Name")
-    network_configurations: Optional[list[NetworkConfigurationsForGetRuntime]] = Field(default=None, alias="NetworkConfigurations")
+    network_configurations: Optional[list[NetworkConfigurationsForGetRuntime]] = Field(
+        default=None, alias="NetworkConfigurations"
+    )
     project_name: Optional[str] = Field(default=None, alias="ProjectName")
     role_name: Optional[str] = Field(default=None, alias="RoleName")
     runtime_id: Optional[str] = Field(default=None, alias="RuntimeId")
@@ -434,7 +509,9 @@ class ListRuntimeVersionsRequest(RuntimeTypeBaseModel):
 
 # ListRuntimeVersions - Response
 class ListRuntimeVersionsResponse(RuntimeTypeBaseModel):
-    agent_kit_runtime_versions: Optional[list[AgentKitRuntimeVersionsForListRuntimeVersions]] = Field(default=None, alias="AgentKitRuntimeVersions")
+    agent_kit_runtime_versions: Optional[
+        list[AgentKitRuntimeVersionsForListRuntimeVersions]
+    ] = Field(default=None, alias="AgentKitRuntimeVersions")
     next_token: Optional[str] = Field(default=None, alias="NextToken")
     page_number: Optional[int] = Field(default=None, alias="PageNumber")
     page_size: Optional[int] = Field(default=None, alias="PageSize")
@@ -460,4 +537,3 @@ class DeleteRuntimeRequest(RuntimeTypeBaseModel):
 # DeleteRuntime - Response
 class DeleteRuntimeResponse(RuntimeTypeBaseModel):
     runtime_id: Optional[str] = Field(default=None, alias="RuntimeId")
-

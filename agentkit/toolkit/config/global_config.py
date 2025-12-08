@@ -38,17 +38,18 @@ class VolcengineCredentials:
     Stores Volcengine API credentials as a fallback to environment variables.
     Has lower priority than environment variables.
     """
+
     access_key: str = ""
     secret_key: str = ""
     region: str = "cn-beijing"
-    
+
     def to_dict(self):
         return {
             "access_key": self.access_key,
             "secret_key": self.secret_key,
             "region": self.region,
         }
-    
+
     @classmethod
     def from_dict(cls, data: dict):
         return cls(
@@ -64,12 +65,15 @@ class CRGlobalConfig:
 
     Used when project config `cr_instance_name` or `cr_namespace_name` is empty or "Auto".
     """
+
     instance_name: str = ""
     namespace_name: str = ""
-    auto_create_instance_type: str = "Micro"  # Instance type when auto-creating: "Micro" or "Enterprise"
+    auto_create_instance_type: str = (
+        "Micro"  # Instance type when auto-creating: "Micro" or "Enterprise"
+    )
     host: str = ""
     schema: str = "https"
-    
+
     def to_dict(self):
         return {
             "instance_name": self.instance_name,
@@ -78,7 +82,7 @@ class CRGlobalConfig:
             "host": self.host,
             "schema": self.schema,
         }
-    
+
     @classmethod
     def from_dict(cls, data: dict):
         return cls(
@@ -96,17 +100,18 @@ class TOSGlobalConfig:
 
     Used when project config `tos_bucket`, `tos_prefix` or `tos_region` is empty or "Auto".
     """
+
     bucket: str = ""
     prefix: str = ""
     region: str = ""
-    
+
     def to_dict(self):
         return {
             "bucket": self.bucket,
             "prefix": self.prefix,
             "region": self.region,
         }
-    
+
     @classmethod
     def from_dict(cls, data: dict):
         return cls(
@@ -122,6 +127,7 @@ class GlobalConfig:
 
     Stored in ``~/.agentkit/config.yaml`` and shared across projects.
     """
+
     volcengine: VolcengineCredentials = field(default_factory=VolcengineCredentials)
     cr: CRGlobalConfig = field(default_factory=CRGlobalConfig)
     tos: TOSGlobalConfig = field(default_factory=TOSGlobalConfig)
@@ -129,14 +135,14 @@ class GlobalConfig:
     agentkit_schema: str = "https"
     iam_host: str = ""
     iam_schema: str = "https"
-    
+
     @dataclass
     class Defaults:
         launch_type: Optional[str] = None
         preflight_mode: Optional[str] = None
         cr_public_endpoint_check: Optional[bool] = None
         iam_role_policies: Optional[list] = None
-        
+
         def to_dict(self):
             data = {}
             if self.launch_type:
@@ -148,7 +154,7 @@ class GlobalConfig:
             if self.iam_role_policies is not None:
                 data["iam_role_policies"] = self.iam_role_policies
             return data
-        
+
         @classmethod
         def from_dict(cls, data: dict):
             return cls(
@@ -157,9 +163,11 @@ class GlobalConfig:
                 cr_public_endpoint_check=data.get("cr_public_endpoint_check"),
                 iam_role_policies=data.get("iam_role_policies"),
             )
-    
-    defaults: 'GlobalConfig.Defaults' = field(default_factory=lambda: GlobalConfig.Defaults())
-    
+
+    defaults: "GlobalConfig.Defaults" = field(
+        default_factory=lambda: GlobalConfig.Defaults()
+    )
+
     def to_dict(self):
         base = {
             "volcengine": self.volcengine.to_dict(),
@@ -178,7 +186,7 @@ class GlobalConfig:
         if defaults_dict:
             base["defaults"] = defaults_dict
         return base
-    
+
     @classmethod
     def from_dict(cls, data: dict):
         return cls(
@@ -199,9 +207,9 @@ class GlobalConfigManager:
     Responsible for loading, saving and managing the global config file.
     Default path: ``~/.agentkit/config.yaml``.
     """
-    
+
     DEFAULT_PATH = Path.home() / ".agentkit" / "config.yaml"
-    
+
     def __init__(self, config_path: Optional[Path] = None):
         """Initialize global configuration manager.
 
@@ -210,7 +218,7 @@ class GlobalConfigManager:
         """
         self.config_path = config_path or self.DEFAULT_PATH
         self._config: Optional[GlobalConfig] = None
-    
+
     def load(self) -> GlobalConfig:
         """Load global configuration.
 
@@ -223,17 +231,20 @@ class GlobalConfigManager:
         if not self.config_path.exists():
             logger.debug(f"Global config file does not exist: {self.config_path}")
             return GlobalConfig()
-        
+
         try:
             import yaml
-            with open(self.config_path, 'r', encoding='utf-8') as f:
+
+            with open(self.config_path, "r", encoding="utf-8") as f:
                 data = yaml.safe_load(f) or {}
             logger.debug(f"Loaded global config from: {self.config_path}")
             return GlobalConfig.from_dict(data)
         except Exception as e:
-            logger.debug(f"Failed to load global config, using empty config: {e}", exc_info=True)
+            logger.debug(
+                f"Failed to load global config, using empty config: {e}", exc_info=True
+            )
             return GlobalConfig()
-    
+
     def save(self, config: GlobalConfig):
         """Save global configuration to disk.
 
@@ -242,26 +253,27 @@ class GlobalConfigManager:
         """
         # Ensure parent directory exists
         self.config_path.parent.mkdir(parents=True, exist_ok=True)
-        
+
         # Write YAML config
-        with open(self.config_path, 'w', encoding='utf-8') as f:
+        with open(self.config_path, "w", encoding="utf-8") as f:
             import yaml
+
             yaml.dump(
-                config.to_dict(), 
-                f, 
-                default_flow_style=False, 
+                config.to_dict(),
+                f,
+                default_flow_style=False,
                 allow_unicode=True,
-                sort_keys=False
+                sort_keys=False,
             )
-        
+
         # Restrict file permission to owner read/write only
         try:
             self.config_path.chmod(0o600)
         except Exception as e:
             logger.warning(f"Failed to set config file permission: {e}")
-        
+
         logger.info(f"Global config saved: {self.config_path}")
-    
+
     def get_config(self, force_reload: bool = False) -> GlobalConfig:
         """Get cached global configuration.
 
@@ -274,7 +286,7 @@ class GlobalConfigManager:
         if self._config is None or force_reload:
             self._config = self.load()
         return self._config
-    
+
     def exists(self) -> bool:
         """Check whether the global config file exists.
 
@@ -370,79 +382,97 @@ def apply_global_config_defaults(
     try:
         from .strategy_configs import HybridStrategyConfig, CloudStrategyConfig
     except ImportError as e:
-        logger.debug(f"Failed to import strategy config classes, skip applying global config defaults: {e}")
+        logger.debug(
+            f"Failed to import strategy config classes, skip applying global config defaults: {e}"
+        )
         return config_obj
-    
+
     # Only handle strategy config classes
     if not isinstance(config_obj, (HybridStrategyConfig, CloudStrategyConfig)):
         return config_obj
-    
+
     try:
         # Load global config
         global_config = get_global_config()
-        
+
         # Map project field -> (global config section, attribute)
         field_mappings = {
-            'cr_instance_name': ('cr', 'instance_name'),
-            'cr_namespace_name': ('cr', 'namespace_name'),
-            'cr_auto_create_instance_type': ('cr', 'auto_create_instance_type'),
+            "cr_instance_name": ("cr", "instance_name"),
+            "cr_namespace_name": ("cr", "namespace_name"),
+            "cr_auto_create_instance_type": ("cr", "auto_create_instance_type"),
         }
-        
+
         # For VeAgentkitConfig, also apply TOS-related settings
         if isinstance(config_obj, CloudStrategyConfig):
-            field_mappings.update({
-                'tos_bucket': ('tos', 'bucket'),
-                'tos_prefix': ('tos', 'prefix'),
-                'tos_region': ('tos', 'region'),
-            })
-        
+            field_mappings.update(
+                {
+                    "tos_bucket": ("tos", "bucket"),
+                    "tos_prefix": ("tos", "prefix"),
+                    "tos_region": ("tos", "region"),
+                }
+            )
+
         # Region fields (cloud/hybrid) inherit from global volcengine.region when project missing
         if isinstance(config_obj, (HybridStrategyConfig, CloudStrategyConfig)):
-            field_mappings.update({
-                'region': ('volcengine', 'region'),
-            })
+            field_mappings.update(
+                {
+                    "region": ("volcengine", "region"),
+                }
+            )
         if isinstance(config_obj, CloudStrategyConfig):
-            field_mappings.update({
-                'cr_region': ('volcengine', 'region'),
-            })
-        
+            field_mappings.update(
+                {
+                    "cr_region": ("volcengine", "region"),
+                }
+            )
+
         # Apply global config values
         for field_name, (section, attr) in field_mappings.items():
             # Skip if the target field does not exist on the config object
             if not hasattr(config_obj, field_name):
                 continue
-            
+
             # Use original project_data value to decide if user explicitly set it.
             # Note: from_dict may have already replaced empty/"Auto" with
             # template defaults, so we rely on raw project_data instead.
-            original_project_value = project_data.get(field_name) if isinstance(project_data, dict) else None
+            original_project_value = (
+                project_data.get(field_name) if isinstance(project_data, dict) else None
+            )
             if is_valid_config(original_project_value):
-                logger.debug(f"Keep explicit project value for field {field_name}: {original_project_value}")
+                logger.debug(
+                    f"Keep explicit project value for field {field_name}: {original_project_value}"
+                )
                 continue  # user explicitly provided value; do not override
-            
+
             # Read value from global config
             section_obj = getattr(global_config, section, None)
             if section_obj is None:
                 continue
-            
+
             global_value = getattr(section_obj, attr, None)
-            
+
             # If global config provides a valid value, apply it
             if global_value and is_valid_config(global_value):
-                logger.info(f"Apply global config: {field_name} = {global_value} (source: ~/.agentkit/config.yaml)")
+                logger.info(
+                    f"Apply global config: {field_name} = {global_value} (source: ~/.agentkit/config.yaml)"
+                )
                 setattr(config_obj, field_name, global_value)
                 # Mark source as 'global' so persistence can keep local field empty
                 try:
-                    if not hasattr(config_obj, '_value_sources'):
+                    if not hasattr(config_obj, "_value_sources"):
                         config_obj._value_sources = {}
-                    config_obj._value_sources[field_name] = 'global'
+                    config_obj._value_sources[field_name] = "global"
                 except Exception:
                     pass
             else:
-                logger.debug(f"Global config does not provide a valid value for field: {field_name}")
-        
+                logger.debug(
+                    f"Global config does not provide a valid value for field: {field_name}"
+                )
+
     except Exception as e:
         # Errors while applying global config should not break the main flow
-        logger.debug(f"Error while applying global config defaults (ignored): {e}", exc_info=True)
-    
+        logger.debug(
+            f"Error while applying global config defaults (ignored): {e}", exc_info=True
+        )
+
     return config_obj

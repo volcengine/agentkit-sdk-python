@@ -30,16 +30,16 @@ def deploy_command(
     from agentkit.toolkit.executors import DeployExecutor
     from agentkit.toolkit.cli.console_reporter import ConsoleReporter
     from agentkit.toolkit.context import ExecutionContext
-    
+
     console.print(f"[green]Deploying with {config_file}[/green]")
-    
+
     # Set execution context - CLI uses ConsoleReporter (with colored output and progress)
     reporter = ConsoleReporter()
     ExecutionContext.set_reporter(reporter)
-    
+
     executor = DeployExecutor(reporter=reporter)
     result = executor.execute(config_file=str(config_file))
-    
+
     # Format output
     if result.success:
         console.print("[green]✅ Deployment successful[/green]")
@@ -52,7 +52,9 @@ def deploy_command(
     else:
         console.print(f"[red]❌ Deployment failed: {result.error}[/red]")
         # deploy_logs may not exist, use getattr for safe access
-        deploy_logs = getattr(result, 'deploy_logs', None) or result.metadata.get('deploy_logs', [])
+        deploy_logs = getattr(result, "deploy_logs", None) or result.metadata.get(
+            "deploy_logs", []
+        )
         if deploy_logs:
             for log in deploy_logs:
                 if log.strip():

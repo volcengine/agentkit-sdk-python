@@ -41,7 +41,7 @@ def get_package_version() -> str:
         return get_version("agentkit-sdk-python")
     except PackageNotFoundError:
         pass
-    
+
     # Fallback: read from pyproject.toml using toml parser
     if tomllib is not None:
         try:
@@ -49,19 +49,19 @@ def get_package_version() -> str:
             current_file = Path(__file__)
             # Go up from agentkit/toolkit/cli/cli.py to workspace root
             pyproject_path = current_file.parent.parent.parent.parent / "pyproject.toml"
-            
+
             if pyproject_path.exists():
                 with open(pyproject_path, "rb") as f:
                     data = tomllib.load(f)
                     return data.get("project", {}).get("version", "unknown")
         except Exception:
             pass
-    
+
     # Last resort: parse pyproject.toml manually for version line
     try:
         current_file = Path(__file__)
         pyproject_path = current_file.parent.parent.parent.parent / "pyproject.toml"
-        
+
         if pyproject_path.exists():
             with open(pyproject_path, "r") as f:
                 for line in f:
@@ -73,15 +73,17 @@ def get_package_version() -> str:
                             return version_str
     except Exception:
         pass
-    
+
     return "unknown"
 
 
 def version_command():
     """Show AgentKit version information."""
     pkg_version = get_package_version()
-    console.print(Panel(
-        f"[bold cyan]AgentKit SDK[/bold cyan]\n[green]Version: {pkg_version}[/green]",
-        title="📦 Version Info",
-        border_style="cyan"
-    ))
+    console.print(
+        Panel(
+            f"[bold cyan]AgentKit SDK[/bold cyan]\n[green]Version: {pkg_version}[/green]",
+            title="📦 Version Info",
+            border_style="cyan",
+        )
+    )
