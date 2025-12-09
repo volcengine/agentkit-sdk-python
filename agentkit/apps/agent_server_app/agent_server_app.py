@@ -19,6 +19,7 @@ import json
 from fastapi import Request
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
+from opentelemetry import trace
 from google.adk.agents.base_agent import BaseAgent
 from google.adk.artifacts.in_memory_artifact_service import (
     InMemoryArtifactService,
@@ -41,6 +42,8 @@ from veadk import Agent
 from veadk.memory.short_term_memory import ShortTermMemory
 
 from agentkit.apps.base_app import BaseAgentkitApp
+from agentkit.apps.agent_server_app.telemetry import telemetry
+from agentkit.apps.agent_server_app.middleware import AgentkitTelemetryHTTPMiddleware
 
 
 class AgentKitAgentLoader(BaseAgentLoader):
@@ -87,7 +90,13 @@ class AgentkitAgentServerApp(BaseAgentkitApp):
 
         self.app = self.server.get_fast_api_app()
 
+        # Attach ASGI middleware for unified telemetry across all routes
+        self.app.add_middleware(AgentkitTelemetryHTTPMiddleware)
+
         async def _invoke_compat(request: Request):
+            # Use current request span from middleware for telemetry
+            span = trace.get_current_span()
+
             # Extract headers (fallback keys supported)
             headers = request.headers
             user_id = (
@@ -126,6 +135,14 @@ class AgentkitAgentServerApp(BaseAgentkitApp):
                         text = ""
             content = types.UserContent(parts=[types.Part(text=text or "")])
 
+            # trace request attributes on current span
+            telemetry.trace_agent_server(
+                func_name="_invoke_compat",
+                span=span,
+                headers=dict(headers),
+                text=text or "",
+            )
+
             # Ensure session exists
             session = await self.server.session_service.get_session(
                 app_name=app_name, user_id=user_id, session_id=session_id
@@ -154,8 +171,11 @@ class AgentkitAgentServerApp(BaseAgentkitApp):
                                 )
                                 + "\n\n"
                             )
+                    # finish span on successful end of stream handled by middleware
+                    pass
                 except Exception as e:
                     yield f'data: {{"error": "{str(e)}"}}\n\n'
+                    telemetry.trace_agent_server_finish(func_result="", exception=e)
 
             return StreamingResponse(
                 event_generator(),
