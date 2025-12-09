@@ -23,6 +23,8 @@ from opentelemetry.trace.span import Span
 
 from agentkit.apps.utils import safe_serialize_to_json_string
 
+_INVOKE_PATH = ["/run_sse", "/run", "/invoke"]
+
 _GEN_AI_CLIENT_OPERATION_DURATION_BUCKETS = [
     0.01,
     0.02,
@@ -77,22 +79,26 @@ class Telemetry:
         if user_id:
             span.set_attribute(key="gen_ai.user.id", value=user_id)
 
-        span.set_attribute(
-            key="gen_ai.input", value=safe_serialize_to_json_string(text)
-        )
+        # Currently unable to retrieve input
+        # span.set_attribute(
+        #     key="gen_ai.input", value=safe_serialize_to_json_string(text)
+        # )
 
-        span.set_attribute(key="gen_ai.span.kind", value="workflow")
+        span.set_attribute(key="gen_ai.span.kind", value="agent_server")
         span.set_attribute(key="gen_ai.operation.name", value="invoke_agent")
         span.set_attribute(key="gen_ai.operation.type", value="agent_server")
 
     def trace_agent_server_finish(
         self,
+        path: str,
         func_result: str,
         exception: Optional[Exception],
     ) -> None:
         span = trace.get_current_span()
         if span and span.is_recording():
-            span.set_attribute(key="gen_ai.output", value=func_result)
+            # Currently unable to retrieve output
+            # span.set_attribute(key="gen_ai.output", value=func_result)
+
             attributes = {
                 "gen_ai_operation_name": "invoke_agent",
                 "gen_ai_operation_type": "agent_server",
@@ -101,7 +107,8 @@ class Telemetry:
                 self.handle_exception(span, exception)
                 attributes["error_type"] = exception.__class__.__name__
 
-            if hasattr(span, "start_time") and self.latency_histogram:
+            # only record invoke request latency metrics
+            if hasattr(span, "start_time") and self.latency_histogram and path in _INVOKE_PATH:
                 duration = (time.time_ns() - span.start_time) / 1e9  # type: ignore
                 self.latency_histogram.record(duration, attributes)
             span.end()

@@ -19,8 +19,10 @@ from opentelemetry import context as context_api
 
 from agentkit.apps.agent_server_app.telemetry import telemetry
 
-
-trace_paths = ["/run_sse", "/run", "/invoke"]
+_EXCLUDED_HEADERS = {
+    "authorization",
+    "token"
+}
 
 
 class AgentkitTelemetryHTTPMiddleware:
@@ -36,19 +38,23 @@ class AgentkitTelemetryHTTPMiddleware:
         path = scope.get("path", "")
         headers_list = scope.get("headers", [])
         headers = {k.decode("latin-1"): v.decode("latin-1") for k, v in headers_list}
-
         span = telemetry.tracer.start_span(name="agent_server_request")
         ctx = trace.set_span_in_context(span)
         context_api.attach(ctx)
+        headers = {
+            k: v for k, v in headers.items()
+            if k.lower() not in _EXCLUDED_HEADERS
+        }
 
+        # Currently unable to retrieve user_id and session_id from headers; keep logic for future use
         user_id = headers.get("user_id") or headers.get("x-user-id") or ""
         session_id = headers.get("session_id") or headers.get("x-session-id") or ""
-        headers_like = {"user_id": user_id, "session_id": session_id}
-
+        headers["user_id"] = user_id
+        headers["session_id"] = session_id
         telemetry.trace_agent_server(
             func_name=f"{method} {path}",
             span=span,
-            headers=headers_like,
+            headers=headers,
             text="",  # do not consume body in middleware
         )
 
@@ -58,7 +64,7 @@ class AgentkitTelemetryHTTPMiddleware:
                     more_body = message.get("more_body", False)
                     if not more_body:
                         telemetry.trace_agent_server_finish(
-                            func_result="", exception=None
+                            path=path, func_result="", exception=None
                         )
                 elif message.get("type") == "http.response.start":
                     # could record status code if needed
@@ -69,5 +75,5 @@ class AgentkitTelemetryHTTPMiddleware:
         try:
             await self.app(scope, receive, send_wrapper)
         except Exception as e:
-            telemetry.trace_agent_server_finish(func_result="", exception=e)
+            telemetry.trace_agent_server_finish(path=path,func_result="", exception=e)
             raise
