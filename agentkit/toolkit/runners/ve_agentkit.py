@@ -370,10 +370,7 @@ class VeAgentkitRuntimeRunner(Runner):
             # Construct invoke endpoint URL
             # Auto-detect invoke path based on agent_type: A2A agents use '/', others use '/invoke'
             common_config = runner_config.common_config
-            agent_type = (
-                getattr(common_config, "agent_type", "") or "" if common_config else ""
-            )
-            is_a2a = "a2a" in agent_type.lower()
+            is_a2a = self._is_a2a(common_config)
             invoke_path = "/" if is_a2a else "/invoke"
             invoke_endpoint = (
                 urljoin(endpoint, invoke_path.lstrip("/"))
@@ -388,21 +385,24 @@ class VeAgentkitRuntimeRunner(Runner):
             if not headers.get("Authorization"):
                 headers["Authorization"] = f"Bearer {api_key}"
 
-            # Use base class HTTP invocation method
-            success, response_data = self._http_post_invoke(
-                endpoint=invoke_endpoint,
-                payload=payload,
+            # Unified ADK-compatible invocation flow via base class
+            ctx = Runner.InvokeContext(
+                base_endpoint=endpoint,
+                invoke_endpoint=invoke_endpoint,
                 headers=headers,
-                stream=stream,
-                timeout=60,
+                is_a2a=is_a2a,
+                preferred_app_name=(
+                    getattr(common_config, "agent_name", None)
+                    if common_config
+                    else None
+                ),
+            )
+            policy = Runner.TimeoutPolicy()
+            success, response_data, is_streaming = self._invoke_with_adk_compat(
+                ctx, payload, policy
             )
 
             if success:
-                # Detect if response is streaming
-                is_streaming = hasattr(response_data, "__iter__") and not isinstance(
-                    response_data, (dict, str, list, bytes)
-                )
-
                 return InvokeResult(
                     success=True, response=response_data, is_streaming=is_streaming
                 )

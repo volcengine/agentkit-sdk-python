@@ -647,8 +647,7 @@ class LocalDockerRunner(Runner):
             port = docker_config.invoke_port or 8000
             endpoint = f"http://127.0.0.1:{port}/"
 
-            agent_type = getattr(common_config, "agent_type", "") or ""
-            is_a2a = "a2a" in agent_type.lower()
+            is_a2a = self._is_a2a(common_config)
             invoke_path = "/" if is_a2a else "/invoke"
             invoke_endpoint = (
                 urljoin(endpoint, invoke_path.lstrip("/"))
@@ -664,21 +663,20 @@ class LocalDockerRunner(Runner):
                     "session_id": "agentkit_sample_session",
                 }
 
-            # Use base class generic HTTP invocation method
-            success, response_data = self._http_post_invoke(
-                endpoint=invoke_endpoint,
-                payload=payload,
+            # Unified ADK-compatible invocation flow using base class
+            ctx = Runner.InvokeContext(
+                base_endpoint=endpoint,
+                invoke_endpoint=invoke_endpoint,
                 headers=headers,
-                stream=stream,
-                timeout=600,
+                is_a2a=is_a2a,
+                preferred_app_name=getattr(common_config, "agent_name", None),
+            )
+            policy = Runner.TimeoutPolicy()
+            success, response_data, is_streaming = self._invoke_with_adk_compat(
+                ctx, payload, policy
             )
 
             if success:
-                # Detect if response is streaming
-                is_streaming = hasattr(response_data, "__iter__") and not isinstance(
-                    response_data, (dict, str, list, bytes)
-                )
-
                 return InvokeResult(
                     success=True, response=response_data, is_streaming=is_streaming
                 )

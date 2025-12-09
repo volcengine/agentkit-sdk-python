@@ -17,6 +17,8 @@ from typing import Dict, Any, Optional, Union, Generator, Tuple
 import logging
 import requests
 import json
+from urllib.parse import urljoin
+from dataclasses import dataclass
 
 from agentkit.toolkit.models import DeployResult, StatusResult, InvokeResult
 from agentkit.toolkit.reporter import Reporter, SilentReporter
@@ -51,6 +53,23 @@ class Runner(ABC):
         """
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
         self.reporter = reporter or SilentReporter()
+
+    # ===== Configuration types =====
+    @dataclass
+    class TimeoutPolicy:
+        detect_timeout: int = 2
+        list_apps_timeout: int = 3
+        session_timeout: int = 5
+        invoke_timeout: int = 300
+        sse_timeout: int = 600
+
+    @dataclass
+    class InvokeContext:
+        base_endpoint: str
+        invoke_endpoint: str
+        headers: Dict[str, str]
+        is_a2a: bool
+        preferred_app_name: Optional[str] = None
 
     @abstractmethod
     def deploy(self, config: Dict[str, Any]) -> DeployResult:
@@ -297,3 +316,312 @@ class Runner(ABC):
             error_msg = f"Invocation error: {str(e)}"
             logger.error(error_msg)
             return False, error_msg
+
+    # ===== Shared helpers for ADK compatibility =====
+    def _detect_adk_backend(
+        self, base_endpoint: str, headers: Dict[str, str], timeout_s: int = 2
+    ) -> bool:
+        """Lightweight detection of ADK webserver by probing /list-apps.
+
+        Returns True if response looks like ADK (list or dict with 'apps').
+        """
+        try:
+            resp = requests.get(
+                urljoin(base_endpoint, "list-apps"), headers=headers, timeout=timeout_s
+            )
+            if resp.status_code != 200:
+                return False
+            try:
+                data = resp.json()
+            except Exception:
+                return False
+            return self._is_adk_list_apps_response(data)
+        except Exception:
+            return False
+
+    def _is_adk_list_apps_response(self, data: Any) -> bool:
+        if isinstance(data, list):
+            return True
+        if isinstance(data, dict) and ("apps" in data):
+            return True
+        return False
+
+    def _build_adk_run_sse_payload(
+        self, app_name: str, headers: Dict[str, str], original_payload: Any
+    ) -> Dict[str, Any]:
+        """Construct ADK RunAgentRequest payload in camelCase."""
+        user_id = headers.get("user_id") or headers.get("x-user-id") or "agentkit_user"
+        session_id = (
+            headers.get("session_id")
+            or headers.get("x-session-id")
+            or "agentkit_sample_session"
+        )
+        text = None
+        if isinstance(original_payload, dict):
+            val = original_payload.get("prompt")
+            if isinstance(val, str):
+                text = val
+        if text is None:
+            try:
+                text = json.dumps(original_payload, ensure_ascii=False)
+            except Exception:
+                text = ""
+        req: Dict[str, Any] = {
+            "appName": app_name,
+            "userId": user_id,
+            "sessionId": session_id,
+            "newMessage": {"role": "user", "parts": [{"text": text or ""}]},
+            "streaming": True,
+        }
+        if isinstance(original_payload, dict) and "state_delta" in original_payload:
+            req["stateDelta"] = original_payload.get("state_delta")
+        return req
+
+    def _should_fallback_to_adk(self, err_str: str) -> bool:
+        """Return True if error string indicates /invoke not found (404/405)."""
+        err = err_str or ""
+        return (
+            (" 404 " in err)
+            or err.startswith("Invocation failed: 404")
+            or (" 405 " in err)
+            or err.startswith("Invocation failed: 405")
+        )
+
+    def _post_run_sse(
+        self,
+        base_endpoint: str,
+        headers: Dict[str, str],
+        adk_payload: Dict[str, Any],
+        timeout_s: int = 300,
+    ) -> Union[Tuple[bool, Any], Tuple[bool, Generator[Dict[str, Any], None, None]]]:
+        return self._http_post_invoke(
+            endpoint=urljoin(base_endpoint, "run_sse"),
+            payload=adk_payload,
+            headers=headers,
+            stream=True,
+            timeout=timeout_s,
+        )
+
+    # ===== Unified ADK-compatible invocation flow =====
+    def _is_a2a(self, common_config: Any) -> bool:
+        val = None
+        if common_config:
+            val = getattr(common_config, "agent_type", None) or getattr(
+                common_config, "template_type", None
+            )
+        val = val or ""
+        try:
+            return "a2a" in str(val).lower()
+        except Exception:
+            return False
+
+    def _invoke_with_adk_compat(
+        self,
+        ctx: "Runner.InvokeContext",
+        payload: Any,
+        policy: "Runner.TimeoutPolicy",
+    ) -> Tuple[bool, Any, bool]:
+        """Unified invoke flow with ADK detection and fallback.
+
+        Returns: (success, response_data, is_streaming)
+        """
+        # A2A: invoke directly using root or provided endpoint
+        if ctx.is_a2a:
+            success, response_data = self._http_post_invoke(
+                endpoint=ctx.invoke_endpoint,
+                payload=payload,
+                headers=ctx.headers,
+                stream=None,
+                timeout=policy.invoke_timeout,
+            )
+        else:
+            # Non-A2A: detect ADK first
+            if self._detect_adk_backend(
+                ctx.base_endpoint, ctx.headers, timeout_s=policy.detect_timeout
+            ):
+                app_name = self._get_adk_app_name(
+                    ctx.base_endpoint,
+                    ctx.headers,
+                    preferred_name=ctx.preferred_app_name,
+                    timeout_s=policy.list_apps_timeout,
+                )
+                app_name = app_name or "agentkit-app"
+                user_id = (
+                    ctx.headers.get("user_id")
+                    or ctx.headers.get("x-user-id")
+                    or "agentkit_user"
+                )
+                session_id = (
+                    ctx.headers.get("session_id")
+                    or ctx.headers.get("x-session-id")
+                    or "agentkit_sample_session"
+                )
+                self._ensure_adk_session(
+                    ctx.base_endpoint,
+                    ctx.headers,
+                    app_name,
+                    user_id,
+                    session_id,
+                    timeout_s=policy.session_timeout,
+                )
+                adk_payload = self._build_adk_run_sse_payload(
+                    app_name, ctx.headers, payload
+                )
+                success, response_data = self._post_run_sse(
+                    ctx.base_endpoint,
+                    ctx.headers,
+                    adk_payload,
+                    timeout_s=policy.sse_timeout,
+                )
+            else:
+                success, response_data = self._http_post_invoke(
+                    endpoint=ctx.invoke_endpoint,
+                    payload=payload,
+                    headers=ctx.headers,
+                    stream=None,
+                    timeout=policy.invoke_timeout,
+                )
+                if not success and self._should_fallback_to_adk(str(response_data)):
+                    app_name = self._get_adk_app_name(
+                        ctx.base_endpoint,
+                        ctx.headers,
+                        preferred_name=ctx.preferred_app_name,
+                        timeout_s=policy.list_apps_timeout,
+                    )
+                    app_name = app_name or "agentkit-app"
+                    user_id = (
+                        ctx.headers.get("user_id")
+                        or ctx.headers.get("x-user-id")
+                        or "agentkit_user"
+                    )
+                    session_id = (
+                        ctx.headers.get("session_id")
+                        or ctx.headers.get("x-session-id")
+                        or "agentkit_sample_session"
+                    )
+                    self._ensure_adk_session(
+                        ctx.base_endpoint,
+                        ctx.headers,
+                        app_name,
+                        user_id,
+                        session_id,
+                        timeout_s=policy.session_timeout,
+                    )
+                    adk_payload = self._build_adk_run_sse_payload(
+                        app_name, ctx.headers, payload
+                    )
+                    success, response_data = self._post_run_sse(
+                        ctx.base_endpoint,
+                        ctx.headers,
+                        adk_payload,
+                        timeout_s=policy.sse_timeout,
+                    )
+
+        is_streaming = hasattr(response_data, "__iter__") and not isinstance(
+            response_data, (dict, str, list, bytes)
+        )
+        return success, response_data, is_streaming
+
+    def _get_adk_app_name(
+        self,
+        base_endpoint: str,
+        headers: Dict[str, str],
+        preferred_name: Optional[str] = None,
+        timeout_s: int = 3,
+    ) -> Optional[str]:
+        """Fetch app name from ADK list-apps endpoint.
+
+        Tries detailed mode first to get structured names; falls back to simple list.
+        If preferred_name is provided and exists in server response, selects it; otherwise select the first.
+        Returns None if no apps are available.
+        """
+        try:
+            # Try detailed listing
+            resp = requests.get(
+                urljoin(base_endpoint, "list-apps?detailed=true"),
+                headers=headers,
+                timeout=timeout_s,
+            )
+            names: list[str] = []
+            if resp.status_code == 200:
+                try:
+                    data = resp.json()
+                    if isinstance(data, dict) and isinstance(data.get("apps"), list):
+                        for item in data["apps"]:
+                            name = item.get("name") if isinstance(item, dict) else None
+                            if isinstance(name, str):
+                                names.append(name)
+                except Exception:
+                    pass
+            # Fallback to simple list
+            if not names:
+                resp2 = requests.get(
+                    urljoin(base_endpoint, "list-apps"),
+                    headers=headers,
+                    timeout=timeout_s,
+                )
+                if resp2.status_code == 200:
+                    try:
+                        data2 = resp2.json()
+                        if isinstance(data2, list):
+                            for item in data2:
+                                if isinstance(item, str):
+                                    names.append(item)
+                    except Exception:
+                        pass
+            if not names:
+                return None
+            # Prefer a matching name if provided
+            if preferred_name and preferred_name in names:
+                return preferred_name
+            return names[0]
+        except Exception:
+            return None
+
+    def _ensure_adk_session(
+        self,
+        base_endpoint: str,
+        headers: Dict[str, str],
+        app_name: str,
+        user_id: str,
+        session_id: str,
+        timeout_s: int = 5,
+    ) -> bool:
+        """Ensure the ADK session exists; create it if missing.
+
+        Returns True on success; False if creation/check fails.
+        """
+        try:
+            get_url = urljoin(
+                base_endpoint,
+                f"apps/{app_name}/users/{user_id}/sessions/{session_id}",
+            )
+            resp = requests.get(get_url, headers=headers, timeout=timeout_s)
+            if resp.status_code == 200:
+                return True
+            if resp.status_code != 404:
+                # Other errors
+                self.logger.warning(
+                    f"Session check failed: {resp.status_code} {resp.text[:200]}"
+                )
+                return False
+            # Create session
+            create_url = urljoin(
+                base_endpoint, f"apps/{app_name}/users/{user_id}/sessions"
+            )
+            payload = {"sessionId": session_id}
+            resp2 = requests.post(
+                create_url,
+                headers={**headers, "Content-Type": "application/json"},
+                json=payload,
+                timeout=timeout_s,
+            )
+            if resp2.status_code == 200:
+                return True
+            self.logger.error(
+                f"Session creation failed: {resp2.status_code} {resp2.text[:200]}"
+            )
+            return False
+        except Exception as e:
+            self.logger.exception(f"Ensure session error: {e}")
+            return False
