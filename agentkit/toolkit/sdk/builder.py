@@ -17,8 +17,8 @@
 from typing import Optional, Dict, Any
 
 from ..executors import BuildExecutor, BuildOptions
-from ..models import BuildResult
-from ..reporter import SilentReporter
+from ..models import BuildResult, PreflightMode
+from ..reporter import SilentReporter, Reporter
 from ..context import ExecutionContext
 
 
@@ -27,6 +27,8 @@ def build(
     config_dict: Optional[Dict[str, Any]] = None,
     platform: str = "auto",
     regenerate_dockerfile: bool = False,
+    preflight_mode: PreflightMode = PreflightMode.WARN,
+    reporter: Optional[Reporter] = None,
 ) -> BuildResult:
     """
     Build agent image.
@@ -40,16 +42,26 @@ def build(
             If not provided, uses default "agentkit.yaml" in current directory.
         config_dict: Configuration as dictionary (highest priority).
             Overrides config_file if both provided.
-        platform: Build platform: "auto", "local", or "cloud".
-            Default is "auto" which selects based on strongly configuration.
+        platform: Docker build platform/architecture string
+            (e.g., "linux/amd64", "linux/arm64", or "auto"). This controls
+            the Docker build target platform and is independent from the
+            launch_type (local/cloud/hybrid) configured in agentkit.yaml.
         regenerate_dockerfile: Force regenerate Dockerfile even if it exists.
             Default is False.
+        preflight_mode: Preflight check behavior for required cloud services when
+            using cloud or hybrid launch types. Options:
+            - PreflightMode.PROMPT: Ask for confirmation (CLI-style, not recommended for SDK)
+            - PreflightMode.FAIL: Fail immediately if services are not enabled
+            - PreflightMode.WARN: Log warning but continue execution (SDK default)
+            - PreflightMode.SKIP: Skip preflight check entirely
+        reporter: Optional Reporter for progress/log output. If None, uses
+            SilentReporter (no console output). Advanced users can pass
+            LoggingReporter or a custom Reporter implementation.
 
     Returns:
         BuildResult: Build operation result containing:
             - success: Whether build succeeded
-            - image_name: Full image name if successful
-            - image_id: Image ID/digest if successful
+            - image: ImageInfo with repository/tag/digest if successful
             - error: Error message if failed
             - build_logs: Build logs if available
 
@@ -64,7 +76,8 @@ def build(
         >>>
         >>> # Check result
         >>> if result.success:
-        ...     print(f"Image built: {result.image_name}")
+        ...     # result.image is an ImageInfo instance; str(image) prints "repository:tag"
+        ...     print(f"Image built: {result.image}")
         ... else:
         ...     print(f"Build failed: {result.error}")
         ...     for log in result.build_logs or []:
@@ -73,8 +86,8 @@ def build(
     Raises:
         No exceptions are raised. All errors are captured in BuildResult.error.
     """
-    # SDK 使用 SilentReporter（无控制台输出）
-    reporter = SilentReporter()
+    if reporter is None:
+        reporter = SilentReporter()
     ExecutionContext.set_reporter(reporter)
 
     options = BuildOptions(
@@ -83,5 +96,8 @@ def build(
 
     executor = BuildExecutor(reporter=reporter)
     return executor.execute(
-        config_dict=config_dict, config_file=config_file, options=options
+        config_dict=config_dict,
+        config_file=config_file,
+        options=options,
+        preflight_mode=preflight_mode,
     )

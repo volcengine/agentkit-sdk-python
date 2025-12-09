@@ -35,8 +35,8 @@ def destroy_command(
         typer.confirm("Are you sure you want to destroy?", abort=True)
 
     try:
-        # Call SDK
-        result = sdk.destroy(config_file=str(config_file), force=force)
+        # Call SDK (force only controls CLI confirmation, SDK always performs the same destroy)
+        result = sdk.destroy(config_file=str(config_file))
 
         if result.success:
             console.print("[green]✅ Destruction completed successfully![/green]")

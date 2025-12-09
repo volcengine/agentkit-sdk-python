@@ -140,7 +140,6 @@ class Runner(ABC):
 
             # Use longer timeout for streaming calls
             actual_timeout = timeout if not stream else max(timeout, 300)
-
             response = requests.post(
                 url=endpoint,
                 json=payload,

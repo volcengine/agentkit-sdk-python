@@ -47,13 +47,14 @@ Two API styles are available:
 from .builder import build
 from .deployer import deploy
 from .invoker import invoke
-from .lifecycle import launch, destroy, stop
+from .lifecycle import launch, destroy
 from .status import status
 from .initializer import init_project, get_available_templates
 
-# Import client and config
+# Import client, config and helpers
 from .client import AgentKitClient
 from .config import AgentConfig
+from .bindings import bind_memory_env_to_config_for_veadk
 
 # Import result types from unified models
 from ..models import (
@@ -72,13 +73,14 @@ __all__ = [
     "invoke",
     "launch",
     "destroy",
-    "stop",
     "status",
     "init_project",
     "get_available_templates",
     # Client and Config
     "AgentKitClient",
     "AgentConfig",
+    # Helpers
+    "bind_memory_env_to_config_for_veadk",
     # Result types
     "BuildResult",
     "DeployResult",

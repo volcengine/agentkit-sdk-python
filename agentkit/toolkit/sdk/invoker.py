@@ -18,7 +18,7 @@ from typing import Optional, Dict, Any
 
 from ..executors import InvokeExecutor
 from ..models import InvokeResult
-from ..reporter import SilentReporter
+from ..reporter import SilentReporter, Reporter
 from ..context import ExecutionContext
 
 
@@ -27,7 +27,7 @@ def invoke(
     config_file: Optional[str] = None,
     config_dict: Optional[Dict[str, Any]] = None,
     headers: Optional[Dict[str, str]] = None,
-    apikey: Optional[str] = None,
+    reporter: Optional[Reporter] = None,
 ) -> InvokeResult:
     """
     Invoke deployed agent with a request.
@@ -44,7 +44,9 @@ def invoke(
             Overrides config_file if both provided.
         headers: Optional HTTP headers dictionary.
             Common headers: {"user_id": "...", "session_id": "..."}
-        apikey: Optional API key for authentication.
+        reporter: Optional Reporter for progress/log output. If None, uses
+            SilentReporter (no console output). Advanced users can pass
+            LoggingReporter or a custom Reporter implementation.
 
     Returns:
         InvokeResult: Invocation result containing:
@@ -61,11 +63,10 @@ def invoke(
         ...     payload={"prompt": "Hello, agent!"}
         ... )
         >>>
-        >>> # With headers and API key
+        >>> # With headers
         >>> result = sdk.invoke(
         ...     payload={"prompt": "What's the weather?"},
         ...     headers={"user_id": ""},
-        ...     apikey=""
         ... )
         >>>
         >>> # Handle streaming response
@@ -75,22 +76,25 @@ def invoke(
         ... else:
         ...     print(result.response)
         >>>
-        >>> # Or get complete response (consumes stream if streaming)
-        >>> full_response = result.get_response()
+        >>> # For non-streaming responses, access result.response directly
+        >>> full_response = result.response
 
     Raises:
         No exceptions are raised. All errors are captured in InvokeResult.error.
     """
-    # SDK 使用 SilentReporter（无控制台输出）
-    reporter = SilentReporter()
+    # SDK uses SilentReporter by default (no console output), but supports custom Reporter
+    if reporter is None:
+        reporter = SilentReporter()
     ExecutionContext.set_reporter(reporter)
 
     executor = InvokeExecutor(reporter=reporter)
-    # InvokeExecutor.execute 使用 stream 参数而不是 apikey
+    # InvokeExecutor.execute uses the stream parameter to control streaming return;
+    # SDK always passes None here, allowing the underlying Runner to automatically
+    # determine whether to enable streaming based on configuration.
     return executor.execute(
         payload=payload,
         config_dict=config_dict,
         config_file=config_file,
         headers=headers,
-        stream=None,  # 由 Runner 自动判断
+        stream=None,  # Automatically determined by Runner
     )

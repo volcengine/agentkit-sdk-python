@@ -18,12 +18,14 @@ from typing import Optional, Dict, Any
 
 from ..executors import StatusExecutor
 from ..models import StatusResult
-from ..reporter import SilentReporter
+from ..reporter import SilentReporter, Reporter
 from ..context import ExecutionContext
 
 
 def status(
-    config_file: Optional[str] = None, config_dict: Optional[Dict[str, Any]] = None
+    config_file: Optional[str] = None,
+    config_dict: Optional[Dict[str, Any]] = None,
+    reporter: Optional[Reporter] = None,
 ) -> StatusResult:
     """
     Query agent runtime status.
@@ -40,13 +42,16 @@ def status(
     Returns:
         StatusResult: Status query result containing:
             - success: Whether status query succeeded
-            - status: ServiceStatus enum (RUNNING, STOPPED, etc.)
+            - status: Service status string (e.g., "running", "stopped", "not_deployed")
             - endpoint_url: Service endpoint if available
             - container_id: Container ID for local deployments
             - service_id: Service ID for cloud deployments
-            - uptime: Service uptime if available
-            - details: Additional status details
+            - uptime_seconds: Service uptime in seconds if available
+            - metadata: Additional status details
             - error: Error message if query failed
+        reporter: Optional Reporter for progress/log output. If None, uses
+            SilentReporter (no console output). Advanced users can pass
+            LoggingReporter or a custom Reporter implementation.
 
     Example:
         >>> from agentkit.toolkit import sdk
@@ -59,18 +64,18 @@ def status(
         >>>
         >>> # Check result
         >>> if result.success:
-        ...     print(f"Status: {result.status.value}")
+        ...     print(f"Status: {result.status}")
         ...     print(f"Running: {result.is_running()}")
         ...     print(f"Endpoint: {result.endpoint_url}")
-        ...     print(f"Uptime: {result.uptime}")
+        ...     print(f"Uptime (seconds): {result.uptime_seconds}")
         ... else:
         ...     print(f"Status query failed: {result.error}")
 
     Raises:
         No exceptions are raised. All errors are captured in StatusResult.error.
     """
-    # SDK 使用 SilentReporter（无控制台输出）
-    reporter = SilentReporter()
+    if reporter is None:
+        reporter = SilentReporter()
     ExecutionContext.set_reporter(reporter)
 
     executor = StatusExecutor(reporter=reporter)

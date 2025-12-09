@@ -445,10 +445,10 @@ class CreateRuntimeRequest(RuntimeTypeBaseModel):
     authorizer_configuration: Optional[AuthorizerForCreateRuntime] = Field(
         default=None, alias="AuthorizerConfiguration"
     )
-    envs: Optional[list[EnvsItemForCreateRuntime]] = Field(default=None, alias="Envs")
     network_configuration: Optional[NetworkForCreateRuntime] = Field(
         default=None, alias="NetworkConfiguration"
     )
+    envs: Optional[list[EnvsItemForCreateRuntime]] = Field(default=None, alias="Envs")
     tags: Optional[list[TagsItemForCreateRuntime]] = Field(default=None, alias="Tags")
 
 
