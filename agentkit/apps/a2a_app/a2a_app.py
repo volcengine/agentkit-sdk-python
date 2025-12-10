@@ -26,10 +26,10 @@ from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.tasks import InMemoryTaskStore
 from a2a.server.tasks.task_store import TaskStore
 from a2a.types import AgentCard
-from starlette.requests import Request
 from starlette.applications import Starlette
 from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
+from starlette.requests import Request
 
 from agentkit.apps.a2a_app.telemetry import telemetry
 from agentkit.apps.base_app import BaseAgentkitApp
@@ -43,9 +43,7 @@ def _wrap_agent_executor_execute_func(execute_func: Callable) -> Callable:
         context: RequestContext = args[1]
         event_queue: EventQueue = args[2]
 
-        with telemetry.tracer.start_as_current_span(
-            name="a2a_invocation"
-        ) as span:
+        with telemetry.tracer.start_as_current_span(name="a2a_invocation") as span:
             exception = None
             try:
                 result = await execute_func(
@@ -89,9 +87,7 @@ class AgentkitA2aApp(BaseAgentkitApp):
                 )
 
             if self._agent_executor:
-                raise RuntimeError(
-                    "An executor is already bound to this app instance."
-                )
+                raise RuntimeError("An executor is already bound to this app instance.")
 
             # Wrap the execute method for intercepting context and event_queue
             cls.execute = _wrap_agent_executor_execute_func(cls.execute)
@@ -122,23 +118,6 @@ class AgentkitA2aApp(BaseAgentkitApp):
 
         return wrapper
 
-    def add_env_detect_route(self, app: Starlette):
-        def is_agentkit_runtime() -> bool:
-            if os.getenv("RUNTIME_IAM_ROLE_TRN", ""):
-                return True
-            else:
-                return False
-
-        route = Route(
-            "/env",
-            endpoint=lambda request: JSONResponse(
-                {"env": "agentkit" if is_agentkit_runtime() else "veadk"}
-            ),
-            methods=["GET"],
-            name="env_detect",
-        )
-        app.routes.append(route)
-
     def ping(self, func: Callable) -> Callable:
         """Register a zero-argument health check function and expose it via GET /ping.
 
@@ -163,6 +142,46 @@ class AgentkitA2aApp(BaseAgentkitApp):
         )
         return {"status": "error", "message": "Invalid response type."}
 
+    async def ping_endpoint(self, request: Request) -> Response:
+        if not self._ping_func:
+            logger.error("Ping handler function is not set")
+            return Response(status_code=404)
+
+        try:
+            result = (
+                await self._ping_func()
+                if inspect.iscoroutinefunction(self._ping_func)
+                else self._ping_func()
+            )
+            payload = self._format_ping_status(result)
+            return JSONResponse(content=payload)
+        except Exception as e:
+            logger.exception("Ping handler function failed: %s", e)
+            return JSONResponse(
+                content={"status": "error", "message": str(e)},
+                status_code=500,
+            )
+
+    def add_env_detect_route(self, app: Starlette):
+        def is_agentkit_runtime() -> bool:
+            if os.getenv("RUNTIME_IAM_ROLE_TRN", ""):
+                return True
+            else:
+                return False
+
+        route = Route(
+            "/env",
+            endpoint=lambda request: JSONResponse(
+                {"env": "agentkit" if is_agentkit_runtime() else "veadk"}
+            ),
+            methods=["GET"],
+            name="env_detect",
+        )
+        app.routes.append(route)
+
+    def add_ping_route(self, app: Starlette):
+        app.add_route("/ping", self.ping_endpoint, methods=["GET"])
+
     @override
     def run(self, agent_card: AgentCard, host: str, port: int = 8000):
         if not self._agent_executor:
@@ -182,30 +201,8 @@ class AgentkitA2aApp(BaseAgentkitApp):
             ),
         ).build()
 
-        # Register /ping route consistent with SimpleApp behavior
-        async def _ping_handler(request: Request):
-            if not self._ping_func:
-                logger.error("Ping handler function is not set")
-                return Response(status_code=404)
-
-            try:
-                result = (
-                    await self._ping_func()
-                    if inspect.iscoroutinefunction(self._ping_func)
-                    else self._ping_func()
-                )
-                payload = self._format_ping_status(result)
-                return JSONResponse(content=payload, media_type="application/json")
-            except Exception as e:
-                logger.exception("Ping handler function failed: %s", e)
-                return JSONResponse(
-                    content={"status": "error", "message": str(e)},
-                    media_type="application/json",
-                    status_code=500,
-                )
-
-        a2a_app.add_route("/ping", _ping_handler, methods=["GET"])
-
+        # Register routes in the same style
+        self.add_ping_route(a2a_app)
         self.add_env_detect_route(a2a_app)
 
         uvicorn.run(a2a_app, host=host, port=port)
