@@ -42,6 +42,7 @@ dependencies = [
     "tos>=2.8.7",
     "volcengine",
     "pyfiglet>=1.0.2",
+    "pyreadline3; sys_platform == 'win32'",
 ]
 
 [project.scripts]
