@@ -15,6 +15,7 @@
 
 import inspect
 import logging
+import os
 from functools import wraps
 from typing import Any, Callable, override
 
@@ -39,7 +40,9 @@ class AgentkitMCPApp(BaseAgentkitApp):
             @wraps(func)
             async def async_wrapper(*args, **kwargs) -> Any:
                 # with tracer.start_as_current_span("tool") as span:
-                with telemetry.tracer.start_as_current_span(name="tool") as span:
+                with telemetry.tracer.start_as_current_span(
+                    name="tool"
+                ) as span:
                     exception = None
                     try:
                         result = await func(*args, **kwargs)
@@ -67,7 +70,9 @@ class AgentkitMCPApp(BaseAgentkitApp):
             @wraps(func)
             def sync_wrapper(*args, **kwargs) -> Any:
                 # with tracer.start_as_current_span("tool") as span:
-                with telemetry.tracer.start_as_current_span(name="tool") as span:
+                with telemetry.tracer.start_as_current_span(
+                    name="tool"
+                ) as span:
                     exception = None
                     try:
                         result = func(*args, **kwargs)
@@ -95,7 +100,9 @@ class AgentkitMCPApp(BaseAgentkitApp):
 
             @wraps(func)
             async def async_wrapper(*args, **kwargs) -> Any:
-                with telemetry.tracer.start_as_current_span(name="tool") as span:
+                with telemetry.tracer.start_as_current_span(
+                    name="tool"
+                ) as span:
                     exception = None
                     try:
                         result = await func(*args, **kwargs)
@@ -119,7 +126,9 @@ class AgentkitMCPApp(BaseAgentkitApp):
 
             @wraps(func)
             def sync_wrapper(*args, **kwargs) -> Any:
-                with telemetry.tracer.start_as_current_span(name="tool") as span:
+                with telemetry.tracer.start_as_current_span(
+                    name="tool"
+                ) as span:
                     exception = None
                     try:
                         result = func(*args, **kwargs)
@@ -142,8 +151,25 @@ class AgentkitMCPApp(BaseAgentkitApp):
 
         return func
 
+    def add_env_detect_tool(self):
+        def is_agentkit_runtime() -> bool:
+            if os.getenv("RUNTIME_IAM_ROLE_TRN", ""):
+                return True
+            else:
+                return False
+
+        def get_env() -> dict:
+            return {"env": "agentkit" if is_agentkit_runtime() else "veadk"}
+
+        self._mcp_server.tool(get_env)
+
     @override
     def run(
-        self, host: str, port: int = 8000, transport: Transport = "streamable-http"
+        self,
+        host: str,
+        port: int = 8000,
+        transport: Transport = "streamable-http",
     ) -> None:
+        self.add_env_detect_tool()
+
         self._mcp_server.run(host=host, port=port, transport=transport)
