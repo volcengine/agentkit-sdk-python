@@ -19,10 +19,7 @@ from opentelemetry import context as context_api
 
 from agentkit.apps.agent_server_app.telemetry import telemetry
 
-_EXCLUDED_HEADERS = {
-    "authorization",
-    "token"
-}
+_EXCLUDED_HEADERS = {"authorization", "token"}
 
 
 class AgentkitTelemetryHTTPMiddleware:
@@ -42,8 +39,7 @@ class AgentkitTelemetryHTTPMiddleware:
         ctx = trace.set_span_in_context(span)
         context_api.attach(ctx)
         headers = {
-            k: v for k, v in headers.items()
-            if k.lower() not in _EXCLUDED_HEADERS
+            k: v for k, v in headers.items() if k.lower() not in _EXCLUDED_HEADERS
         }
 
         # Currently unable to retrieve user_id and session_id from headers; keep logic for future use
@@ -75,5 +71,5 @@ class AgentkitTelemetryHTTPMiddleware:
         try:
             await self.app(scope, receive, send_wrapper)
         except Exception as e:
-            telemetry.trace_agent_server_finish(path=path,func_result="", exception=e)
+            telemetry.trace_agent_server_finish(path=path, func_result="", exception=e)
             raise
