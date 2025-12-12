@@ -24,6 +24,8 @@ from urllib.parse import urljoin
 from agentkit.toolkit.config import (
     CommonConfig,
     AUTO_CREATE_VE,
+    AUTH_TYPE_KEY_AUTH,
+    AUTH_TYPE_CUSTOM_JWT,
     is_valid_config,
     is_invalid_config,
 )
@@ -86,6 +88,20 @@ class VeAgentkitRunnerConfig(AutoSerializableMixin):
     )
     runtime_envs: Dict[str, str] = field(
         default_factory=dict, metadata={"description": "Runtime environment variables"}
+    )
+
+    # Authentication configuration
+    runtime_auth_type: str = field(
+        default=AUTH_TYPE_KEY_AUTH,
+        metadata={
+            "description": "Runtime authentication type: 'key_auth' or 'custom_jwt'"
+        },
+    )
+    runtime_jwt_discovery_url: str = field(
+        default="", metadata={"description": "OIDC Discovery URL for JWT validation"}
+    )
+    runtime_jwt_allowed_clients: List[str] = field(
+        default_factory=list, metadata={"description": "Allowed OAuth2 client IDs"}
     )
 
     # Container image configuration
@@ -232,14 +248,30 @@ class VeAgentkitRuntimeRunner(Runner):
             runtime = self.agentkit_runtime_client.get_runtime(
                 runtime_types.GetRuntimeRequest(runtime_id=runner_config.runtime_id)
             )
-            if not runner_config.runtime_apikey:
-                runner_config.runtime_apikey = (
-                    runtime.authorizer_configuration.key_auth.api_key
-                )
+
+            # Only fetch API key for key_auth mode
+            if (
+                not runner_config.runtime_apikey
+                and runner_config.runtime_auth_type == AUTH_TYPE_KEY_AUTH
+            ):
+                if (
+                    runtime.authorizer_configuration
+                    and runtime.authorizer_configuration.key_auth
+                ):
+                    runner_config.runtime_apikey = (
+                        runtime.authorizer_configuration.key_auth.api_key
+                    )
 
             ping_status = None
             public_endpoint = self.get_public_endpoint_of_runtime(runtime)
-            if runtime.status == RUNTIME_STATUS_READY and public_endpoint:
+
+            # Only perform ping check for key_auth mode with valid API key
+            if (
+                runner_config.runtime_auth_type == AUTH_TYPE_KEY_AUTH
+                and runner_config.runtime_apikey
+                and runtime.status == RUNTIME_STATUS_READY
+                and public_endpoint
+            ):
                 try:
                     ping_response = requests.get(
                         urljoin(public_endpoint, "ping"),
@@ -273,6 +305,9 @@ class VeAgentkitRuntimeRunner(Runner):
                 except Exception as e:
                     logger.error(f"Failed to check endpoint connectivity: {str(e)}")
                     ping_status = False
+            elif runner_config.runtime_auth_type == AUTH_TYPE_CUSTOM_JWT:
+                # For JWT auth, skip ping check (user provides token via headers)
+                ping_status = None
 
             if runtime.status == RUNTIME_STATUS_READY:
                 status = "running"
@@ -346,11 +381,15 @@ class VeAgentkitRuntimeRunner(Runner):
         """
         try:
             runner_config = config
+            is_jwt_auth = runner_config.runtime_auth_type == AUTH_TYPE_CUSTOM_JWT
 
             # Get Runtime endpoint and API key
             endpoint = runner_config.runtime_endpoint
             api_key = runner_config.runtime_apikey
-            if not endpoint or not api_key:
+
+            # For key_auth: require both endpoint and api_key
+            # For custom_jwt: only require endpoint (user provides token via headers)
+            if not endpoint or (not is_jwt_auth and not api_key):
                 if (
                     not runner_config.runtime_id
                     or runner_config.runtime_id == AUTO_CREATE_VE
@@ -381,10 +420,26 @@ class VeAgentkitRuntimeRunner(Runner):
                         )
                     raise e
                 endpoint = self.get_public_endpoint_of_runtime(runtime)
-                api_key = runtime.authorizer_configuration.key_auth.api_key
 
-                if not endpoint or not api_key:
-                    error_msg = "Failed to obtain Runtime endpoint or API key."
+                # Only fetch API key for key_auth mode
+                if not is_jwt_auth:
+                    if (
+                        runtime.authorizer_configuration
+                        and runtime.authorizer_configuration.key_auth
+                    ):
+                        api_key = runtime.authorizer_configuration.key_auth.api_key
+
+                # Validate based on auth type
+                if not endpoint:
+                    error_msg = "Failed to obtain Runtime endpoint."
+                    logger.error(f"{error_msg}, runtime: {runtime}")
+                    return InvokeResult(
+                        success=False,
+                        error=error_msg,
+                        error_code=ErrorCode.CONFIG_MISSING,
+                    )
+                if not is_jwt_auth and not api_key:
+                    error_msg = "Failed to obtain Runtime API key."
                     logger.error(f"{error_msg}, runtime: {runtime}")
                     return InvokeResult(
                         success=False,
@@ -407,8 +462,21 @@ class VeAgentkitRuntimeRunner(Runner):
             if headers is None:
                 headers = {}
 
+            # Check Authorization header for JWT auth
             if not headers.get("Authorization"):
-                headers["Authorization"] = f"Bearer {api_key}"
+                if is_jwt_auth:
+                    error_msg = (
+                        "Authorization header with OAuth token is required for JWT authentication. "
+                        "Please provide the token via headers={'Authorization': 'Bearer <your_oauth_token>'}."
+                    )
+                    logger.error(error_msg)
+                    return InvokeResult(
+                        success=False,
+                        error=error_msg,
+                        error_code=ErrorCode.AUTH_FAILED,
+                    )
+                else:
+                    headers["Authorization"] = f"Bearer {api_key}"
 
             # Unified ADK-compatible invocation flow via base class
             ctx = Runner.InvokeContext(
@@ -488,6 +556,62 @@ class VeAgentkitRuntimeRunner(Runner):
             logger.error(f"Failed to prepare Runtime configuration: {str(e)}")
             return False
 
+    def _build_authorizer_config_for_create(
+        self, config: VeAgentkitRunnerConfig
+    ) -> runtime_types.AuthorizerForCreateRuntime:
+        """Build authorizer configuration for creating a new Runtime.
+
+        Args:
+            config: Runner configuration.
+
+        Returns:
+            AuthorizerForCreateRuntime: Authorizer configuration for create request.
+        """
+        if config.runtime_auth_type == AUTH_TYPE_CUSTOM_JWT:
+            return runtime_types.AuthorizerForCreateRuntime(
+                custom_jwt_authorizer=runtime_types.AuthorizerCustomJwtAuthorizerForCreateRuntime(
+                    discovery_url=config.runtime_jwt_discovery_url,
+                    allowed_clients=config.runtime_jwt_allowed_clients
+                    if config.runtime_jwt_allowed_clients
+                    else None,
+                )
+            )
+        else:
+            return runtime_types.AuthorizerForCreateRuntime(
+                key_auth=runtime_types.AuthorizerKeyAuthForCreateRuntime(
+                    api_key_name=config.runtime_apikey_name,
+                    api_key_location=API_KEY_LOCATION,
+                )
+            )
+
+    def _build_authorizer_config_for_update(
+        self, config: VeAgentkitRunnerConfig
+    ) -> runtime_types.AuthorizerForUpdateRuntime:
+        """Build authorizer configuration for updating an existing Runtime.
+
+        Args:
+            config: Runner configuration.
+
+        Returns:
+            AuthorizerForUpdateRuntime: Authorizer configuration for update request.
+        """
+        if config.runtime_auth_type == AUTH_TYPE_CUSTOM_JWT:
+            return runtime_types.AuthorizerForUpdateRuntime(
+                custom_jwt_authorizer=runtime_types.AuthorizerCustomJwtAuthorizerForUpdateRuntime(
+                    discovery_url=config.runtime_jwt_discovery_url,
+                    allowed_clients=config.runtime_jwt_allowed_clients
+                    if config.runtime_jwt_allowed_clients
+                    else None,
+                )
+            )
+        else:
+            return runtime_types.AuthorizerForUpdateRuntime(
+                key_auth=runtime_types.AuthorizerKeyAuthForUpdateRuntime(
+                    api_key_name=config.runtime_apikey_name,
+                    api_key_location=API_KEY_LOCATION,
+                )
+            )
+
     def _create_new_runtime(self, config: VeAgentkitRunnerConfig) -> DeployResult:
         """Create a new Runtime instance.
 
@@ -506,6 +630,9 @@ class VeAgentkitRuntimeRunner(Runner):
                 for k, v in config.runtime_envs.items()
             ]
 
+            # Build authorizer configuration based on auth type
+            authorizer_config = self._build_authorizer_config_for_create(config)
+
             create_request = runtime_types.CreateRuntimeRequest(
                 name=config.runtime_name,
                 description=config.common_config.description
@@ -516,12 +643,7 @@ class VeAgentkitRuntimeRunner(Runner):
                 role_name=config.runtime_role_name,
                 envs=envs,
                 project_name=PROJECT_NAME_DEFAULT,
-                authorizer_configuration=runtime_types.AuthorizerForCreateRuntime(
-                    key_auth=runtime_types.AuthorizerKeyAuthForCreateRuntime(
-                        api_key_name=config.runtime_apikey_name,
-                        api_key_location=API_KEY_LOCATION,
-                    ),
-                ),
+                authorizer_configuration=authorizer_config,
                 client_token=generate_client_token(),
                 apmplus_enable=True,
             )
@@ -588,7 +710,16 @@ class VeAgentkitRuntimeRunner(Runner):
             public_endpoint = self.get_public_endpoint_of_runtime(runtime)
             self.reporter.info(f"Endpoint: {public_endpoint}")
             config.runtime_endpoint = public_endpoint
-            config.runtime_apikey = runtime.authorizer_configuration.key_auth.api_key
+
+            # Only retrieve API key for key_auth mode
+            if config.runtime_auth_type == AUTH_TYPE_KEY_AUTH:
+                if (
+                    runtime.authorizer_configuration
+                    and runtime.authorizer_configuration.key_auth
+                ):
+                    config.runtime_apikey = (
+                        runtime.authorizer_configuration.key_auth.api_key
+                    )
 
             return DeployResult(
                 success=True,
@@ -601,6 +732,9 @@ class VeAgentkitRuntimeRunner(Runner):
                     "runtime_apikey": config.runtime_apikey,
                     "runtime_apikey_name": config.runtime_apikey_name,
                     "runtime_role_name": config.runtime_role_name,
+                    "runtime_auth_type": config.runtime_auth_type,
+                    "runtime_jwt_discovery_url": config.runtime_jwt_discovery_url,
+                    "runtime_jwt_allowed_clients": config.runtime_jwt_allowed_clients,
                     "message": "Runtime created successfully",
                 },
             )
@@ -882,9 +1016,16 @@ class VeAgentkitRuntimeRunner(Runner):
                 )
                 public_endpoint = self.get_public_endpoint_of_runtime(runtime)
                 config.runtime_endpoint = public_endpoint
-                config.runtime_apikey = (
-                    runtime.authorizer_configuration.key_auth.api_key
-                )
+
+                # Only retrieve API key for key_auth mode
+                if config.runtime_auth_type == AUTH_TYPE_KEY_AUTH:
+                    if (
+                        runtime.authorizer_configuration
+                        and runtime.authorizer_configuration.key_auth
+                    ):
+                        config.runtime_apikey = (
+                            runtime.authorizer_configuration.key_auth.api_key
+                        )
 
                 return DeployResult(
                     success=True,
@@ -895,6 +1036,7 @@ class VeAgentkitRuntimeRunner(Runner):
                         "runtime_id": config.runtime_id,
                         "runtime_name": config.runtime_name,
                         "runtime_apikey": config.runtime_apikey,
+                        "runtime_auth_type": config.runtime_auth_type,
                         "message": "Runtime configuration is up-to-date",
                     },
                 )
@@ -987,9 +1129,16 @@ class VeAgentkitRuntimeRunner(Runner):
             public_endpoint = self.get_public_endpoint_of_runtime(updated_runtime)
             self.reporter.info(f"Endpoint: {public_endpoint}")
             config.runtime_endpoint = public_endpoint
-            config.runtime_apikey = (
-                updated_runtime.authorizer_configuration.key_auth.api_key
-            )
+
+            # Only retrieve API key for key_auth mode
+            if config.runtime_auth_type == AUTH_TYPE_KEY_AUTH:
+                if (
+                    updated_runtime.authorizer_configuration
+                    and updated_runtime.authorizer_configuration.key_auth
+                ):
+                    config.runtime_apikey = (
+                        updated_runtime.authorizer_configuration.key_auth.api_key
+                    )
 
             return DeployResult(
                 success=True,
@@ -1004,6 +1153,9 @@ class VeAgentkitRuntimeRunner(Runner):
                     "runtime_apikey": config.runtime_apikey,
                     "runtime_apikey_name": config.runtime_apikey_name,
                     "runtime_role_name": config.runtime_role_name,
+                    "runtime_auth_type": config.runtime_auth_type,
+                    "runtime_jwt_discovery_url": config.runtime_jwt_discovery_url,
+                    "runtime_jwt_allowed_clients": config.runtime_jwt_allowed_clients,
                     "message": "Runtime update completed",
                 },
             )

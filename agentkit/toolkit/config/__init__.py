@@ -44,6 +44,8 @@ from .global_config import (
 from .utils import is_valid_config, is_invalid_config, merge_runtime_envs
 from .constants import (
     AUTO_CREATE_VE,
+    AUTH_TYPE_KEY_AUTH,
+    AUTH_TYPE_CUSTOM_JWT,
     GLOBAL_CONFIG_FILE_PERMISSIONS,
     GLOBAL_CONFIG_FILE,
     GLOBAL_CONFIG_DIR,
@@ -70,6 +72,8 @@ __all__ = [
     "CRGlobalConfig",
     "TOSGlobalConfig",
     "AUTO_CREATE_VE",
+    "AUTH_TYPE_KEY_AUTH",
+    "AUTH_TYPE_CUSTOM_JWT",
     "DEFAULT_WORKSPACE_NAME",
     "DEFAULT_CR_NAMESPACE",
     "DEFAULT_CR_INSTANCE_TEMPLATE_NAME",

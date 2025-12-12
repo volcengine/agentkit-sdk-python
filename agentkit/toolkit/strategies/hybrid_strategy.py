@@ -499,6 +499,9 @@ class HybridStrategy(Strategy):
             runtime_apikey_name=strategy_config.runtime_apikey_name,
             runtime_endpoint=strategy_config.runtime_endpoint,
             runtime_envs=merged_envs,
+            runtime_auth_type=strategy_config.runtime_auth_type,
+            runtime_jwt_discovery_url=strategy_config.runtime_jwt_discovery_url,
+            runtime_jwt_allowed_clients=strategy_config.runtime_jwt_allowed_clients,
             image_url=strategy_config.cr_image_full_url,
         )
 

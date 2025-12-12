@@ -36,3 +36,6 @@ DEFAULT_IMAGE_TAG_TEMPLATE = "{{timestamp}}"
 GLOBAL_CONFIG_DIR = Path.home() / ".agentkit"
 GLOBAL_CONFIG_FILE = GLOBAL_CONFIG_DIR / "config.yaml"
 GLOBAL_CONFIG_FILE_PERMISSIONS = 0o600  # Owner read/write only
+
+AUTH_TYPE_KEY_AUTH = "key_auth"
+AUTH_TYPE_CUSTOM_JWT = "custom_jwt"

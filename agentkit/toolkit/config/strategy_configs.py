@@ -2,6 +2,8 @@ from dataclasses import dataclass, field
 from typing import Dict, List
 from .dataclass_utils import AutoSerializableMixin
 from .constants import (
+    AUTH_TYPE_CUSTOM_JWT,
+    AUTH_TYPE_KEY_AUTH,
     AUTO_CREATE_VE,
     DEFAULT_CR_NAMESPACE,
     DEFAULT_IMAGE_TAG,
@@ -207,6 +209,20 @@ class HybridStrategyConfig(AutoSerializableMixin):
             "aliases": ["ve_runtime_role_name"],
         },
     )
+    runtime_auth_type: str = field(
+        default=AUTH_TYPE_KEY_AUTH,
+        metadata={
+            "description": "Runtime authentication type",
+            "icon": "🔑",
+            "choices": [
+                {"value": AUTH_TYPE_KEY_AUTH, "description": "API Key authentication"},
+                {
+                    "value": AUTH_TYPE_CUSTOM_JWT,
+                    "description": "OAuth2/JWT authentication",
+                },
+            ],
+        },
+    )
     runtime_apikey_name: str = field(
         default=AUTO_CREATE_VE,
         metadata={
@@ -221,6 +237,20 @@ class HybridStrategyConfig(AutoSerializableMixin):
             "system": True,
             "description": "Runtime API key",
             "aliases": ["ve_runtime_apikey"],
+        },
+    )
+    runtime_jwt_discovery_url: str = field(
+        default="",
+        metadata={
+            "description": "OIDC Discovery URL for JWT validation (required when auth_type is custom_jwt)",
+            "examples": "https://userpool-xxx.userpool.auth.id.cn-beijing.volces.com/.well-known/openid-configuration",
+        },
+    )
+    runtime_jwt_allowed_clients: List[str] = field(
+        default_factory=list,
+        metadata={
+            "description": "Allowed OAuth2 client IDs (required when auth_type is custom_jwt)",
+            "examples": "['fa99ec54-8a1c-49b2-9a9e-3f3ba31d9a33']",
         },
     )
     runtime_endpoint: str = field(
@@ -403,6 +433,20 @@ class CloudStrategyConfig(AutoSerializableMixin):
             "aliases": ["ve_runtime_role_name"],
         },
     )
+    runtime_auth_type: str = field(
+        default=AUTH_TYPE_KEY_AUTH,
+        metadata={
+            "description": "Runtime authentication type",
+            "icon": "🔑",
+            "choices": [
+                {"value": AUTH_TYPE_KEY_AUTH, "description": "API Key authentication"},
+                {
+                    "value": AUTH_TYPE_CUSTOM_JWT,
+                    "description": "OAuth2/JWT authentication",
+                },
+            ],
+        },
+    )
     runtime_apikey_name: str = field(
         default=AUTO_CREATE_VE,
         metadata={
@@ -417,6 +461,20 @@ class CloudStrategyConfig(AutoSerializableMixin):
             "system": True,
             "description": "Runtime API key for authentication",
             "aliases": ["ve_runtime_apikey"],
+        },
+    )
+    runtime_jwt_discovery_url: str = field(
+        default="",
+        metadata={
+            "description": "OIDC Discovery URL for JWT validation (required when auth_type is custom_jwt)",
+            "examples": "https://userpool-xxx.userpool.auth.id.cn-beijing.volces.com/.well-known/openid-configuration",
+        },
+    )
+    runtime_jwt_allowed_clients: List[str] = field(
+        default_factory=list,
+        metadata={
+            "description": "Allowed OAuth2 client IDs (required when auth_type is custom_jwt)",
+            "examples": "['fa99ec54-8a1c-49b2-9a9e-3f3ba31d9a33']",
         },
     )
     runtime_endpoint: str = field(
