@@ -225,6 +225,16 @@ def init_command(
         "--model-name",
         help="Model name in volcengine ARK platform (default: 'doubao-seed-1-6-250615')",
     ),
+    model_api_base: Optional[str] = typer.Option(
+        None,
+        "--model-api-base",
+        help="Base URL for model API requests (e.g., https://ark.cn-beijing.volces.com/api/v3)",
+    ),
+    model_api_key: Optional[str] = typer.Option(
+        None,
+        "--model-api-key",
+        help="API key for accessing the model",
+    ),
     tools: Optional[str] = typer.Option(
         None,
         "--tools",
@@ -328,6 +338,8 @@ def init_command(
             description=description,
             system_prompt=system_prompt,
             model_name=model_name,
+            model_api_base=model_api_base,
+            model_api_key=model_api_key,
             tools=tools,
         )
 

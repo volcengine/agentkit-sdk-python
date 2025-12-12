@@ -115,6 +115,8 @@ class InitExecutor(BaseExecutor):
         description: Optional[str] = None,
         system_prompt: Optional[str] = None,
         model_name: Optional[str] = None,
+        model_api_base: Optional[str] = None,
+        model_api_key: Optional[str] = None,
         tools: Optional[str] = None,
     ) -> InitResult:
         """
@@ -193,7 +195,11 @@ class InitExecutor(BaseExecutor):
                 )
 
             render_context = self._build_render_context(
-                agent_name, description, system_prompt, model_name, tools
+                agent_name,
+                description,
+                system_prompt,
+                model_name,
+                tools,
             )
 
             if source_path.is_dir():
@@ -222,6 +228,14 @@ class InitExecutor(BaseExecutor):
             else:
                 entry_point_name = file_name
 
+            runtime_envs = None
+            if model_api_base or model_api_key:
+                runtime_envs = {}
+                if model_api_base:
+                    runtime_envs["MODEL_AGENT_API_BASE"] = model_api_base
+                if model_api_key:
+                    runtime_envs["MODEL_AGENT_API_KEY"] = model_api_key
+
             if not config_file_path.exists():
                 self._create_config_file(
                     config_file_path=config_file_path,
@@ -232,6 +246,7 @@ class InitExecutor(BaseExecutor):
                     description=f"AgentKit project {project_name} - {template_info.get('name', '')}",
                     entry_point_name=entry_point_name,
                     dependencies_file_name=dependencies_file_path.name,
+                    runtime_envs=runtime_envs,
                 )
                 self.created_files.append("agentkit.yaml")
             else:
@@ -544,6 +559,7 @@ class InitExecutor(BaseExecutor):
         description: str,
         entry_point_name: str,
         dependencies_file_name: str,
+        runtime_envs: Optional[dict] = None,
     ):
         """
         Create agentkit.yaml configuration file.
@@ -569,6 +585,8 @@ class InitExecutor(BaseExecutor):
         common_config.description = description
         common_config.entry_point = entry_point_name
         common_config.dependencies_file = dependencies_file_name
+        if runtime_envs:
+            common_config.runtime_envs.update(runtime_envs)
         config_manager.update_common_config(common_config)
 
         self._setup_config_launch_type(config_manager, common_config)
