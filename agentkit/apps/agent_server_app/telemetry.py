@@ -108,7 +108,11 @@ class Telemetry:
                 attributes["error_type"] = exception.__class__.__name__
 
             # only record invoke request latency metrics
-            if hasattr(span, "start_time") and self.latency_histogram and path in _INVOKE_PATH:
+            if (
+                hasattr(span, "start_time")
+                and self.latency_histogram
+                and path in _INVOKE_PATH
+            ):
                 duration = (time.time_ns() - span.start_time) / 1e9  # type: ignore
                 self.latency_histogram.record(duration, attributes)
             span.end()

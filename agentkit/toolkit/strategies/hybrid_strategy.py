@@ -479,9 +479,16 @@ class HybridStrategy(Strategy):
         self, common_config: CommonConfig, strategy_config: HybridStrategyConfig
     ) -> VeAgentkitRunnerConfig:
         """
-        Convert HybridStrategyConfig to VeAgentkitRunnerConfig.
+        Convert HybridStrategyConfig to VeAgentkitRunnerConfig with veADK compatibility.
         """
-        merged_envs = merge_runtime_envs(common_config, strategy_config.to_dict())
+        # Get project directory from config manager if available
+        project_dir = None
+        if self.config_manager:
+            project_dir = self.config_manager.get_project_dir()
+
+        merged_envs = merge_runtime_envs(
+            common_config, strategy_config.to_dict(), project_dir
+        )
 
         return VeAgentkitRunnerConfig(
             common_config=common_config,

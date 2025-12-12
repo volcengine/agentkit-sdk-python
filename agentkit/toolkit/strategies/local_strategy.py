@@ -261,9 +261,16 @@ class LocalStrategy(Strategy):
         Convert configuration to runner format.
 
         Centralizes configuration mapping and merges environment variables from
-        both application and strategy levels.
+        both application and strategy levels with veADK compatibility.
         """
-        merged_envs = merge_runtime_envs(common_config, strategy_config.to_dict())
+        # Get project directory from config manager if available
+        project_dir = None
+        if self.config_manager:
+            project_dir = self.config_manager.get_project_dir()
+
+        merged_envs = merge_runtime_envs(
+            common_config, strategy_config.to_dict(), project_dir
+        )
 
         return LocalDockerRunnerConfig(
             common_config=common_config,
