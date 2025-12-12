@@ -12,7 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import readline
+# Cross-platform readline support:
+# - On Unix, use built-in `readline`
+# - On Windows, try `pyreadline3` if available; otherwise gracefully degrade
+try:
+    import readline  # type: ignore
+except ImportError:  # ImportError on Windows or environments without GNU readline
+    try:
+        import pyreadline3 as readline  # type: ignore
+    except ImportError:
+        readline = None  # type: ignore
 from typing import (
     Any,
     Dict,
@@ -128,9 +137,10 @@ class AutoPromptGenerator:
 
             def prefill():
                 try:
-                    readline.insert_text(default)
+                    # Ensure default is a string to avoid TypeError
+                    readline.insert_text(str(default))
                     readline.redisplay()
-                except (AttributeError, OSError):
+                except (AttributeError, OSError, TypeError):
                     # Some readline implementations (e.g., libedit) may not support insert_text or redisplay
                     # In this case, we'll display the default value in the prompt as a fallback
                     pass
@@ -157,8 +167,9 @@ class AutoPromptGenerator:
         finally:
             # Clean up hook; use try-except to prevent errors on unsupported systems
             try:
-                readline.set_pre_input_hook()
-            except (AttributeError, OSError):
+                # Unset hook explicitly to avoid TypeError on some implementations
+                readline.set_pre_input_hook(None)
+            except (AttributeError, OSError, TypeError):
                 pass
 
     def generate_config(
@@ -572,7 +583,13 @@ class AutoPromptGenerator:
         while True:
             # Build complete prompt information
             if default:
-                prompt_str = f"\n[{current}/{total}] {icon} {description} (current: {default}{'' if not ('{' in default and '}' in default) else ', content in curly braces is a dynamic placeholder, no need to fill manually'}): "
+                default_str = str(default)
+                placeholder_hint = (
+                    ", content in curly braces is a dynamic placeholder, no need to fill manually"
+                    if ("{" in default_str and "}" in default_str)
+                    else ""
+                )
+                prompt_str = f"\n[{current}/{total}] {icon} {description} (current: {default_str}{placeholder_hint}): "
             else:
                 prompt_str = f"\n[{current}/{total}] {icon} {description}: "
 
