@@ -13,13 +13,13 @@
 # limitations under the License.
 
 """
-Volcengine - 火山引擎平台集成
+Volcengine - Volcengine integration
 
-CodePipeline、AgentKit Runtime、容器镜像服务、IAM认证等
+CodePipeline, AgentKit Runtime, container image service, IAM authentication, etc.
 """
 
 
-# 使用延迟导入，避免导入时的依赖问题
+# Use lazy import to avoid dependency issues during import
 def __getattr__(name):
     if name == "VeCodePipeline":
         from .code_pipeline import VeCodePipeline

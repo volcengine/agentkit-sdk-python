@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Dockerfile 智能管理模块"""
-
 from .manager import DockerfileManager
 from .metadata import DockerfileMetadata, DockerfileDecision
 

@@ -407,7 +407,6 @@ class VeCR:
         get default cr domain
         """
         domains = self._list_domains(instance_name=instance_name)
-        # 如果只有一个结果，直接返回该域名
         try:
             if isinstance(domains, list) and len(domains) == 1:
                 single = domains[0]

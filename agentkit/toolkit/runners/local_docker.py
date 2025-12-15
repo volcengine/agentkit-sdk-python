@@ -161,7 +161,7 @@ class LocalDockerRunner(Runner):
             else:
                 error_msg = f"Image {image_name} does not exist"
                 logger.error(error_msg)
-                self.reporter.error(f"镜像不存在: {image_name}")
+                self.reporter.error(f"Image does not exist: {image_name}")
                 return DeployResult(
                     success=False,
                     error=error_msg,
