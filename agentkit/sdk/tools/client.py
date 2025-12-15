@@ -49,17 +49,17 @@ class AgentkitToolsClient(BaseAgentkitClient):
     """AgentKit Tools Management Service"""
 
     API_ACTIONS: Dict[str, str] = {
-        "UpdateTool": "UpdateTool",
-        "GetSession": "GetSession",
-        "DeleteSession": "DeleteSession",
         "CreateSession": "CreateSession",
-        "GetSessionLogs": "GetSessionLogs",
         "CreateTool": "CreateTool",
-        "GetTool": "GetTool",
-        "ListTools": "ListTools",
-        "ListSessions": "ListSessions",
+        "DeleteSession": "DeleteSession",
         "DeleteTool": "DeleteTool",
+        "GetSession": "GetSession",
+        "GetSessionLogs": "GetSessionLogs",
+        "GetTool": "GetTool",
+        "ListSessions": "ListSessions",
+        "ListTools": "ListTools",
         "SetSessionTtl": "SetSessionTtl",
+        "UpdateTool": "UpdateTool",
     }
 
     def __init__(
@@ -77,18 +77,18 @@ class AgentkitToolsClient(BaseAgentkitClient):
             service_name="tools",
         )
 
-    def update_tool(self, request: UpdateToolRequest) -> UpdateToolResponse:
+    def create_session(self, request: CreateSessionRequest) -> CreateSessionResponse:
         return self._invoke_api(
-            api_action="UpdateTool",
+            api_action="CreateSession",
             request=request,
-            response_type=UpdateToolResponse,
+            response_type=CreateSessionResponse,
         )
 
-    def get_session(self, request: GetSessionRequest) -> GetSessionResponse:
+    def create_tool(self, request: CreateToolRequest) -> CreateToolResponse:
         return self._invoke_api(
-            api_action="GetSession",
+            api_action="CreateTool",
             request=request,
-            response_type=GetSessionResponse,
+            response_type=CreateToolResponse,
         )
 
     def delete_session(self, request: DeleteSessionRequest) -> DeleteSessionResponse:
@@ -98,11 +98,18 @@ class AgentkitToolsClient(BaseAgentkitClient):
             response_type=DeleteSessionResponse,
         )
 
-    def create_session(self, request: CreateSessionRequest) -> CreateSessionResponse:
+    def delete_tool(self, request: DeleteToolRequest) -> DeleteToolResponse:
         return self._invoke_api(
-            api_action="CreateSession",
+            api_action="DeleteTool",
             request=request,
-            response_type=CreateSessionResponse,
+            response_type=DeleteToolResponse,
+        )
+
+    def get_session(self, request: GetSessionRequest) -> GetSessionResponse:
+        return self._invoke_api(
+            api_action="GetSession",
+            request=request,
+            response_type=GetSessionResponse,
         )
 
     def get_session_logs(
@@ -114,25 +121,11 @@ class AgentkitToolsClient(BaseAgentkitClient):
             response_type=GetSessionLogsResponse,
         )
 
-    def create_tool(self, request: CreateToolRequest) -> CreateToolResponse:
-        return self._invoke_api(
-            api_action="CreateTool",
-            request=request,
-            response_type=CreateToolResponse,
-        )
-
     def get_tool(self, request: GetToolRequest) -> GetToolResponse:
         return self._invoke_api(
             api_action="GetTool",
             request=request,
             response_type=GetToolResponse,
-        )
-
-    def list_tools(self, request: ListToolsRequest) -> ListToolsResponse:
-        return self._invoke_api(
-            api_action="ListTools",
-            request=request,
-            response_type=ListToolsResponse,
         )
 
     def list_sessions(self, request: ListSessionsRequest) -> ListSessionsResponse:
@@ -142,11 +135,11 @@ class AgentkitToolsClient(BaseAgentkitClient):
             response_type=ListSessionsResponse,
         )
 
-    def delete_tool(self, request: DeleteToolRequest) -> DeleteToolResponse:
+    def list_tools(self, request: ListToolsRequest) -> ListToolsResponse:
         return self._invoke_api(
-            api_action="DeleteTool",
+            api_action="ListTools",
             request=request,
-            response_type=DeleteToolResponse,
+            response_type=ListToolsResponse,
         )
 
     def set_session_ttl(self, request: SetSessionTtlRequest) -> SetSessionTtlResponse:
@@ -154,4 +147,11 @@ class AgentkitToolsClient(BaseAgentkitClient):
             api_action="SetSessionTtl",
             request=request,
             response_type=SetSessionTtlResponse,
+        )
+
+    def update_tool(self, request: UpdateToolRequest) -> UpdateToolResponse:
+        return self._invoke_api(
+            api_action="UpdateTool",
+            request=request,
+            response_type=UpdateToolResponse,
         )

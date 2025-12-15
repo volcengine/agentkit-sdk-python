@@ -28,18 +28,24 @@ class MemoryBaseModel(BaseModel):
 
 
 # Data Types
-class StrategiesForUpdateMemoryCollection(MemoryBaseModel):
-    custom_extraction_instructions: Optional[str] = Field(
-        default=None, alias="CustomExtractionInstructions"
-    )
+class AssociatedRuntimesForGetMemoryCollection(MemoryBaseModel):
+    id: Optional[str] = Field(default=None, alias="Id")
     name: Optional[str] = Field(default=None, alias="Name")
-    type: Optional[str] = Field(default=None, alias="Type")
 
 
-class LongTermConfigurationForUpdateMemoryCollection(MemoryBaseModel):
-    strategies: Optional[list[StrategiesForUpdateMemoryCollection]] = Field(
-        default=None, alias="Strategies"
+class AssociatedRuntimesForListMemoryCollections(MemoryBaseModel):
+    id: Optional[str] = Field(default=None, alias="Id")
+    name: Optional[str] = Field(default=None, alias="Name")
+
+
+class CollectionsForAddMemoryCollection(MemoryBaseModel):
+    memory_id: Optional[str] = Field(default=None, alias="MemoryId")
+    message: Optional[str] = Field(default=None, alias="Message")
+    provider_collection_id: Optional[str] = Field(
+        default=None, alias="ProviderCollectionId"
     )
+    provider_type: Optional[str] = Field(default=None, alias="ProviderType")
+    status: Optional[str] = Field(default=None, alias="Status")
 
 
 class ConnectionInfosForGetMemoryConnectionInfo(MemoryBaseModel):
@@ -52,34 +58,16 @@ class ConnectionInfosForGetMemoryConnectionInfo(MemoryBaseModel):
     vpc_id: Optional[str] = Field(default=None, alias="VpcId")
 
 
-class AssociatedRuntimesForListMemoryCollections(MemoryBaseModel):
-    id: Optional[str] = Field(default=None, alias="Id")
-    name: Optional[str] = Field(default=None, alias="Name")
-
-
-class VpcConfigurationForListMemoryCollections(MemoryBaseModel):
-    security_group_ids: Optional[list[str]] = Field(
-        default=None, alias="SecurityGroupIds"
-    )
-    subnet_ids: Optional[list[str]] = Field(default=None, alias="SubnetIds")
-    vpc_id: Optional[str] = Field(default=None, alias="VpcId")
-
-
-class NetworkConfigurationForListMemoryCollections(MemoryBaseModel):
-    enable_private_network: Optional[bool] = Field(
-        default=None, alias="EnablePrivateNetwork"
-    )
-    enable_public_network: Optional[bool] = Field(
-        default=None, alias="EnablePublicNetwork"
-    )
-    vpc_configuration: Optional[VpcConfigurationForListMemoryCollections] = Field(
-        default=None, alias="VpcConfiguration"
+class LongTermConfigurationForGetMemoryCollection(MemoryBaseModel):
+    strategies: Optional[list[StrategiesForGetMemoryCollection]] = Field(
+        default=None, alias="Strategies"
     )
 
 
-class TagsForListMemoryCollections(MemoryBaseModel):
-    key: Optional[str] = Field(default=None, alias="Key")
-    value: Optional[str] = Field(default=None, alias="Value")
+class LongTermConfigurationForUpdateMemoryCollection(MemoryBaseModel):
+    strategies: Optional[list[StrategiesForUpdateMemoryCollection]] = Field(
+        default=None, alias="Strategies"
+    )
 
 
 class MemoriesForListMemoryCollections(MemoryBaseModel):
@@ -108,19 +96,16 @@ class MemoriesForListMemoryCollections(MemoryBaseModel):
     )
 
 
-class CollectionsForAddMemoryCollection(MemoryBaseModel):
-    memory_id: Optional[str] = Field(default=None, alias="MemoryId")
-    message: Optional[str] = Field(default=None, alias="Message")
-    provider_collection_id: Optional[str] = Field(
-        default=None, alias="ProviderCollectionId"
+class NetworkConfigurationForListMemoryCollections(MemoryBaseModel):
+    enable_private_network: Optional[bool] = Field(
+        default=None, alias="EnablePrivateNetwork"
     )
-    provider_type: Optional[str] = Field(default=None, alias="ProviderType")
-    status: Optional[str] = Field(default=None, alias="Status")
-
-
-class AssociatedRuntimesForGetMemoryCollection(MemoryBaseModel):
-    id: Optional[str] = Field(default=None, alias="Id")
-    name: Optional[str] = Field(default=None, alias="Name")
+    enable_public_network: Optional[bool] = Field(
+        default=None, alias="EnablePublicNetwork"
+    )
+    vpc_configuration: Optional[VpcConfigurationForListMemoryCollections] = Field(
+        default=None, alias="VpcConfiguration"
+    )
 
 
 class StrategiesForGetMemoryCollection(MemoryBaseModel):
@@ -131,13 +116,20 @@ class StrategiesForGetMemoryCollection(MemoryBaseModel):
     type: Optional[str] = Field(default=None, alias="Type")
 
 
-class LongTermConfigurationForGetMemoryCollection(MemoryBaseModel):
-    strategies: Optional[list[StrategiesForGetMemoryCollection]] = Field(
-        default=None, alias="Strategies"
+class StrategiesForUpdateMemoryCollection(MemoryBaseModel):
+    custom_extraction_instructions: Optional[str] = Field(
+        default=None, alias="CustomExtractionInstructions"
     )
+    name: Optional[str] = Field(default=None, alias="Name")
+    type: Optional[str] = Field(default=None, alias="Type")
 
 
 class TagsForGetMemoryCollection(MemoryBaseModel):
+    key: Optional[str] = Field(default=None, alias="Key")
+    value: Optional[str] = Field(default=None, alias="Value")
+
+
+class TagsForListMemoryCollections(MemoryBaseModel):
     key: Optional[str] = Field(default=None, alias="Key")
     value: Optional[str] = Field(default=None, alias="Value")
 
@@ -147,47 +139,85 @@ class VpcConfigForGetMemoryCollection(MemoryBaseModel):
     vpc_id: Optional[str] = Field(default=None, alias="VpcId")
 
 
-# UpdateMemoryCollection - Request
-class LongTermForUpdateMemoryCollection(MemoryBaseModel):
-    strategies: Optional[list[LongTermStrategiesItemForUpdateMemoryCollection]] = Field(
+class VpcConfigurationForListMemoryCollections(MemoryBaseModel):
+    security_group_ids: Optional[list[str]] = Field(
+        default=None, alias="SecurityGroupIds"
+    )
+    subnet_ids: Optional[list[str]] = Field(default=None, alias="SubnetIds")
+    vpc_id: Optional[str] = Field(default=None, alias="VpcId")
+
+
+# AddMemoryCollection - Request
+class CollectionsItemForAddMemoryCollection(MemoryBaseModel):
+    description: Optional[str] = Field(default=None, alias="Description")
+    name: Optional[str] = Field(default=None, alias="Name")
+    project_name: Optional[str] = Field(default=None, alias="ProjectName")
+    provider_collection_id: str = Field(..., alias="ProviderCollectionId")
+    provider_type: Optional[str] = Field(default=None, alias="ProviderType")
+
+
+class AddMemoryCollectionRequest(MemoryBaseModel):
+    collections: Optional[list[CollectionsItemForAddMemoryCollection]] = Field(
+        default=None, alias="Collections"
+    )
+
+
+# AddMemoryCollection - Response
+class AddMemoryCollectionResponse(MemoryBaseModel):
+    collections: Optional[list[CollectionsForAddMemoryCollection]] = Field(
+        default=None, alias="Collections"
+    )
+
+
+# CreateMemoryCollection - Request
+class LongTermForCreateMemoryCollection(MemoryBaseModel):
+    strategies: Optional[list[LongTermStrategiesItemForCreateMemoryCollection]] = Field(
         default=None, alias="Strategies"
     )
 
 
-class VpcForUpdateMemoryCollection(MemoryBaseModel):
-    vpc_id: str = Field(..., alias="VpcId")
+class VpcForCreateMemoryCollection(MemoryBaseModel):
     subnet_ids: Optional[list[str]] = Field(default=None, alias="SubnetIds")
+    vpc_id: str = Field(..., alias="VpcId")
 
 
-class LongTermStrategiesItemForUpdateMemoryCollection(MemoryBaseModel):
-    name: str = Field(..., alias="Name")
-    type: str = Field(..., alias="Type")
+class LongTermStrategiesItemForCreateMemoryCollection(MemoryBaseModel):
     custom_extraction_instructions: Optional[str] = Field(
         default=None, alias="CustomExtractionInstructions"
     )
+    name: str = Field(..., alias="Name")
+    type: str = Field(..., alias="Type")
 
 
-class UpdateMemoryCollectionRequest(MemoryBaseModel):
+class TagsItemForCreateMemoryCollection(MemoryBaseModel):
+    key: str = Field(..., alias="Key")
+    value: Optional[str] = Field(default=None, alias="Value")
+
+
+class CreateMemoryCollectionRequest(MemoryBaseModel):
     description: Optional[str] = Field(default=None, alias="Description")
-    memory_id: str = Field(..., alias="MemoryId")
-    long_term_configuration: Optional[LongTermForUpdateMemoryCollection] = Field(
+    name: str = Field(..., alias="Name")
+    project_name: Optional[str] = Field(default=None, alias="ProjectName")
+    provider_type: Optional[str] = Field(default=None, alias="ProviderType")
+    long_term_configuration: Optional[LongTermForCreateMemoryCollection] = Field(
         default=None, alias="LongTermConfiguration"
     )
-    vpc_config: Optional[VpcForUpdateMemoryCollection] = Field(
+    vpc_config: Optional[VpcForCreateMemoryCollection] = Field(
         default=None, alias="VpcConfig"
+    )
+    tags: Optional[list[TagsItemForCreateMemoryCollection]] = Field(
+        default=None, alias="Tags"
     )
 
 
-# UpdateMemoryCollection - Response
-class UpdateMemoryCollectionResponse(MemoryBaseModel):
-    long_term_configuration: Optional[
-        LongTermConfigurationForUpdateMemoryCollection
-    ] = Field(default=None, alias="LongTermConfiguration")
+# CreateMemoryCollection - Response
+class CreateMemoryCollectionResponse(MemoryBaseModel):
     memory_id: Optional[str] = Field(default=None, alias="MemoryId")
     provider_collection_id: Optional[str] = Field(
         default=None, alias="ProviderCollectionId"
     )
     provider_type: Optional[str] = Field(default=None, alias="ProviderType")
+    status: Optional[str] = Field(default=None, alias="Status")
 
 
 # DeleteMemoryCollection - Request
@@ -203,6 +233,39 @@ class DeleteMemoryCollectionResponse(MemoryBaseModel):
     )
     provider_type: Optional[str] = Field(default=None, alias="ProviderType")
     status: Optional[str] = Field(default=None, alias="Status")
+
+
+# GetMemoryCollection - Request
+class GetMemoryCollectionRequest(MemoryBaseModel):
+    memory_id: str = Field(..., alias="MemoryId")
+
+
+# GetMemoryCollection - Response
+class GetMemoryCollectionResponse(MemoryBaseModel):
+    associated_runtimes: Optional[list[AssociatedRuntimesForGetMemoryCollection]] = (
+        Field(default=None, alias="AssociatedRuntimes")
+    )
+    create_time: Optional[str] = Field(default=None, alias="CreateTime")
+    description: Optional[str] = Field(default=None, alias="Description")
+    last_update_time: Optional[str] = Field(default=None, alias="LastUpdateTime")
+    long_term_configuration: Optional[LongTermConfigurationForGetMemoryCollection] = (
+        Field(default=None, alias="LongTermConfiguration")
+    )
+    managed: Optional[bool] = Field(default=None, alias="Managed")
+    memory_id: Optional[str] = Field(default=None, alias="MemoryId")
+    name: Optional[str] = Field(default=None, alias="Name")
+    project_name: Optional[str] = Field(default=None, alias="ProjectName")
+    provider_collection_id: Optional[str] = Field(
+        default=None, alias="ProviderCollectionId"
+    )
+    provider_type: Optional[str] = Field(default=None, alias="ProviderType")
+    region: Optional[str] = Field(default=None, alias="Region")
+    status: Optional[str] = Field(default=None, alias="Status")
+    tags: Optional[list[TagsForGetMemoryCollection]] = Field(default=None, alias="Tags")
+    trn: Optional[str] = Field(default=None, alias="Trn")
+    vpc_config: Optional[VpcConfigForGetMemoryCollection] = Field(
+        default=None, alias="VpcConfig"
+    )
 
 
 # GetMemoryConnectionInfo - Request
@@ -261,112 +324,46 @@ class ListMemoryCollectionsResponse(MemoryBaseModel):
         default=None, alias="Memories"
     )
     next_token: Optional[str] = Field(default=None, alias="NextToken")
-    page_number: Optional[int] = Field(default=None, alias="PageNumber")
-    page_size: Optional[int] = Field(default=None, alias="PageSize")
-    total_count: Optional[int] = Field(default=None, alias="TotalCount")
 
 
-# AddMemoryCollection - Request
-class CollectionsItemForAddMemoryCollection(MemoryBaseModel):
-    provider_collection_id: str = Field(..., alias="ProviderCollectionId")
-    description: Optional[str] = Field(default=None, alias="Description")
-    name: Optional[str] = Field(default=None, alias="Name")
-    project_name: Optional[str] = Field(default=None, alias="ProjectName")
-    provider_type: Optional[str] = Field(default=None, alias="ProviderType")
-
-
-class AddMemoryCollectionRequest(MemoryBaseModel):
-    collections: Optional[list[CollectionsItemForAddMemoryCollection]] = Field(
-        default=None, alias="Collections"
-    )
-
-
-# AddMemoryCollection - Response
-class AddMemoryCollectionResponse(MemoryBaseModel):
-    collections: Optional[list[CollectionsForAddMemoryCollection]] = Field(
-        default=None, alias="Collections"
-    )
-
-
-# GetMemoryCollection - Request
-class GetMemoryCollectionRequest(MemoryBaseModel):
-    memory_id: str = Field(..., alias="MemoryId")
-
-
-# GetMemoryCollection - Response
-class GetMemoryCollectionResponse(MemoryBaseModel):
-    associated_runtimes: Optional[list[AssociatedRuntimesForGetMemoryCollection]] = (
-        Field(default=None, alias="AssociatedRuntimes")
-    )
-    create_time: Optional[str] = Field(default=None, alias="CreateTime")
-    description: Optional[str] = Field(default=None, alias="Description")
-    last_update_time: Optional[str] = Field(default=None, alias="LastUpdateTime")
-    long_term_configuration: Optional[LongTermConfigurationForGetMemoryCollection] = (
-        Field(default=None, alias="LongTermConfiguration")
-    )
-    managed: Optional[bool] = Field(default=None, alias="Managed")
-    memory_id: Optional[str] = Field(default=None, alias="MemoryId")
-    name: Optional[str] = Field(default=None, alias="Name")
-    project_name: Optional[str] = Field(default=None, alias="ProjectName")
-    provider_collection_id: Optional[str] = Field(
-        default=None, alias="ProviderCollectionId"
-    )
-    provider_type: Optional[str] = Field(default=None, alias="ProviderType")
-    region: Optional[str] = Field(default=None, alias="Region")
-    status: Optional[str] = Field(default=None, alias="Status")
-    tags: Optional[list[TagsForGetMemoryCollection]] = Field(default=None, alias="Tags")
-    trn: Optional[str] = Field(default=None, alias="Trn")
-    vpc_config: Optional[VpcConfigForGetMemoryCollection] = Field(
-        default=None, alias="VpcConfig"
-    )
-
-
-# CreateMemoryCollection - Request
-class LongTermForCreateMemoryCollection(MemoryBaseModel):
-    strategies: Optional[list[LongTermStrategiesItemForCreateMemoryCollection]] = Field(
+# UpdateMemoryCollection - Request
+class LongTermForUpdateMemoryCollection(MemoryBaseModel):
+    strategies: Optional[list[LongTermStrategiesItemForUpdateMemoryCollection]] = Field(
         default=None, alias="Strategies"
     )
 
 
-class VpcForCreateMemoryCollection(MemoryBaseModel):
-    vpc_id: str = Field(..., alias="VpcId")
+class VpcForUpdateMemoryCollection(MemoryBaseModel):
     subnet_ids: Optional[list[str]] = Field(default=None, alias="SubnetIds")
+    vpc_id: str = Field(..., alias="VpcId")
 
 
-class LongTermStrategiesItemForCreateMemoryCollection(MemoryBaseModel):
-    name: str = Field(..., alias="Name")
-    type: str = Field(..., alias="Type")
+class LongTermStrategiesItemForUpdateMemoryCollection(MemoryBaseModel):
     custom_extraction_instructions: Optional[str] = Field(
         default=None, alias="CustomExtractionInstructions"
     )
-
-
-class TagsItemForCreateMemoryCollection(MemoryBaseModel):
-    key: str = Field(..., alias="Key")
-    value: Optional[str] = Field(default=None, alias="Value")
-
-
-class CreateMemoryCollectionRequest(MemoryBaseModel):
-    description: Optional[str] = Field(default=None, alias="Description")
     name: str = Field(..., alias="Name")
-    project_name: Optional[str] = Field(default=None, alias="ProjectName")
-    provider_type: Optional[str] = Field(default=None, alias="ProviderType")
-    long_term_configuration: Optional[LongTermForCreateMemoryCollection] = Field(
+    type: str = Field(..., alias="Type")
+
+
+class UpdateMemoryCollectionRequest(MemoryBaseModel):
+    description: Optional[str] = Field(default=None, alias="Description")
+    memory_id: str = Field(..., alias="MemoryId")
+    long_term_configuration: Optional[LongTermForUpdateMemoryCollection] = Field(
         default=None, alias="LongTermConfiguration"
     )
-    vpc_config: Optional[VpcForCreateMemoryCollection] = Field(
+    vpc_config: Optional[VpcForUpdateMemoryCollection] = Field(
         default=None, alias="VpcConfig"
     )
-    tags: Optional[list[TagsItemForCreateMemoryCollection]] = Field(
-        default=None, alias="Tags"
-    )
 
 
-# CreateMemoryCollection - Response
-class CreateMemoryCollectionResponse(MemoryBaseModel):
+# UpdateMemoryCollection - Response
+class UpdateMemoryCollectionResponse(MemoryBaseModel):
+    long_term_configuration: Optional[
+        LongTermConfigurationForUpdateMemoryCollection
+    ] = Field(default=None, alias="LongTermConfiguration")
     memory_id: Optional[str] = Field(default=None, alias="MemoryId")
     provider_collection_id: Optional[str] = Field(
         default=None, alias="ProviderCollectionId"
     )
     provider_type: Optional[str] = Field(default=None, alias="ProviderType")
-    status: Optional[str] = Field(default=None, alias="Status")

@@ -28,115 +28,9 @@ class MCPBaseModel(BaseModel):
 
 
 # Data Types
-class CustomJwtAuthorizerForListMCPToolsets(MCPBaseModel):
-    allowed_clients: Optional[list[str]] = Field(default=None, alias="AllowedClients")
-    discovery_url: Optional[str] = Field(default=None, alias="DiscoveryUrl")
-
-
-class ApiKeysForListMCPToolsets(MCPBaseModel):
+class ApiKeysForGetMCPService(MCPBaseModel):
     key: Optional[str] = Field(default=None, alias="Key")
     name: Optional[str] = Field(default=None, alias="Name")
-
-
-class KeyAuthForListMCPToolsets(MCPBaseModel):
-    api_key_location: Optional[str] = Field(default=None, alias="ApiKeyLocation")
-    api_keys: Optional[list[ApiKeysForListMCPToolsets]] = Field(
-        default=None, alias="ApiKeys"
-    )
-    parameter: Optional[str] = Field(default=None, alias="Parameter")
-
-
-class AuthorizerForListMCPToolsets(MCPBaseModel):
-    custom_jwt_authorizer: Optional[CustomJwtAuthorizerForListMCPToolsets] = Field(
-        default=None, alias="CustomJwtAuthorizer"
-    )
-    key_auth: Optional[KeyAuthForListMCPToolsets] = Field(default=None, alias="KeyAuth")
-
-
-class AuthorizerConfigurationForListMCPToolsets(MCPBaseModel):
-    authorizer: Optional[AuthorizerForListMCPToolsets] = Field(
-        default=None, alias="Authorizer"
-    )
-    authorizer_type: Optional[str] = Field(default=None, alias="AuthorizerType")
-
-
-class VpcConfigurationForListMCPToolsets(MCPBaseModel):
-    security_group_ids: Optional[list[str]] = Field(
-        default=None, alias="SecurityGroupIds"
-    )
-    subnet_ids: Optional[list[str]] = Field(default=None, alias="SubnetIds")
-    vpc_id: Optional[str] = Field(default=None, alias="VpcId")
-
-
-class NetworkConfigurationsForListMCPToolsets(MCPBaseModel):
-    endpoint: Optional[str] = Field(default=None, alias="Endpoint")
-    network_type: Optional[str] = Field(default=None, alias="NetworkType")
-    vpc_configuration: Optional[VpcConfigurationForListMCPToolsets] = Field(
-        default=None, alias="VpcConfiguration"
-    )
-
-
-class ProtocolConfigurationForListMCPToolsets(MCPBaseModel):
-    protocol_convert_configuration: Optional[str] = Field(
-        default=None, alias="ProtocolConvertConfiguration"
-    )
-
-
-class MCPServicesForListMCPToolsets(MCPBaseModel):
-    created_at: Optional[str] = Field(default=None, alias="CreatedAt")
-    mcp_service_id: Optional[str] = Field(default=None, alias="MCPServiceId")
-    name: Optional[str] = Field(default=None, alias="Name")
-    network_configurations: Optional[list[NetworkConfigurationsForListMCPToolsets]] = (
-        Field(default=None, alias="NetworkConfigurations")
-    )
-    path: Optional[str] = Field(default=None, alias="Path")
-    project_name: Optional[str] = Field(default=None, alias="ProjectName")
-    protocol_configuration: Optional[ProtocolConfigurationForListMCPToolsets] = Field(
-        default=None, alias="ProtocolConfiguration"
-    )
-    protocol_type: Optional[str] = Field(default=None, alias="ProtocolType")
-    status: Optional[str] = Field(default=None, alias="Status")
-    updated_at: Optional[str] = Field(default=None, alias="UpdatedAt")
-
-
-class TagsForListMCPToolsets(MCPBaseModel):
-    key: Optional[str] = Field(default=None, alias="Key")
-    value: Optional[str] = Field(default=None, alias="Value")
-
-
-class MCPToolsetsForListMCPToolsets(MCPBaseModel):
-    authorizer_configuration: Optional[AuthorizerConfigurationForListMCPToolsets] = (
-        Field(default=None, alias="AuthorizerConfiguration")
-    )
-    created_at: Optional[str] = Field(default=None, alias="CreatedAt")
-    mcp_services: Optional[list[MCPServicesForListMCPToolsets]] = Field(
-        default=None, alias="MCPServices"
-    )
-    mcp_toolset_id: Optional[str] = Field(default=None, alias="MCPToolsetId")
-    name: Optional[str] = Field(default=None, alias="Name")
-    network_configurations: Optional[list[NetworkConfigurationsForListMCPToolsets]] = (
-        Field(default=None, alias="NetworkConfigurations")
-    )
-    path: Optional[str] = Field(default=None, alias="Path")
-    project_name: Optional[str] = Field(default=None, alias="ProjectName")
-    status: Optional[str] = Field(default=None, alias="Status")
-    tags: Optional[list[TagsForListMCPToolsets]] = Field(default=None, alias="Tags")
-    updated_at: Optional[str] = Field(default=None, alias="UpdatedAt")
-
-
-class MCPServiceToolsForListMCPTools(MCPBaseModel):
-    mcp_service_id: Optional[str] = Field(default=None, alias="MCPServiceId")
-    tools: Optional[str] = Field(default=None, alias="Tools")
-
-
-class AssociatedRuntimesForGetMCPToolset(MCPBaseModel):
-    id: Optional[str] = Field(default=None, alias="Id")
-    name: Optional[str] = Field(default=None, alias="Name")
-
-
-class CustomJwtAuthorizerForGetMCPToolset(MCPBaseModel):
-    allowed_clients: Optional[list[str]] = Field(default=None, alias="AllowedClients")
-    discovery_url: Optional[str] = Field(default=None, alias="DiscoveryUrl")
 
 
 class ApiKeysForGetMCPToolset(MCPBaseModel):
@@ -144,19 +38,14 @@ class ApiKeysForGetMCPToolset(MCPBaseModel):
     name: Optional[str] = Field(default=None, alias="Name")
 
 
-class KeyAuthForGetMCPToolset(MCPBaseModel):
-    api_key_location: Optional[str] = Field(default=None, alias="ApiKeyLocation")
-    api_keys: Optional[list[ApiKeysForGetMCPToolset]] = Field(
-        default=None, alias="ApiKeys"
-    )
-    parameter: Optional[str] = Field(default=None, alias="Parameter")
+class ApiKeysForListMCPToolsets(MCPBaseModel):
+    key: Optional[str] = Field(default=None, alias="Key")
+    name: Optional[str] = Field(default=None, alias="Name")
 
 
-class AuthorizerForGetMCPToolset(MCPBaseModel):
-    custom_jwt_authorizer: Optional[CustomJwtAuthorizerForGetMCPToolset] = Field(
-        default=None, alias="CustomJwtAuthorizer"
-    )
-    key_auth: Optional[KeyAuthForGetMCPToolset] = Field(default=None, alias="KeyAuth")
+class AssociatedRuntimesForGetMCPToolset(MCPBaseModel):
+    id: Optional[str] = Field(default=None, alias="Id")
+    name: Optional[str] = Field(default=None, alias="Name")
 
 
 class AuthorizerConfigurationForGetMCPToolset(MCPBaseModel):
@@ -166,155 +55,33 @@ class AuthorizerConfigurationForGetMCPToolset(MCPBaseModel):
     authorizer_type: Optional[str] = Field(default=None, alias="AuthorizerType")
 
 
-class VpcConfigurationForGetMCPToolset(MCPBaseModel):
-    subnet_ids: Optional[list[str]] = Field(default=None, alias="SubnetIds")
-    vpc_id: Optional[str] = Field(default=None, alias="VpcId")
-
-
-class NetworkConfigurationsForGetMCPToolset(MCPBaseModel):
-    endpoint: Optional[str] = Field(default=None, alias="Endpoint")
-    network_type: Optional[str] = Field(default=None, alias="NetworkType")
-    vpc_configuration: Optional[VpcConfigurationForGetMCPToolset] = Field(
-        default=None, alias="VpcConfiguration"
+class AuthorizerConfigurationForListMCPToolsets(MCPBaseModel):
+    authorizer: Optional[AuthorizerForListMCPToolsets] = Field(
+        default=None, alias="Authorizer"
     )
+    authorizer_type: Optional[str] = Field(default=None, alias="AuthorizerType")
 
 
-class ProtocolConfigurationForGetMCPToolset(MCPBaseModel):
-    protocol_convert_configuration: Optional[str] = Field(
-        default=None, alias="ProtocolConvertConfiguration"
+class AuthorizerForGetMCPServiceForInboundAuthorizerConfiguration(MCPBaseModel):
+    key_auth: Optional[KeyAuthForGetMCPService] = Field(default=None, alias="KeyAuth")
+
+
+class AuthorizerForGetMCPServiceForOutboundAuthorizerConfiguration(MCPBaseModel):
+    key_auth: Optional[KeyAuthForGetMCPService] = Field(default=None, alias="KeyAuth")
+
+
+class AuthorizerForGetMCPToolset(MCPBaseModel):
+    custom_jwt_authorizer: Optional[CustomJwtAuthorizerForGetMCPToolset] = Field(
+        default=None, alias="CustomJwtAuthorizer"
     )
+    key_auth: Optional[KeyAuthForGetMCPToolset] = Field(default=None, alias="KeyAuth")
 
 
-class TagsForGetMCPToolset(MCPBaseModel):
-    key: Optional[str] = Field(default=None, alias="Key")
-    value: Optional[str] = Field(default=None, alias="Value")
-
-
-class MCPServicesForGetMCPToolset(MCPBaseModel):
-    created_at: Optional[str] = Field(default=None, alias="CreatedAt")
-    mcp_service_id: Optional[str] = Field(default=None, alias="MCPServiceId")
-    name: Optional[str] = Field(default=None, alias="Name")
-    network_configurations: Optional[list[NetworkConfigurationsForGetMCPToolset]] = (
-        Field(default=None, alias="NetworkConfigurations")
+class AuthorizerForListMCPToolsets(MCPBaseModel):
+    custom_jwt_authorizer: Optional[CustomJwtAuthorizerForListMCPToolsets] = Field(
+        default=None, alias="CustomJwtAuthorizer"
     )
-    path: Optional[str] = Field(default=None, alias="Path")
-    project_name: Optional[str] = Field(default=None, alias="ProjectName")
-    protocol_configuration: Optional[ProtocolConfigurationForGetMCPToolset] = Field(
-        default=None, alias="ProtocolConfiguration"
-    )
-    protocol_type: Optional[str] = Field(default=None, alias="ProtocolType")
-    status: Optional[str] = Field(default=None, alias="Status")
-    tags: Optional[list[TagsForGetMCPToolset]] = Field(default=None, alias="Tags")
-    updated_at: Optional[str] = Field(default=None, alias="UpdatedAt")
-
-
-class MCPToolsetForGetMCPToolset(MCPBaseModel):
-    associated_runtimes: Optional[list[AssociatedRuntimesForGetMCPToolset]] = Field(
-        default=None, alias="AssociatedRuntimes"
-    )
-    authorizer_configuration: Optional[AuthorizerConfigurationForGetMCPToolset] = Field(
-        default=None, alias="AuthorizerConfiguration"
-    )
-    created_at: Optional[str] = Field(default=None, alias="CreatedAt")
-    mcp_services: Optional[list[MCPServicesForGetMCPToolset]] = Field(
-        default=None, alias="MCPServices"
-    )
-    mcp_toolset_id: Optional[str] = Field(default=None, alias="MCPToolsetId")
-    name: Optional[str] = Field(default=None, alias="Name")
-    network_configurations: Optional[list[NetworkConfigurationsForGetMCPToolset]] = (
-        Field(default=None, alias="NetworkConfigurations")
-    )
-    path: Optional[str] = Field(default=None, alias="Path")
-    project_name: Optional[str] = Field(default=None, alias="ProjectName")
-    status: Optional[str] = Field(default=None, alias="Status")
-    tags: Optional[list[TagsForGetMCPToolset]] = Field(default=None, alias="Tags")
-    updated_at: Optional[str] = Field(default=None, alias="UpdatedAt")
-
-
-class VpcConfigurationForListMCPServices(MCPBaseModel):
-    security_group_ids: Optional[list[str]] = Field(
-        default=None, alias="SecurityGroupIds"
-    )
-    subnet_ids: Optional[list[str]] = Field(default=None, alias="SubnetIds")
-    vpc_id: Optional[str] = Field(default=None, alias="VpcId")
-
-
-class NetworkConfigurationsForListMCPServices(MCPBaseModel):
-    endpoint: Optional[str] = Field(default=None, alias="Endpoint")
-    network_type: Optional[str] = Field(default=None, alias="NetworkType")
-    vpc_configuration: Optional[VpcConfigurationForListMCPServices] = Field(
-        default=None, alias="VpcConfiguration"
-    )
-
-
-class ProtocolConfigurationForListMCPServices(MCPBaseModel):
-    protocol_convert_configuration: Optional[str] = Field(
-        default=None, alias="ProtocolConvertConfiguration"
-    )
-
-
-class TagsForListMCPServices(MCPBaseModel):
-    key: Optional[str] = Field(default=None, alias="Key")
-    value: Optional[str] = Field(default=None, alias="Value")
-
-
-class MCPServicesForListMCPServices(MCPBaseModel):
-    created_at: Optional[str] = Field(default=None, alias="CreatedAt")
-    mcp_service_id: Optional[str] = Field(default=None, alias="MCPServiceId")
-    name: Optional[str] = Field(default=None, alias="Name")
-    network_configurations: Optional[list[NetworkConfigurationsForListMCPServices]] = (
-        Field(default=None, alias="NetworkConfigurations")
-    )
-    path: Optional[str] = Field(default=None, alias="Path")
-    project_name: Optional[str] = Field(default=None, alias="ProjectName")
-    protocol_configuration: Optional[ProtocolConfigurationForListMCPServices] = Field(
-        default=None, alias="ProtocolConfiguration"
-    )
-    protocol_type: Optional[str] = Field(default=None, alias="ProtocolType")
-    status: Optional[str] = Field(default=None, alias="Status")
-    tags: Optional[list[TagsForListMCPServices]] = Field(default=None, alias="Tags")
-    updated_at: Optional[str] = Field(default=None, alias="UpdatedAt")
-
-
-class CustomConfigurationForGetMCPService(MCPBaseModel):
-    domain: Optional[str] = Field(default=None, alias="Domain")
-    port: Optional[int] = Field(default=None, alias="Port")
-    protocol_type: Optional[str] = Field(default=None, alias="ProtocolType")
-
-
-class EnvsForGetMCPService(MCPBaseModel):
-    key: Optional[str] = Field(default=None, alias="Key")
-    value: Optional[str] = Field(default=None, alias="Value")
-
-
-class PrivatePackageForGetMCPService(MCPBaseModel):
-    command: Optional[str] = Field(default=None, alias="Command")
-    envs: Optional[list[EnvsForGetMCPService]] = Field(default=None, alias="Envs")
-    image_url: Optional[str] = Field(default=None, alias="ImageUrl")
-
-
-class PublicPackageForGetMCPService(MCPBaseModel):
-    mcp_type: Optional[str] = Field(default=None, alias="McpType")
-    package_manager_type: Optional[str] = Field(
-        default=None, alias="PackageManagerType"
-    )
-    raw_config: Optional[str] = Field(default=None, alias="RawConfig")
-
-
-class CustomMcpConfigurationForGetMCPService(MCPBaseModel):
-    function_id: Optional[str] = Field(default=None, alias="FunctionId")
-    function_name: Optional[str] = Field(default=None, alias="FunctionName")
-    private_package: Optional[PrivatePackageForGetMCPService] = Field(
-        default=None, alias="PrivatePackage"
-    )
-    public_package: Optional[PublicPackageForGetMCPService] = Field(
-        default=None, alias="PublicPackage"
-    )
-
-
-class FunctionConfigurationForGetMCPService(MCPBaseModel):
-    function_id: Optional[str] = Field(default=None, alias="FunctionId")
-    function_name: Optional[str] = Field(default=None, alias="FunctionName")
+    key_auth: Optional[KeyAuthForListMCPToolsets] = Field(default=None, alias="KeyAuth")
 
 
 class BackendConfigurationForGetMCPService(MCPBaseModel):
@@ -329,14 +96,49 @@ class BackendConfigurationForGetMCPService(MCPBaseModel):
     )
 
 
-class CustomJwtAuthorizerForGetMCPService(MCPBaseModel):
+class CustomConfigurationForGetMCPService(MCPBaseModel):
+    domain: Optional[str] = Field(default=None, alias="Domain")
+    port: Optional[int] = Field(default=None, alias="Port")
+    protocol_type: Optional[str] = Field(default=None, alias="ProtocolType")
+
+
+class CustomJwtAuthorizerForGetMCPToolset(MCPBaseModel):
     allowed_clients: Optional[list[str]] = Field(default=None, alias="AllowedClients")
     discovery_url: Optional[str] = Field(default=None, alias="DiscoveryUrl")
 
 
-class ApiKeysForGetMCPService(MCPBaseModel):
+class CustomJwtAuthorizerForListMCPToolsets(MCPBaseModel):
+    allowed_clients: Optional[list[str]] = Field(default=None, alias="AllowedClients")
+    discovery_url: Optional[str] = Field(default=None, alias="DiscoveryUrl")
+
+
+class CustomMcpConfigurationForGetMCPService(MCPBaseModel):
+    enable_apmplus: Optional[bool] = Field(default=None, alias="EnableApmplus")
+    function_id: Optional[str] = Field(default=None, alias="FunctionId")
+    function_name: Optional[str] = Field(default=None, alias="FunctionName")
+    private_package: Optional[PrivatePackageForGetMCPService] = Field(
+        default=None, alias="PrivatePackage"
+    )
+    public_package: Optional[PublicPackageForGetMCPService] = Field(
+        default=None, alias="PublicPackage"
+    )
+
+
+class EnvsForGetMCPService(MCPBaseModel):
     key: Optional[str] = Field(default=None, alias="Key")
-    name: Optional[str] = Field(default=None, alias="Name")
+    value: Optional[str] = Field(default=None, alias="Value")
+
+
+class FunctionConfigurationForGetMCPService(MCPBaseModel):
+    function_id: Optional[str] = Field(default=None, alias="FunctionId")
+    function_name: Optional[str] = Field(default=None, alias="FunctionName")
+
+
+class InboundAuthorizerConfigurationForGetMCPService(MCPBaseModel):
+    authorizer: Optional[
+        AuthorizerForGetMCPServiceForInboundAuthorizerConfiguration
+    ] = Field(default=None, alias="Authorizer")
+    authorizer_type: Optional[str] = Field(default=None, alias="AuthorizerType")
 
 
 class KeyAuthForGetMCPService(MCPBaseModel):
@@ -347,49 +149,20 @@ class KeyAuthForGetMCPService(MCPBaseModel):
     parameter: Optional[str] = Field(default=None, alias="Parameter")
 
 
-class AuthorizerForGetMCPService(MCPBaseModel):
-    custom_jwt_authorizer: Optional[CustomJwtAuthorizerForGetMCPService] = Field(
-        default=None, alias="CustomJwtAuthorizer"
+class KeyAuthForGetMCPToolset(MCPBaseModel):
+    api_key_location: Optional[str] = Field(default=None, alias="ApiKeyLocation")
+    api_keys: Optional[list[ApiKeysForGetMCPToolset]] = Field(
+        default=None, alias="ApiKeys"
     )
-    key_auth: Optional[KeyAuthForGetMCPService] = Field(default=None, alias="KeyAuth")
+    parameter: Optional[str] = Field(default=None, alias="Parameter")
 
 
-class InboundAuthorizerConfigurationForGetMCPService(MCPBaseModel):
-    authorizer: Optional[AuthorizerForGetMCPService] = Field(
-        default=None, alias="Authorizer"
+class KeyAuthForListMCPToolsets(MCPBaseModel):
+    api_key_location: Optional[str] = Field(default=None, alias="ApiKeyLocation")
+    api_keys: Optional[list[ApiKeysForListMCPToolsets]] = Field(
+        default=None, alias="ApiKeys"
     )
-    authorizer_type: Optional[str] = Field(default=None, alias="AuthorizerType")
-
-
-class VpcConfigurationForGetMCPService(MCPBaseModel):
-    subnet_ids: Optional[list[str]] = Field(default=None, alias="SubnetIds")
-    vpc_id: Optional[str] = Field(default=None, alias="VpcId")
-
-
-class NetworkConfigurationsForGetMCPService(MCPBaseModel):
-    endpoint: Optional[str] = Field(default=None, alias="Endpoint")
-    network_type: Optional[str] = Field(default=None, alias="NetworkType")
-    vpc_configuration: Optional[VpcConfigurationForGetMCPService] = Field(
-        default=None, alias="VpcConfiguration"
-    )
-
-
-class OutboundAuthorizerConfigurationForGetMCPService(MCPBaseModel):
-    authorizer: Optional[AuthorizerForGetMCPService] = Field(
-        default=None, alias="Authorizer"
-    )
-    authorizer_type: Optional[str] = Field(default=None, alias="AuthorizerType")
-
-
-class ProtocolConfigurationForGetMCPService(MCPBaseModel):
-    protocol_convert_configuration: Optional[str] = Field(
-        default=None, alias="ProtocolConvertConfiguration"
-    )
-
-
-class TagsForGetMCPService(MCPBaseModel):
-    key: Optional[str] = Field(default=None, alias="Key")
-    value: Optional[str] = Field(default=None, alias="Value")
+    parameter: Optional[str] = Field(default=None, alias="Parameter")
 
 
 class MCPServiceForGetMCPService(MCPBaseModel):
@@ -420,45 +193,253 @@ class MCPServiceForGetMCPService(MCPBaseModel):
     updated_at: Optional[str] = Field(default=None, alias="UpdatedAt")
 
 
-# UpdateMCPToolset - Request
-class AuthorizerForUpdateMCPToolset(MCPBaseModel):
-    authorizer: Optional[AuthorizerAuthorizerForUpdateMCPToolset] = Field(
-        default=None, alias="Authorizer"
+class MCPServiceToolsForListMCPTools(MCPBaseModel):
+    mcp_service_id: Optional[str] = Field(default=None, alias="MCPServiceId")
+    tools: Optional[str] = Field(default=None, alias="Tools")
+
+
+class MCPServicesForGetMCPToolset(MCPBaseModel):
+    created_at: Optional[str] = Field(default=None, alias="CreatedAt")
+    mcp_service_id: Optional[str] = Field(default=None, alias="MCPServiceId")
+    name: Optional[str] = Field(default=None, alias="Name")
+    network_configurations: Optional[
+        list[NetworkConfigurationsForGetMCPToolsetForMCPServices]
+    ] = Field(default=None, alias="NetworkConfigurations")
+    path: Optional[str] = Field(default=None, alias="Path")
+    project_name: Optional[str] = Field(default=None, alias="ProjectName")
+    protocol_configuration: Optional[ProtocolConfigurationForGetMCPToolset] = Field(
+        default=None, alias="ProtocolConfiguration"
     )
-    authorizer_type: str = Field(..., alias="AuthorizerType")
-
-
-class AuthorizerAuthorizerForUpdateMCPToolset(MCPBaseModel):
-    key_auth: Optional[AuthorizerAuthorizerKeyAuthForUpdateMCPToolset] = Field(
-        default=None, alias="KeyAuth"
+    protocol_type: Optional[str] = Field(default=None, alias="ProtocolType")
+    status: Optional[str] = Field(default=None, alias="Status")
+    tags: Optional[list[TagsForGetMCPToolsetForMCPServices]] = Field(
+        default=None, alias="Tags"
     )
+    updated_at: Optional[str] = Field(default=None, alias="UpdatedAt")
 
 
-class AuthorizerAuthorizerKeyAuthForUpdateMCPToolset(MCPBaseModel):
-    api_keys: Optional[
-        list[AuthorizerAuthorizerKeyAuthApiKeysItemForUpdateMCPToolset]
-    ] = Field(default=None, alias="ApiKeys")
-    api_key_location: Optional[str] = Field(default=None, alias="ApiKeyLocation")
-    parameter: Optional[str] = Field(default=None, alias="Parameter")
+class MCPServicesForListMCPServices(MCPBaseModel):
+    created_at: Optional[str] = Field(default=None, alias="CreatedAt")
+    mcp_service_id: Optional[str] = Field(default=None, alias="MCPServiceId")
+    name: Optional[str] = Field(default=None, alias="Name")
+    network_configurations: Optional[list[NetworkConfigurationsForListMCPServices]] = (
+        Field(default=None, alias="NetworkConfigurations")
+    )
+    path: Optional[str] = Field(default=None, alias="Path")
+    project_name: Optional[str] = Field(default=None, alias="ProjectName")
+    protocol_configuration: Optional[ProtocolConfigurationForListMCPServices] = Field(
+        default=None, alias="ProtocolConfiguration"
+    )
+    protocol_type: Optional[str] = Field(default=None, alias="ProtocolType")
+    status: Optional[str] = Field(default=None, alias="Status")
+    tags: Optional[list[TagsForListMCPServices]] = Field(default=None, alias="Tags")
+    updated_at: Optional[str] = Field(default=None, alias="UpdatedAt")
 
 
-class AuthorizerAuthorizerKeyAuthApiKeysItemForUpdateMCPToolset(MCPBaseModel):
-    name: str = Field(..., alias="Name")
-    key: Optional[str] = Field(default=None, alias="Key")
+class MCPServicesForListMCPToolsets(MCPBaseModel):
+    created_at: Optional[str] = Field(default=None, alias="CreatedAt")
+    mcp_service_id: Optional[str] = Field(default=None, alias="MCPServiceId")
+    name: Optional[str] = Field(default=None, alias="Name")
+    network_configurations: Optional[
+        list[NetworkConfigurationsForListMCPToolsetsForMCPServices]
+    ] = Field(default=None, alias="NetworkConfigurations")
+    path: Optional[str] = Field(default=None, alias="Path")
+    project_name: Optional[str] = Field(default=None, alias="ProjectName")
+    protocol_configuration: Optional[ProtocolConfigurationForListMCPToolsets] = Field(
+        default=None, alias="ProtocolConfiguration"
+    )
+    protocol_type: Optional[str] = Field(default=None, alias="ProtocolType")
+    status: Optional[str] = Field(default=None, alias="Status")
+    updated_at: Optional[str] = Field(default=None, alias="UpdatedAt")
 
 
-class UpdateMCPToolsetRequest(MCPBaseModel):
-    client_token: Optional[str] = Field(default=None, alias="ClientToken")
-    mcp_service_ids: Optional[str] = Field(default=None, alias="MCPServiceIds")
-    mcp_toolset_id: str = Field(..., alias="MCPToolsetId")
-    authorizer_configuration: Optional[AuthorizerForUpdateMCPToolset] = Field(
+class MCPToolsetForGetMCPToolset(MCPBaseModel):
+    associated_runtimes: Optional[list[AssociatedRuntimesForGetMCPToolset]] = Field(
+        default=None, alias="AssociatedRuntimes"
+    )
+    authorizer_configuration: Optional[AuthorizerConfigurationForGetMCPToolset] = Field(
         default=None, alias="AuthorizerConfiguration"
     )
-
-
-# UpdateMCPToolset - Response
-class UpdateMCPToolsetResponse(MCPBaseModel):
+    created_at: Optional[str] = Field(default=None, alias="CreatedAt")
+    mcp_services: Optional[list[MCPServicesForGetMCPToolset]] = Field(
+        default=None, alias="MCPServices"
+    )
     mcp_toolset_id: Optional[str] = Field(default=None, alias="MCPToolsetId")
+    name: Optional[str] = Field(default=None, alias="Name")
+    network_configurations: Optional[
+        list[NetworkConfigurationsForGetMCPToolsetForMCPToolset]
+    ] = Field(default=None, alias="NetworkConfigurations")
+    path: Optional[str] = Field(default=None, alias="Path")
+    project_name: Optional[str] = Field(default=None, alias="ProjectName")
+    status: Optional[str] = Field(default=None, alias="Status")
+    tags: Optional[list[TagsForGetMCPToolsetForMCPToolset]] = Field(
+        default=None, alias="Tags"
+    )
+    updated_at: Optional[str] = Field(default=None, alias="UpdatedAt")
+
+
+class MCPToolsetsForListMCPToolsets(MCPBaseModel):
+    authorizer_configuration: Optional[AuthorizerConfigurationForListMCPToolsets] = (
+        Field(default=None, alias="AuthorizerConfiguration")
+    )
+    created_at: Optional[str] = Field(default=None, alias="CreatedAt")
+    mcp_services: Optional[list[MCPServicesForListMCPToolsets]] = Field(
+        default=None, alias="MCPServices"
+    )
+    mcp_toolset_id: Optional[str] = Field(default=None, alias="MCPToolsetId")
+    name: Optional[str] = Field(default=None, alias="Name")
+    network_configurations: Optional[
+        list[NetworkConfigurationsForListMCPToolsetsForMCPToolsets]
+    ] = Field(default=None, alias="NetworkConfigurations")
+    path: Optional[str] = Field(default=None, alias="Path")
+    project_name: Optional[str] = Field(default=None, alias="ProjectName")
+    status: Optional[str] = Field(default=None, alias="Status")
+    tags: Optional[list[TagsForListMCPToolsets]] = Field(default=None, alias="Tags")
+    updated_at: Optional[str] = Field(default=None, alias="UpdatedAt")
+
+
+class NetworkConfigurationsForGetMCPService(MCPBaseModel):
+    endpoint: Optional[str] = Field(default=None, alias="Endpoint")
+    network_type: Optional[str] = Field(default=None, alias="NetworkType")
+    vpc_configuration: Optional[VpcConfigurationForGetMCPService] = Field(
+        default=None, alias="VpcConfiguration"
+    )
+
+
+class NetworkConfigurationsForGetMCPToolsetForMCPServices(MCPBaseModel):
+    endpoint: Optional[str] = Field(default=None, alias="Endpoint")
+    network_type: Optional[str] = Field(default=None, alias="NetworkType")
+    vpc_configuration: Optional[VpcConfigurationForGetMCPToolset] = Field(
+        default=None, alias="VpcConfiguration"
+    )
+
+
+class NetworkConfigurationsForGetMCPToolsetForMCPToolset(MCPBaseModel):
+    endpoint: Optional[str] = Field(default=None, alias="Endpoint")
+    network_type: Optional[str] = Field(default=None, alias="NetworkType")
+    vpc_configuration: Optional[VpcConfigurationForGetMCPToolset] = Field(
+        default=None, alias="VpcConfiguration"
+    )
+
+
+class NetworkConfigurationsForListMCPServices(MCPBaseModel):
+    endpoint: Optional[str] = Field(default=None, alias="Endpoint")
+    network_type: Optional[str] = Field(default=None, alias="NetworkType")
+    vpc_configuration: Optional[VpcConfigurationForListMCPServices] = Field(
+        default=None, alias="VpcConfiguration"
+    )
+
+
+class NetworkConfigurationsForListMCPToolsetsForMCPServices(MCPBaseModel):
+    endpoint: Optional[str] = Field(default=None, alias="Endpoint")
+    network_type: Optional[str] = Field(default=None, alias="NetworkType")
+    vpc_configuration: Optional[VpcConfigurationForListMCPToolsets] = Field(
+        default=None, alias="VpcConfiguration"
+    )
+
+
+class NetworkConfigurationsForListMCPToolsetsForMCPToolsets(MCPBaseModel):
+    endpoint: Optional[str] = Field(default=None, alias="Endpoint")
+    network_type: Optional[str] = Field(default=None, alias="NetworkType")
+    vpc_configuration: Optional[VpcConfigurationForListMCPToolsets] = Field(
+        default=None, alias="VpcConfiguration"
+    )
+
+
+class OutboundAuthorizerConfigurationForGetMCPService(MCPBaseModel):
+    authorizer: Optional[
+        AuthorizerForGetMCPServiceForOutboundAuthorizerConfiguration
+    ] = Field(default=None, alias="Authorizer")
+    authorizer_type: Optional[str] = Field(default=None, alias="AuthorizerType")
+
+
+class PrivatePackageForGetMCPService(MCPBaseModel):
+    command: Optional[str] = Field(default=None, alias="Command")
+    envs: Optional[list[EnvsForGetMCPService]] = Field(default=None, alias="Envs")
+    image_url: Optional[str] = Field(default=None, alias="ImageUrl")
+
+
+class ProtocolConfigurationForGetMCPService(MCPBaseModel):
+    protocol_convert_configuration: Optional[str] = Field(
+        default=None, alias="ProtocolConvertConfiguration"
+    )
+
+
+class ProtocolConfigurationForGetMCPToolset(MCPBaseModel):
+    protocol_convert_configuration: Optional[str] = Field(
+        default=None, alias="ProtocolConvertConfiguration"
+    )
+
+
+class ProtocolConfigurationForListMCPServices(MCPBaseModel):
+    protocol_convert_configuration: Optional[str] = Field(
+        default=None, alias="ProtocolConvertConfiguration"
+    )
+
+
+class ProtocolConfigurationForListMCPToolsets(MCPBaseModel):
+    protocol_convert_configuration: Optional[str] = Field(
+        default=None, alias="ProtocolConvertConfiguration"
+    )
+
+
+class PublicPackageForGetMCPService(MCPBaseModel):
+    mcp_type: Optional[str] = Field(default=None, alias="McpType")
+    package_manager_type: Optional[str] = Field(
+        default=None, alias="PackageManagerType"
+    )
+    raw_config: Optional[str] = Field(default=None, alias="RawConfig")
+
+
+class TagsForGetMCPService(MCPBaseModel):
+    key: Optional[str] = Field(default=None, alias="Key")
+    value: Optional[str] = Field(default=None, alias="Value")
+
+
+class TagsForGetMCPToolsetForMCPServices(MCPBaseModel):
+    key: Optional[str] = Field(default=None, alias="Key")
+    value: Optional[str] = Field(default=None, alias="Value")
+
+
+class TagsForGetMCPToolsetForMCPToolset(MCPBaseModel):
+    key: Optional[str] = Field(default=None, alias="Key")
+    value: Optional[str] = Field(default=None, alias="Value")
+
+
+class TagsForListMCPServices(MCPBaseModel):
+    key: Optional[str] = Field(default=None, alias="Key")
+    value: Optional[str] = Field(default=None, alias="Value")
+
+
+class TagsForListMCPToolsets(MCPBaseModel):
+    key: Optional[str] = Field(default=None, alias="Key")
+    value: Optional[str] = Field(default=None, alias="Value")
+
+
+class VpcConfigurationForGetMCPService(MCPBaseModel):
+    subnet_ids: Optional[list[str]] = Field(default=None, alias="SubnetIds")
+    vpc_id: Optional[str] = Field(default=None, alias="VpcId")
+
+
+class VpcConfigurationForGetMCPToolset(MCPBaseModel):
+    subnet_ids: Optional[list[str]] = Field(default=None, alias="SubnetIds")
+    vpc_id: Optional[str] = Field(default=None, alias="VpcId")
+
+
+class VpcConfigurationForListMCPServices(MCPBaseModel):
+    security_group_ids: Optional[list[str]] = Field(
+        default=None, alias="SecurityGroupIds"
+    )
+    subnet_ids: Optional[list[str]] = Field(default=None, alias="SubnetIds")
+    vpc_id: Optional[str] = Field(default=None, alias="VpcId")
+
+
+class VpcConfigurationForListMCPToolsets(MCPBaseModel):
+    security_group_ids: Optional[list[str]] = Field(
+        default=None, alias="SecurityGroupIds"
+    )
+    subnet_ids: Optional[list[str]] = Field(default=None, alias="SubnetIds")
+    vpc_id: Optional[str] = Field(default=None, alias="VpcId")
 
 
 # CreateMCPService - Request
@@ -475,9 +456,16 @@ class BackendForCreateMCPService(MCPBaseModel):
 
 
 class BackendCustomForCreateMCPService(MCPBaseModel):
+    tls_settings: Optional[BackendCustomTlsSettingsForCreateMCPService] = Field(
+        default=None, alias="TlsSettings"
+    )
     domain: Optional[str] = Field(default=None, alias="Domain")
     port: Optional[int] = Field(default=None, alias="Port")
     protocol_type: Optional[str] = Field(default=None, alias="ProtocolType")
+
+
+class BackendCustomTlsSettingsForCreateMCPService(MCPBaseModel):
+    tls_mode: str = Field(..., alias="TlsMode")
 
 
 class BackendCustomMcpForCreateMCPService(MCPBaseModel):
@@ -487,6 +475,7 @@ class BackendCustomMcpForCreateMCPService(MCPBaseModel):
     public_package: Optional[BackendCustomMcpPublicPackageForCreateMCPService] = Field(
         default=None, alias="PublicPackage"
     )
+    enable_apmplus: Optional[bool] = Field(default=None, alias="EnableApmplus")
     function_id: Optional[str] = Field(default=None, alias="FunctionId")
     function_name: Optional[str] = Field(default=None, alias="FunctionName")
 
@@ -529,8 +518,8 @@ class InboundAuthorizerAuthorizerForCreateMCPService(MCPBaseModel):
 
 
 class InboundAuthorizerAuthorizerCustomJwtAuthorizerForCreateMCPService(MCPBaseModel):
-    discovery_url: str = Field(..., alias="DiscoveryUrl")
     allowed_clients: Optional[list[str]] = Field(default=None, alias="AllowedClients")
+    discovery_url: str = Field(..., alias="DiscoveryUrl")
 
 
 class InboundAuthorizerAuthorizerKeyAuthForCreateMCPService(MCPBaseModel):
@@ -554,8 +543,8 @@ class NetworkForCreateMCPService(MCPBaseModel):
 
 
 class NetworkVpcForCreateMCPService(MCPBaseModel):
-    vpc_id: str = Field(..., alias="VpcId")
     subnet_ids: Optional[list[str]] = Field(default=None, alias="SubnetIds")
+    vpc_id: str = Field(..., alias="VpcId")
 
 
 class OutboundAuthorizerForCreateMCPService(MCPBaseModel):
@@ -596,13 +585,13 @@ class BackendCustomMcpPrivatePackageEnvsItemForCreateMCPService(MCPBaseModel):
 
 
 class InboundAuthorizerAuthorizerKeyAuthApiKeysItemForCreateMCPService(MCPBaseModel):
-    name: str = Field(..., alias="Name")
     key: Optional[str] = Field(default=None, alias="Key")
+    name: str = Field(..., alias="Name")
 
 
 class OutboundAuthorizerAuthorizerKeyAuthApiKeysItemForCreateMCPService(MCPBaseModel):
-    name: str = Field(..., alias="Name")
     key: Optional[str] = Field(default=None, alias="Key")
+    name: str = Field(..., alias="Name")
 
 
 class TagsItemForCreateMCPService(MCPBaseModel):
@@ -642,55 +631,6 @@ class CreateMCPServiceResponse(MCPBaseModel):
     mcp_service_id: Optional[str] = Field(default=None, alias="MCPServiceId")
 
 
-# ListMCPToolsets - Request
-class FiltersItemForListMCPToolsets(MCPBaseModel):
-    name: Optional[str] = Field(default=None, alias="Name")
-    name_contains: Optional[str] = Field(default=None, alias="NameContains")
-    values: Optional[list[str]] = Field(default=None, alias="Values")
-
-
-class TagFiltersItemForListMCPToolsets(MCPBaseModel):
-    key: Optional[str] = Field(default=None, alias="Key")
-    values: Optional[list[str]] = Field(default=None, alias="Values")
-
-
-class ListMCPToolsetsRequest(MCPBaseModel):
-    max_results: Optional[int] = Field(default=None, alias="MaxResults")
-    next_token: Optional[str] = Field(default=None, alias="NextToken")
-    page_number: Optional[int] = Field(default=None, alias="PageNumber")
-    page_size: Optional[int] = Field(default=None, alias="PageSize")
-    project_name: Optional[str] = Field(default=None, alias="ProjectName")
-    filters: Optional[list[FiltersItemForListMCPToolsets]] = Field(
-        default=None, alias="Filters"
-    )
-    tag_filters: Optional[list[TagFiltersItemForListMCPToolsets]] = Field(
-        default=None, alias="TagFilters"
-    )
-
-
-# ListMCPToolsets - Response
-class ListMCPToolsetsResponse(MCPBaseModel):
-    mcp_toolsets: Optional[list[MCPToolsetsForListMCPToolsets]] = Field(
-        default=None, alias="MCPToolsets"
-    )
-    next_token: Optional[str] = Field(default=None, alias="NextToken")
-    page_number: Optional[int] = Field(default=None, alias="PageNumber")
-    page_size: Optional[int] = Field(default=None, alias="PageSize")
-    total_count: Optional[int] = Field(default=None, alias="TotalCount")
-
-
-# ListMCPTools - Request
-class ListMCPToolsRequest(MCPBaseModel):
-    mcp_toolset_ids: str = Field(..., alias="MCPToolsetIds")
-
-
-# ListMCPTools - Response
-class ListMCPToolsResponse(MCPBaseModel):
-    mcp_service_tools: Optional[list[MCPServiceToolsForListMCPTools]] = Field(
-        default=None, alias="MCPServiceTools"
-    )
-
-
 # CreateMCPToolset - Request
 class AuthorizerForCreateMCPToolset(MCPBaseModel):
     authorizer: Optional[AuthorizerAuthorizerForCreateMCPToolset] = Field(
@@ -709,8 +649,8 @@ class AuthorizerAuthorizerForCreateMCPToolset(MCPBaseModel):
 
 
 class AuthorizerAuthorizerCustomJwtAuthorizerForCreateMCPToolset(MCPBaseModel):
-    discovery_url: str = Field(..., alias="DiscoveryUrl")
     allowed_clients: Optional[list[str]] = Field(default=None, alias="AllowedClients")
+    discovery_url: str = Field(..., alias="DiscoveryUrl")
 
 
 class AuthorizerAuthorizerKeyAuthForCreateMCPToolset(MCPBaseModel):
@@ -734,16 +674,16 @@ class NetworkForCreateMCPToolset(MCPBaseModel):
 
 
 class NetworkVpcForCreateMCPToolset(MCPBaseModel):
-    vpc_id: str = Field(..., alias="VpcId")
     security_group_ids: Optional[list[str]] = Field(
         default=None, alias="SecurityGroupIds"
     )
     subnet_ids: Optional[list[str]] = Field(default=None, alias="SubnetIds")
+    vpc_id: str = Field(..., alias="VpcId")
 
 
 class AuthorizerAuthorizerKeyAuthApiKeysItemForCreateMCPToolset(MCPBaseModel):
-    name: str = Field(..., alias="Name")
     key: Optional[str] = Field(default=None, alias="Key")
+    name: str = Field(..., alias="Name")
 
 
 class TagsItemForCreateMCPToolset(MCPBaseModel):
@@ -773,16 +713,6 @@ class CreateMCPToolsetResponse(MCPBaseModel):
     mcp_toolset_id: Optional[str] = Field(default=None, alias="MCPToolsetId")
 
 
-# GetMCPTools - Request
-class GetMCPToolsRequest(MCPBaseModel):
-    mcp_toolset_id: str = Field(..., alias="MCPToolsetId")
-
-
-# GetMCPTools - Response
-class GetMCPToolsResponse(MCPBaseModel):
-    tools: Optional[str] = Field(default=None, alias="Tools")
-
-
 # DeleteMCPService - Request
 class DeleteMCPServiceRequest(MCPBaseModel):
     mcp_service_id: str = Field(..., alias="MCPServiceId")
@@ -791,6 +721,38 @@ class DeleteMCPServiceRequest(MCPBaseModel):
 # DeleteMCPService - Response
 class DeleteMCPServiceResponse(MCPBaseModel):
     mcp_service_id: Optional[str] = Field(default=None, alias="MCPServiceId")
+
+
+# DeleteMCPToolset - Request
+class DeleteMCPToolsetRequest(MCPBaseModel):
+    mcp_toolset_id: str = Field(..., alias="MCPToolsetId")
+
+
+# DeleteMCPToolset - Response
+class DeleteMCPToolsetResponse(MCPBaseModel):
+    mcp_toolset_id: Optional[str] = Field(default=None, alias="MCPToolsetId")
+
+
+# GetMCPService - Request
+class GetMCPServiceRequest(MCPBaseModel):
+    mcp_service_id: str = Field(..., alias="MCPServiceId")
+
+
+# GetMCPService - Response
+class GetMCPServiceResponse(MCPBaseModel):
+    mcp_service: Optional[MCPServiceForGetMCPService] = Field(
+        default=None, alias="MCPService"
+    )
+
+
+# GetMCPTools - Request
+class GetMCPToolsRequest(MCPBaseModel):
+    mcp_toolset_id: str = Field(..., alias="MCPToolsetId")
+
+
+# GetMCPTools - Response
+class GetMCPToolsResponse(MCPBaseModel):
+    tools: Optional[str] = Field(default=None, alias="Tools")
 
 
 # GetMCPToolset - Request
@@ -837,30 +799,52 @@ class ListMCPServicesResponse(MCPBaseModel):
         default=None, alias="MCPServices"
     )
     next_token: Optional[str] = Field(default=None, alias="NextToken")
+
+
+# ListMCPTools - Request
+class ListMCPToolsRequest(MCPBaseModel):
+    mcp_toolset_ids: str = Field(..., alias="MCPToolsetIds")
+
+
+# ListMCPTools - Response
+class ListMCPToolsResponse(MCPBaseModel):
+    mcp_service_tools: Optional[list[MCPServiceToolsForListMCPTools]] = Field(
+        default=None, alias="MCPServiceTools"
+    )
+
+
+# ListMCPToolsets - Request
+class FiltersItemForListMCPToolsets(MCPBaseModel):
+    name: Optional[str] = Field(default=None, alias="Name")
+    name_contains: Optional[str] = Field(default=None, alias="NameContains")
+    values: Optional[list[str]] = Field(default=None, alias="Values")
+
+
+class TagFiltersItemForListMCPToolsets(MCPBaseModel):
+    key: Optional[str] = Field(default=None, alias="Key")
+    values: Optional[list[str]] = Field(default=None, alias="Values")
+
+
+class ListMCPToolsetsRequest(MCPBaseModel):
+    max_results: Optional[int] = Field(default=None, alias="MaxResults")
+    next_token: Optional[str] = Field(default=None, alias="NextToken")
     page_number: Optional[int] = Field(default=None, alias="PageNumber")
     page_size: Optional[int] = Field(default=None, alias="PageSize")
-    total_count: Optional[int] = Field(default=None, alias="TotalCount")
+    project_name: Optional[str] = Field(default=None, alias="ProjectName")
+    filters: Optional[list[FiltersItemForListMCPToolsets]] = Field(
+        default=None, alias="Filters"
+    )
+    tag_filters: Optional[list[TagFiltersItemForListMCPToolsets]] = Field(
+        default=None, alias="TagFilters"
+    )
 
 
-# DeleteMCPToolset - Request
-class DeleteMCPToolsetRequest(MCPBaseModel):
-    mcp_toolset_id: str = Field(..., alias="MCPToolsetId")
-
-
-# DeleteMCPToolset - Response
-class DeleteMCPToolsetResponse(MCPBaseModel):
-    mcp_toolset_id: Optional[str] = Field(default=None, alias="MCPToolsetId")
-
-
-# UpdateMCPTools - Request
-class UpdateMCPToolsRequest(MCPBaseModel):
-    mcp_service_id: str = Field(..., alias="MCPServiceId")
-    tools: str = Field(..., alias="Tools")
-
-
-# UpdateMCPTools - Response
-class UpdateMCPToolsResponse(MCPBaseModel):
-    mcp_service_id: Optional[str] = Field(default=None, alias="MCPServiceId")
+# ListMCPToolsets - Response
+class ListMCPToolsetsResponse(MCPBaseModel):
+    mcp_toolsets: Optional[list[MCPToolsetsForListMCPToolsets]] = Field(
+        default=None, alias="MCPToolsets"
+    )
+    next_token: Optional[str] = Field(default=None, alias="NextToken")
 
 
 # UpdateMCPService - Request
@@ -877,9 +861,16 @@ class BackendForUpdateMCPService(MCPBaseModel):
 
 
 class BackendCustomForUpdateMCPService(MCPBaseModel):
+    tls_settings: Optional[BackendCustomTlsSettingsForUpdateMCPService] = Field(
+        default=None, alias="TlsSettings"
+    )
     domain: Optional[str] = Field(default=None, alias="Domain")
     port: Optional[int] = Field(default=None, alias="Port")
     protocol_type: Optional[str] = Field(default=None, alias="ProtocolType")
+
+
+class BackendCustomTlsSettingsForUpdateMCPService(MCPBaseModel):
+    tls_mode: str = Field(..., alias="TlsMode")
 
 
 class BackendCustomMcpForUpdateMCPService(MCPBaseModel):
@@ -889,6 +880,7 @@ class BackendCustomMcpForUpdateMCPService(MCPBaseModel):
     public_package: Optional[BackendCustomMcpPublicPackageForUpdateMCPService] = Field(
         default=None, alias="PublicPackage"
     )
+    enable_apmplus: Optional[bool] = Field(default=None, alias="EnableApmplus")
     function_id: Optional[str] = Field(default=None, alias="FunctionId")
     function_name: Optional[str] = Field(default=None, alias="FunctionName")
 
@@ -922,9 +914,17 @@ class InboundAuthorizerForUpdateMCPService(MCPBaseModel):
 
 
 class InboundAuthorizerAuthorizerForUpdateMCPService(MCPBaseModel):
+    custom_jwt_authorizer: Optional[
+        InboundAuthorizerAuthorizerCustomJwtAuthorizerForUpdateMCPService
+    ] = Field(default=None, alias="CustomJwtAuthorizer")
     key_auth: Optional[InboundAuthorizerAuthorizerKeyAuthForUpdateMCPService] = Field(
         default=None, alias="KeyAuth"
     )
+
+
+class InboundAuthorizerAuthorizerCustomJwtAuthorizerForUpdateMCPService(MCPBaseModel):
+    allowed_clients: Optional[list[str]] = Field(default=None, alias="AllowedClients")
+    discovery_url: str = Field(..., alias="DiscoveryUrl")
 
 
 class InboundAuthorizerAuthorizerKeyAuthForUpdateMCPService(MCPBaseModel):
@@ -962,13 +962,13 @@ class BackendCustomMcpPrivatePackageEnvsItemForUpdateMCPService(MCPBaseModel):
 
 
 class InboundAuthorizerAuthorizerKeyAuthApiKeysItemForUpdateMCPService(MCPBaseModel):
-    name: str = Field(..., alias="Name")
     key: Optional[str] = Field(default=None, alias="Key")
+    name: str = Field(..., alias="Name")
 
 
 class OutboundAuthorizerAuthorizerKeyAuthApiKeysItemForUpdateMCPService(MCPBaseModel):
-    name: str = Field(..., alias="Name")
     key: Optional[str] = Field(default=None, alias="Key")
+    name: str = Field(..., alias="Name")
 
 
 class UpdateMCPServiceRequest(MCPBaseModel):
@@ -990,13 +990,53 @@ class UpdateMCPServiceResponse(MCPBaseModel):
     mcp_service_id: Optional[str] = Field(default=None, alias="MCPServiceId")
 
 
-# GetMCPService - Request
-class GetMCPServiceRequest(MCPBaseModel):
+# UpdateMCPTools - Request
+class UpdateMCPToolsRequest(MCPBaseModel):
     mcp_service_id: str = Field(..., alias="MCPServiceId")
+    tools: str = Field(..., alias="Tools")
 
 
-# GetMCPService - Response
-class GetMCPServiceResponse(MCPBaseModel):
-    mcp_service: Optional[MCPServiceForGetMCPService] = Field(
-        default=None, alias="MCPService"
+# UpdateMCPTools - Response
+class UpdateMCPToolsResponse(MCPBaseModel):
+    mcp_service_id: Optional[str] = Field(default=None, alias="MCPServiceId")
+
+
+# UpdateMCPToolset - Request
+class AuthorizerForUpdateMCPToolset(MCPBaseModel):
+    authorizer: Optional[AuthorizerAuthorizerForUpdateMCPToolset] = Field(
+        default=None, alias="Authorizer"
     )
+    authorizer_type: str = Field(..., alias="AuthorizerType")
+
+
+class AuthorizerAuthorizerForUpdateMCPToolset(MCPBaseModel):
+    key_auth: Optional[AuthorizerAuthorizerKeyAuthForUpdateMCPToolset] = Field(
+        default=None, alias="KeyAuth"
+    )
+
+
+class AuthorizerAuthorizerKeyAuthForUpdateMCPToolset(MCPBaseModel):
+    api_keys: Optional[
+        list[AuthorizerAuthorizerKeyAuthApiKeysItemForUpdateMCPToolset]
+    ] = Field(default=None, alias="ApiKeys")
+    api_key_location: Optional[str] = Field(default=None, alias="ApiKeyLocation")
+    parameter: Optional[str] = Field(default=None, alias="Parameter")
+
+
+class AuthorizerAuthorizerKeyAuthApiKeysItemForUpdateMCPToolset(MCPBaseModel):
+    key: Optional[str] = Field(default=None, alias="Key")
+    name: str = Field(..., alias="Name")
+
+
+class UpdateMCPToolsetRequest(MCPBaseModel):
+    client_token: Optional[str] = Field(default=None, alias="ClientToken")
+    mcp_service_ids: Optional[str] = Field(default=None, alias="MCPServiceIds")
+    mcp_toolset_id: str = Field(..., alias="MCPToolsetId")
+    authorizer_configuration: Optional[AuthorizerForUpdateMCPToolset] = Field(
+        default=None, alias="AuthorizerConfiguration"
+    )
+
+
+# UpdateMCPToolset - Response
+class UpdateMCPToolsetResponse(MCPBaseModel):
+    mcp_toolset_id: Optional[str] = Field(default=None, alias="MCPToolsetId")
