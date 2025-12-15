@@ -171,6 +171,11 @@ class HybridStrategyConfig(AutoSerializableMixin):
         metadata={
             "description": "CR instance type when auto-creating (Micro or Enterprise)",
             "icon": "⚙️",
+            "choices": [
+                {"value": "Micro", "description": "Micro"},
+                {"value": "Enterprise", "description": "Enterprise"},
+            ],
+            "hidden": True,
         },
     )
     cr_image_full_url: str = field(
@@ -244,6 +249,22 @@ class HybridStrategyConfig(AutoSerializableMixin):
         metadata={
             "description": "OIDC Discovery URL for JWT validation (required when auth_type is custom_jwt)",
             "examples": "https://userpool-xxx.userpool.auth.id.cn-beijing.volces.com/.well-known/openid-configuration",
+            "prompt_condition": {
+                "depends_on": "runtime_auth_type",
+                "values": [AUTH_TYPE_CUSTOM_JWT],
+            },
+            "validation": {
+                "type": "conditional",
+                "depends_on": "runtime_auth_type",
+                "rules": {
+                    AUTH_TYPE_CUSTOM_JWT: {
+                        "required": True,
+                        "pattern": r"^https://.+",
+                        "hint": "(must be a valid https URL)",
+                        "message": "must be a valid https URL",
+                    }
+                },
+            },
         },
     )
     runtime_jwt_allowed_clients: List[str] = field(
@@ -251,6 +272,10 @@ class HybridStrategyConfig(AutoSerializableMixin):
         metadata={
             "description": "Allowed OAuth2 client IDs (required when auth_type is custom_jwt)",
             "examples": "['fa99ec54-8a1c-49b2-9a9e-3f3ba31d9a33']",
+            "prompt_condition": {
+                "depends_on": "runtime_auth_type",
+                "values": [AUTH_TYPE_CUSTOM_JWT],
+            },
         },
     )
     runtime_endpoint: str = field(
@@ -371,6 +396,11 @@ class CloudStrategyConfig(AutoSerializableMixin):
         metadata={
             "description": "CR instance type when auto-creating (Micro or Enterprise)",
             "icon": "⚙️",
+            "choices": [
+                {"value": "Micro", "description": "Micro"},
+                {"value": "Enterprise", "description": "Enterprise"},
+            ],
+            "hidden": True,
         },
     )
     cr_region: str = field(
@@ -468,6 +498,22 @@ class CloudStrategyConfig(AutoSerializableMixin):
         metadata={
             "description": "OIDC Discovery URL for JWT validation (required when auth_type is custom_jwt)",
             "examples": "https://userpool-xxx.userpool.auth.id.cn-beijing.volces.com/.well-known/openid-configuration",
+            "prompt_condition": {
+                "depends_on": "runtime_auth_type",
+                "values": [AUTH_TYPE_CUSTOM_JWT],
+            },
+            "validation": {
+                "type": "conditional",
+                "depends_on": "runtime_auth_type",
+                "rules": {
+                    AUTH_TYPE_CUSTOM_JWT: {
+                        "required": True,
+                        "pattern": r"^https://.+",
+                        "hint": "(must be a valid https URL)",
+                        "message": "must be a valid https URL",
+                    }
+                },
+            },
         },
     )
     runtime_jwt_allowed_clients: List[str] = field(
@@ -475,6 +521,10 @@ class CloudStrategyConfig(AutoSerializableMixin):
         metadata={
             "description": "Allowed OAuth2 client IDs (required when auth_type is custom_jwt)",
             "examples": "['fa99ec54-8a1c-49b2-9a9e-3f3ba31d9a33']",
+            "prompt_condition": {
+                "depends_on": "runtime_auth_type",
+                "values": [AUTH_TYPE_CUSTOM_JWT],
+            },
         },
     )
     runtime_endpoint: str = field(

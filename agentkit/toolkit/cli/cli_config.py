@@ -119,6 +119,11 @@ def config_command(
     cr_repo_name: Optional[str] = typer.Option(
         None, "--cr_repo_name", "--ve_cr_repo_name", help="CR repository name"
     ),
+    cr_auto_create_instance_type: Optional[str] = typer.Option(
+        None,
+        "--cr_auto_create_instance_type",
+        help="CR instance type when auto-creating: Micro/Enterprise",
+    ),
     # Runtime configuration parameters
     runtime_name: Optional[str] = typer.Option(
         None, "--runtime_name", "--ve_runtime_name", help="Runtime instance name"
@@ -134,6 +139,21 @@ def config_command(
         "--runtime_apikey_name",
         "--ve_runtime_apikey_name",
         help="Runtime API key secret name",
+    ),
+    runtime_auth_type: Optional[str] = typer.Option(
+        None,
+        "--runtime_auth_type",
+        help="Runtime authentication type: key_auth/custom_jwt",
+    ),
+    runtime_jwt_discovery_url: Optional[str] = typer.Option(
+        None,
+        "--runtime_jwt_discovery_url",
+        help="OIDC Discovery URL when runtime_auth_type is custom_jwt",
+    ),
+    runtime_jwt_allowed_clients: Optional[List[str]] = typer.Option(
+        None,
+        "--runtime_jwt_allowed_clients",
+        help="Allowed OAuth2 client IDs when runtime_auth_type is custom_jwt (can be used multiple times)",
     ),
 ):
     """Configure AgentKit (supports interactive and non-interactive modes).
@@ -227,9 +247,13 @@ def config_command(
             cr_instance_name=cr_instance_name,
             cr_namespace_name=cr_namespace_name,
             cr_repo_name=cr_repo_name,
+            cr_auto_create_instance_type=cr_auto_create_instance_type,
             runtime_name=runtime_name,
             runtime_role_name=runtime_role_name,
             runtime_apikey_name=runtime_apikey_name,
+            runtime_auth_type=runtime_auth_type,
+            runtime_jwt_discovery_url=runtime_jwt_discovery_url,
+            runtime_jwt_allowed_clients=runtime_jwt_allowed_clients,
         )
 
         has_cli_params = ConfigParamHandler.has_cli_params(cli_params)

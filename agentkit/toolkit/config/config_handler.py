@@ -81,9 +81,13 @@ class ConfigParamHandler:
         cr_instance_name: Optional[str],
         cr_namespace_name: Optional[str],
         cr_repo_name: Optional[str],
+        cr_auto_create_instance_type: Optional[str],
         runtime_name: Optional[str],
         runtime_role_name: Optional[str],
         runtime_apikey_name: Optional[str],
+        runtime_auth_type: Optional[str],
+        runtime_jwt_discovery_url: Optional[str],
+        runtime_jwt_allowed_clients: Optional[List[str]],
     ) -> Dict[str, Any]:
         """Collect all CLI parameters.
 
@@ -144,12 +148,22 @@ class ConfigParamHandler:
             strategy_params["cr_namespace_name"] = cr_namespace_name
         if cr_repo_name is not None:
             strategy_params["cr_repo_name"] = cr_repo_name
+        if cr_auto_create_instance_type is not None:
+            strategy_params["cr_auto_create_instance_type"] = (
+                cr_auto_create_instance_type
+            )
         if runtime_name is not None:
             strategy_params["runtime_name"] = runtime_name
         if runtime_role_name is not None:
             strategy_params["runtime_role_name"] = runtime_role_name
         if runtime_apikey_name is not None:
             strategy_params["runtime_apikey_name"] = runtime_apikey_name
+        if runtime_auth_type is not None:
+            strategy_params["runtime_auth_type"] = runtime_auth_type
+        if runtime_jwt_discovery_url is not None:
+            strategy_params["runtime_jwt_discovery_url"] = runtime_jwt_discovery_url
+        if runtime_jwt_allowed_clients is not None:
+            strategy_params["runtime_jwt_allowed_clients"] = runtime_jwt_allowed_clients
 
         return {"common": common_params, "strategy": strategy_params}
 
@@ -229,6 +243,34 @@ class NonInteractiveConfigHandler:
                         new_strategy_config["runtime_envs"] = value
                 else:
                     new_strategy_config[key] = value
+
+            strategy_obj = None
+            if strategy_name == "local":
+                from agentkit.toolkit.config import LocalStrategyConfig
+
+                strategy_obj = LocalStrategyConfig.from_dict(
+                    new_strategy_config, skip_render=True
+                )
+            elif strategy_name == "cloud":
+                from agentkit.toolkit.config import CloudStrategyConfig
+
+                strategy_obj = CloudStrategyConfig.from_dict(
+                    new_strategy_config, skip_render=True
+                )
+            elif strategy_name == "hybrid":
+                from agentkit.toolkit.config import HybridStrategyConfig
+
+                strategy_obj = HybridStrategyConfig.from_dict(
+                    new_strategy_config, skip_render=True
+                )
+
+            if strategy_obj is not None:
+                strategy_errors = self.validator.validate_dataclass(strategy_obj)
+                if strategy_errors:
+                    console.print("[red]Configuration validation failed:[/red]")
+                    for error in strategy_errors:
+                        console.print(f"  [red]✗[/red] {error}")
+                    return False
 
             self._show_config_changes(
                 old_strategy_config,

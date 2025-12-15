@@ -307,6 +307,15 @@ class AutoPromptGenerator:
                 if len(args) == 2 and type(None) in args:
                     field_type = args[0]
 
+        prompt_condition = metadata.get("prompt_condition")
+        if prompt_condition:
+            depends_on = prompt_condition.get("depends_on")
+            expected_values = prompt_condition.get("values", [])
+            if depends_on and expected_values:
+                depend_value = current_config.get(depends_on)
+                if depend_value not in expected_values:
+                    return current_config.get(name, default)
+
         if get_origin(field_type) is list or field_type is List:
             return self._handle_list(description, default, metadata, current, total)
 
@@ -327,7 +336,6 @@ class AutoPromptGenerator:
             description, metadata, current_config
         )
 
-        # Conditional validation loop
         validation = metadata.get("validation", {})
         while True:
             # Call specific input handler (basic validation)
@@ -339,8 +347,7 @@ class AutoPromptGenerator:
                     enhanced_description, default, metadata, current, total
                 )
 
-            # If conditional validation type, perform conditional validation
-            if validation.get("type") == "conditional" and value:
+            if validation.get("type") == "conditional":
                 errors = self._validate_conditional_value(
                     name, value, validation, current_config
                 )
@@ -428,7 +435,11 @@ class AutoPromptGenerator:
         if depend_value and depend_value in rules:
             rule = rules[depend_value]
 
-            # choices validation
+            if rule.get("required") and (
+                not value or (isinstance(value, str) and not value.strip())
+            ):
+                errors.append("This field cannot be empty")
+
             if "choices" in rule and value not in rule["choices"]:
                 msg = rule.get(
                     "message", f"Must be one of: {', '.join(rule['choices'])}"

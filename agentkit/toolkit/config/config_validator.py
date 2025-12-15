@@ -16,7 +16,7 @@
 
 import re
 from typing import List, Any
-from dataclasses import fields
+from dataclasses import fields, is_dataclass
 
 from agentkit.toolkit.config.config import CommonConfig
 
@@ -82,7 +82,59 @@ class ConfigValidator:
         return errors
 
     @staticmethod
-    def _validate_conditional_fields(config: CommonConfig) -> List[str]:
+    def validate_dataclass(config: Any) -> List[str]:
+        if not is_dataclass(config):
+            return []
+
+        errors: List[str] = []
+
+        for field in fields(config):
+            if field.name.startswith("_"):
+                continue
+
+            validation = field.metadata.get("validation", {})
+
+            if validation.get("type") == "conditional":
+                continue
+
+            value = getattr(config, field.name)
+
+            if validation.get("required") and (
+                not value or (isinstance(value, str) and not value.strip())
+            ):
+                desc = field.metadata.get("description", field.name)
+                errors.append(f"{desc} is required")
+                continue
+
+            pattern = validation.get("pattern")
+            if pattern and value and isinstance(value, str):
+                if not re.match(pattern, value):
+                    desc = field.metadata.get("description", field.name)
+                    msg = validation.get("message", "Invalid format")
+                    errors.append(f"{desc}: {msg}")
+
+            choices = field.metadata.get("choices")
+            if choices and value:
+                valid_values = []
+                if isinstance(choices, list):
+                    if choices and isinstance(choices[0], dict):
+                        valid_values = [c["value"] for c in choices]
+                    else:
+                        valid_values = choices
+
+                if valid_values and value not in valid_values:
+                    desc = field.metadata.get("description", field.name)
+                    errors.append(
+                        f"{desc} must be one of: {', '.join(map(str, valid_values))}"
+                    )
+
+        conditional_errors = ConfigValidator._validate_conditional_fields(config)
+        errors.extend(conditional_errors)
+
+        return errors
+
+    @staticmethod
+    def _validate_conditional_fields(config: Any) -> List[str]:
         """Execute conditional validation (cross-field dependencies).
 
         Args:
@@ -93,7 +145,7 @@ class ConfigValidator:
         """
         errors = []
 
-        for field in fields(CommonConfig):
+        for field in fields(config):
             if field.name.startswith("_"):
                 continue
 
@@ -110,11 +162,6 @@ class ConfigValidator:
 
             depend_value = getattr(config, depends_on, None)
             current_value = getattr(config, field.name, None)
-
-            if not current_value or (
-                isinstance(current_value, str) and not current_value.strip()
-            ):
-                continue
 
             if depend_value in rules:
                 rule = rules[depend_value]
@@ -142,6 +189,12 @@ class ConfigValidator:
         """
         errors = []
         desc = metadata.get("description", field_name)
+
+        if rule.get("required") and (
+            value is None or (isinstance(value, str) and not value.strip())
+        ):
+            errors.append(f"{desc} is required")
+            return errors
 
         if "choices" in rule:
             if value not in rule["choices"]:
