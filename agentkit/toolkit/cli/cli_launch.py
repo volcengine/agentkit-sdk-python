@@ -26,11 +26,18 @@ console = Console()
 def launch_command(
     config_file: Path = typer.Option("agentkit.yaml", help="Configuration file"),
     platform: str = typer.Option("auto", help="Build platform"),
+    preflight_mode: str = typer.Option(
+        "",
+        "--preflight-mode",
+        help="Preflight behavior: prompt|fail|warn|skip",
+    ),
 ):
     """Build and deploy in one command."""
     from agentkit.toolkit.executors import LifecycleExecutor
     from agentkit.toolkit.cli.console_reporter import ConsoleReporter
     from agentkit.toolkit.context import ExecutionContext
+    from agentkit.toolkit.models import PreflightMode
+    from agentkit.toolkit.config.global_config import get_global_config
 
     console.print("[green]Launching agent...[/green]")
 
@@ -38,8 +45,47 @@ def launch_command(
     reporter = ConsoleReporter()
     ExecutionContext.set_reporter(reporter)
 
+    resolved_mode = PreflightMode.PROMPT
+    mode_map = {
+        "prompt": PreflightMode.PROMPT,
+        "fail": PreflightMode.FAIL,
+        "warn": PreflightMode.WARN,
+        "skip": PreflightMode.SKIP,
+    }
+
+    cli_mode = preflight_mode.strip().lower()
+    if cli_mode:
+        if cli_mode not in mode_map:
+            console.print(
+                "[red]Invalid --preflight-mode. Allowed: prompt|fail|warn|skip[/red]"
+            )
+            raise typer.Exit(2)
+        resolved_mode = mode_map[cli_mode]
+    else:
+        try:
+            gm = (
+                (
+                    getattr(
+                        getattr(get_global_config(), "defaults", None),
+                        "preflight_mode",
+                        None,
+                    )
+                    or ""
+                )
+                .strip()
+                .lower()
+            )
+            if gm in mode_map:
+                resolved_mode = mode_map[gm]
+        except Exception:
+            pass
+
     executor = LifecycleExecutor(reporter=reporter)
-    result = executor.launch(config_file=str(config_file), platform=platform)
+    result = executor.launch(
+        config_file=str(config_file),
+        platform=platform,
+        preflight_mode=resolved_mode,
+    )
 
     # Format output
     if result.success:

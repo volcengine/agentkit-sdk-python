@@ -584,34 +584,6 @@ class VeAgentkitRuntimeRunner(Runner):
                 )
             )
 
-    def _build_authorizer_config_for_update(
-        self, config: VeAgentkitRunnerConfig
-    ) -> runtime_types.AuthorizerForUpdateRuntime:
-        """Build authorizer configuration for updating an existing Runtime.
-
-        Args:
-            config: Runner configuration.
-
-        Returns:
-            AuthorizerForUpdateRuntime: Authorizer configuration for update request.
-        """
-        if config.runtime_auth_type == AUTH_TYPE_CUSTOM_JWT:
-            return runtime_types.AuthorizerForUpdateRuntime(
-                custom_jwt_authorizer=runtime_types.AuthorizerCustomJwtAuthorizerForUpdateRuntime(
-                    discovery_url=config.runtime_jwt_discovery_url,
-                    allowed_clients=config.runtime_jwt_allowed_clients
-                    if config.runtime_jwt_allowed_clients
-                    else None,
-                )
-            )
-        else:
-            return runtime_types.AuthorizerForUpdateRuntime(
-                key_auth=runtime_types.AuthorizerKeyAuthForUpdateRuntime(
-                    api_key_name=config.runtime_apikey_name,
-                    api_key_location=API_KEY_LOCATION,
-                )
-            )
-
     def _create_new_runtime(self, config: VeAgentkitRunnerConfig) -> DeployResult:
         """Create a new Runtime instance.
 

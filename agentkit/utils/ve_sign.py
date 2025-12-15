@@ -16,9 +16,10 @@ import datetime
 import hashlib
 import hmac
 import os
-from urllib.parse import quote
-
 import requests
+from urllib.parse import quote
+from agentkit.utils.global_config_io import get_global_config_str
+
 
 Service = ""
 Version = ""
@@ -266,19 +267,14 @@ def get_volc_ak_sk_region(service: str = ""):
         sk = sk or os.getenv("VOLCENGINE_SECRET_KEY") or os.getenv("VOLC_SECRETKEY")
         region = region or os.getenv("VOLCENGINE_REGION") or os.getenv("VOLC_REGION")
 
-    # 3. 【新增】如果环境变量仍不完整，尝试全局配置
+    # 3. 如果环境变量仍不完整，尝试全局配置文件
     if not all([ak, sk]):
-        try:
-            # 延迟导入，避免循环依赖
-            from agentkit.toolkit.config.global_config import get_global_config
-
-            global_config = get_global_config()
-            ak = ak or global_config.volcengine.access_key
-            sk = sk or global_config.volcengine.secret_key
-            region = region or global_config.volcengine.region
-        except Exception:
-            # 全局配置加载失败，继续原有逻辑
-            pass
+        gc_ak = get_global_config_str("volcengine", "access_key")
+        gc_sk = get_global_config_str("volcengine", "secret_key")
+        gc_region = get_global_config_str("volcengine", "region")
+        ak = ak or gc_ak
+        sk = sk or gc_sk
+        region = region or gc_region
 
     # 4. 设置默认 region
     region = region if region else "cn-beijing"
@@ -294,18 +290,13 @@ def get_volc_ak_sk_region(service: str = ""):
 
 
 def get_volc_agentkit_host_info():
-    try:
-        from agentkit.toolkit.config.global_config import get_global_config
-
-        gc = get_global_config()
-        if gc.agentkit_host:
-            host = gc.agentkit_host
-        else:
-            host = os.getenv("VOLCENGINE_AGENTKIT_HOST") or os.getenv(
-                "VOLC_AGENTKIT_HOST"
-            )
-    except Exception:
-        host = os.getenv("VOLCENGINE_AGENTKIT_HOST") or os.getenv("VOLC_AGENTKIT_HOST")
+    host = os.getenv("VOLCENGINE_AGENTKIT_HOST") or os.getenv("VOLC_AGENTKIT_HOST")
+    if not host:
+        host = get_global_config_str(
+            "agentkit",
+            "host",
+            fallback_keys=("agentkit_host",),
+        )
     api_version = os.getenv("VOLCENGINE_AGENTKIT_API_VERSION") or os.getenv(
         "VOLC_AGENTKIT_API_VERSION"
     )
@@ -317,6 +308,35 @@ def get_volc_agentkit_host_info():
         api_version if api_version else "2025-10-30",
         service_code if service_code else "agentkit",
     )
+
+
+def get_volc_agentkit_scheme() -> str:
+    scheme = os.getenv("VOLCENGINE_AGENTKIT_SCHEMA") or os.getenv(
+        "VOLC_AGENTKIT_SCHEMA"
+    )
+    if scheme:
+        return scheme
+    return (
+        get_global_config_str("agentkit", "schema")
+        or get_global_config_str("agentkit_schema")
+        or "https"
+    )
+
+
+def get_volc_iam_host_scheme():
+    host = os.getenv("VOLCENGINE_IAM_HOST") or os.getenv("VOLC_IAM_HOST")
+    if not host:
+        host = get_global_config_str("iam", "host", fallback_keys=("iam_host",))
+
+    scheme = os.getenv("VOLCENGINE_IAM_SCHEMA") or os.getenv("VOLC_IAM_SCHEMA")
+    if not scheme:
+        scheme = (
+            get_global_config_str("iam", "schema")
+            or get_global_config_str("iam_schema")
+            or "https"
+        )
+
+    return host, scheme
 
 
 def get_identity_host_info():

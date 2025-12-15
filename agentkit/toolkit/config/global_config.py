@@ -26,6 +26,11 @@ from pathlib import Path
 from typing import Optional
 import logging
 
+from agentkit.utils.global_config_io import (
+    read_global_config_dict,
+    write_global_config_dict,
+)
+
 from .utils import is_valid_config
 
 logger = logging.getLogger(__name__)
@@ -228,20 +233,18 @@ class GlobalConfigManager:
         Returns:
             GlobalConfig instance
         """
-        if not self.config_path.exists():
-            logger.debug(f"Global config file does not exist: {self.config_path}")
+        data = read_global_config_dict(self.config_path)
+        if not data:
+            logger.debug(
+                f"Global config file does not exist or empty: {self.config_path}"
+            )
             return GlobalConfig()
-
         try:
-            import yaml
-
-            with open(self.config_path, "r", encoding="utf-8") as f:
-                data = yaml.safe_load(f) or {}
             logger.debug(f"Loaded global config from: {self.config_path}")
             return GlobalConfig.from_dict(data)
         except Exception as e:
             logger.debug(
-                f"Failed to load global config, using empty config: {e}", exc_info=True
+                f"Failed to parse global config, using empty config: {e}", exc_info=True
             )
             return GlobalConfig()
 
@@ -251,27 +254,7 @@ class GlobalConfigManager:
         Args:
             config: Configuration object to persist
         """
-        # Ensure parent directory exists
-        self.config_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # Write YAML config
-        with open(self.config_path, "w", encoding="utf-8") as f:
-            import yaml
-
-            yaml.dump(
-                config.to_dict(),
-                f,
-                default_flow_style=False,
-                allow_unicode=True,
-                sort_keys=False,
-            )
-
-        # Restrict file permission to owner read/write only
-        try:
-            self.config_path.chmod(0o600)
-        except Exception as e:
-            logger.warning(f"Failed to set config file permission: {e}")
-
+        write_global_config_dict(config.to_dict(), self.config_path)
         logger.info(f"Global config saved: {self.config_path}")
 
     def get_config(self, force_reload: bool = False) -> GlobalConfig:
