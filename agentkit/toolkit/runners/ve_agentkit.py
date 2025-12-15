@@ -107,6 +107,11 @@ class VeAgentkitRunnerConfig(AutoSerializableMixin):
     # Container image configuration
     image_url: str = field(default="", metadata={"description": "Container image URL"})
 
+    # Minimum instance count
+    min_instance: int = field(
+        default=1, metadata={"description": "Minimum number of Runtime instances"}
+    )
+
 
 # VeAgentkitDeployResult has been replaced by unified DeployResult
 # Configuration class is retained for backward compatibility
@@ -618,6 +623,7 @@ class VeAgentkitRuntimeRunner(Runner):
                 authorizer_configuration=authorizer_config,
                 client_token=generate_client_token(),
                 apmplus_enable=True,
+                min_instance=config.min_instance,
             )
 
             # Create Runtime
@@ -635,7 +641,7 @@ class VeAgentkitRuntimeRunner(Runner):
                 runtime_id=config.runtime_id,
                 target_status=RUNTIME_STATUS_READY,
                 task_description="Waiting for Runtime to be ready...",
-                timeout=None,  # No timeout for creation
+                timeout=600,
                 error_message="Initialization failed",
             )
 
@@ -1036,7 +1042,7 @@ class VeAgentkitRuntimeRunner(Runner):
                 runtime_id=config.runtime_id,
                 target_statuses=[RUNTIME_STATUS_UNRELEASED, RUNTIME_STATUS_READY],
                 task_description="Waiting for Runtime update to complete...",
-                timeout=180,
+                timeout=600,
                 error_message="Update failed",
             )
 
