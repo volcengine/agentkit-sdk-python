@@ -39,6 +39,7 @@ from agentkit.utils.misc import (
     generate_apikey_name,
     generate_client_token,
     calculate_nonlinear_progress,
+    retry,
 )
 from agentkit.sdk.runtime.client import AgentkitRuntimeClient
 from agentkit.toolkit.volcengine.iam import VeIAM
@@ -834,8 +835,10 @@ class VeAgentkitRuntimeRunner(Runner):
         # Use reporter.long_task() for progress tracking
         with self.reporter.long_task(task_description, total=total_time) as task:
             while True:
-                runtime = self.agentkit_runtime_client.get_runtime(
-                    runtime_types.GetRuntimeRequest(runtime_id=runtime_id)
+                runtime = retry(
+                    lambda: self.agentkit_runtime_client.get_runtime(
+                        runtime_types.GetRuntimeRequest(runtime_id=runtime_id)
+                    )
                 )
 
                 # Check if target status reached

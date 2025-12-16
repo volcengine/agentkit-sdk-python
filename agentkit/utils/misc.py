@@ -15,6 +15,10 @@
 import math
 import string
 import random
+import time
+from typing import Callable, TypeVar
+
+T = TypeVar("T")
 
 
 def generate_random_id(length=8):
@@ -102,3 +106,17 @@ def calculate_nonlinear_progress(
     """
     progress = max_time * (1 - math.exp(-elapsed / expected_time))
     return min(progress, max_time * max_ratio)
+
+
+def retry(
+    func: Callable[[], T],
+    retries: int = 3,
+    delay: float = 1.0,
+) -> T:
+    for attempt in range(retries):
+        try:
+            return func()
+        except Exception:  # noqa: BLE001
+            if attempt == retries - 1:
+                raise
+            time.sleep(delay)
