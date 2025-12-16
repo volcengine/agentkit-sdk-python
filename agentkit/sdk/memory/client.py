@@ -41,13 +41,13 @@ class AgentkitMemoryClient(BaseAgentkitClient):
     """AgentKit Memory Management Service"""
 
     API_ACTIONS: Dict[str, str] = {
-        "UpdateMemoryCollection": "UpdateMemoryCollection",
+        "AddMemoryCollection": "AddMemoryCollection",
+        "CreateMemoryCollection": "CreateMemoryCollection",
         "DeleteMemoryCollection": "DeleteMemoryCollection",
+        "GetMemoryCollection": "GetMemoryCollection",
         "GetMemoryConnectionInfo": "GetMemoryConnectionInfo",
         "ListMemoryCollections": "ListMemoryCollections",
-        "AddMemoryCollection": "AddMemoryCollection",
-        "GetMemoryCollection": "GetMemoryCollection",
-        "CreateMemoryCollection": "CreateMemoryCollection",
+        "UpdateMemoryCollection": "UpdateMemoryCollection",
     }
 
     def __init__(
@@ -65,13 +65,22 @@ class AgentkitMemoryClient(BaseAgentkitClient):
             service_name="memory",
         )
 
-    def update_memory_collection(
-        self, request: UpdateMemoryCollectionRequest
-    ) -> UpdateMemoryCollectionResponse:
+    def add_memory_collection(
+        self, request: AddMemoryCollectionRequest
+    ) -> AddMemoryCollectionResponse:
         return self._invoke_api(
-            api_action="UpdateMemoryCollection",
+            api_action="AddMemoryCollection",
             request=request,
-            response_type=UpdateMemoryCollectionResponse,
+            response_type=AddMemoryCollectionResponse,
+        )
+
+    def create_memory_collection(
+        self, request: CreateMemoryCollectionRequest
+    ) -> CreateMemoryCollectionResponse:
+        return self._invoke_api(
+            api_action="CreateMemoryCollection",
+            request=request,
+            response_type=CreateMemoryCollectionResponse,
         )
 
     def delete_memory_collection(
@@ -81,6 +90,15 @@ class AgentkitMemoryClient(BaseAgentkitClient):
             api_action="DeleteMemoryCollection",
             request=request,
             response_type=DeleteMemoryCollectionResponse,
+        )
+
+    def get_memory_collection(
+        self, request: GetMemoryCollectionRequest
+    ) -> GetMemoryCollectionResponse:
+        return self._invoke_api(
+            api_action="GetMemoryCollection",
+            request=request,
+            response_type=GetMemoryCollectionResponse,
         )
 
     def get_memory_connection_info(
@@ -101,29 +119,11 @@ class AgentkitMemoryClient(BaseAgentkitClient):
             response_type=ListMemoryCollectionsResponse,
         )
 
-    def add_memory_collection(
-        self, request: AddMemoryCollectionRequest
-    ) -> AddMemoryCollectionResponse:
+    def update_memory_collection(
+        self, request: UpdateMemoryCollectionRequest
+    ) -> UpdateMemoryCollectionResponse:
         return self._invoke_api(
-            api_action="AddMemoryCollection",
+            api_action="UpdateMemoryCollection",
             request=request,
-            response_type=AddMemoryCollectionResponse,
-        )
-
-    def get_memory_collection(
-        self, request: GetMemoryCollectionRequest
-    ) -> GetMemoryCollectionResponse:
-        return self._invoke_api(
-            api_action="GetMemoryCollection",
-            request=request,
-            response_type=GetMemoryCollectionResponse,
-        )
-
-    def create_memory_collection(
-        self, request: CreateMemoryCollectionRequest
-    ) -> CreateMemoryCollectionResponse:
-        return self._invoke_api(
-            api_action="CreateMemoryCollection",
-            request=request,
-            response_type=CreateMemoryCollectionResponse,
+            response_type=UpdateMemoryCollectionResponse,
         )

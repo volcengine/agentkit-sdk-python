@@ -33,22 +33,34 @@ class AssociatedRuntimesForGetTool(ToolsBaseModel):
     name: Optional[str] = Field(default=None, alias="Name")
 
 
+class AuthorizerConfigurationForGetTool(ToolsBaseModel):
+    key_auth: Optional[KeyAuthForGetTool] = Field(default=None, alias="KeyAuth")
+
+
+class AuthorizerConfigurationForListTools(ToolsBaseModel):
+    key_auth: Optional[KeyAuthForListTools] = Field(default=None, alias="KeyAuth")
+
+
+class EnvsForGetTool(ToolsBaseModel):
+    key: Optional[str] = Field(default=None, alias="Key")
+    value: Optional[str] = Field(default=None, alias="Value")
+
+
+class EnvsForListTools(ToolsBaseModel):
+    key: Optional[str] = Field(default=None, alias="Key")
+    value: Optional[str] = Field(default=None, alias="Value")
+
+
 class KeyAuthForGetTool(ToolsBaseModel):
     api_key: Optional[str] = Field(default=None, alias="ApiKey")
     api_key_location: Optional[str] = Field(default=None, alias="ApiKeyLocation")
     api_key_name: Optional[str] = Field(default=None, alias="ApiKeyName")
 
 
-class AuthorizerConfigurationForGetTool(ToolsBaseModel):
-    key_auth: Optional[KeyAuthForGetTool] = Field(default=None, alias="KeyAuth")
-
-
-class VpcConfigurationForGetTool(ToolsBaseModel):
-    security_group_ids: Optional[list[str]] = Field(
-        default=None, alias="SecurityGroupIds"
-    )
-    subnet_ids: Optional[list[str]] = Field(default=None, alias="SubnetIds")
-    vpc_id: Optional[str] = Field(default=None, alias="VpcId")
+class KeyAuthForListTools(ToolsBaseModel):
+    api_key: Optional[str] = Field(default=None, alias="ApiKey")
+    api_key_location: Optional[str] = Field(default=None, alias="ApiKeyLocation")
+    api_key_name: Optional[str] = Field(default=None, alias="ApiKeyName")
 
 
 class NetworkConfigurationsForGetTool(ToolsBaseModel):
@@ -59,9 +71,12 @@ class NetworkConfigurationsForGetTool(ToolsBaseModel):
     )
 
 
-class TagsForGetTool(ToolsBaseModel):
-    key: Optional[str] = Field(default=None, alias="Key")
-    value: Optional[str] = Field(default=None, alias="Value")
+class NetworkConfigurationsForListTools(ToolsBaseModel):
+    endpoint: Optional[str] = Field(default=None, alias="Endpoint")
+    network_type: Optional[str] = Field(default=None, alias="NetworkType")
+    vpc_configuration: Optional[VpcConfigurationForListTools] = Field(
+        default=None, alias="VpcConfiguration"
+    )
 
 
 class SessionInfosForListSessions(ToolsBaseModel):
@@ -69,20 +84,67 @@ class SessionInfosForListSessions(ToolsBaseModel):
     endpoint: Optional[str] = Field(default=None, alias="Endpoint")
     expire_at: Optional[str] = Field(default=None, alias="ExpireAt")
     internal_endpoint: Optional[str] = Field(default=None, alias="InternalEndpoint")
-    name: Optional[str] = Field(default=None, alias="Name")
     session_id: Optional[str] = Field(default=None, alias="SessionId")
     status: Optional[str] = Field(default=None, alias="Status")
     tool_type: Optional[str] = Field(default=None, alias="ToolType")
+    user_session_id: Optional[str] = Field(default=None, alias="UserSessionId")
 
 
-class KeyAuthForListTools(ToolsBaseModel):
-    api_key: Optional[str] = Field(default=None, alias="ApiKey")
-    api_key_location: Optional[str] = Field(default=None, alias="ApiKeyLocation")
-    api_key_name: Optional[str] = Field(default=None, alias="ApiKeyName")
+class TagsForGetTool(ToolsBaseModel):
+    key: Optional[str] = Field(default=None, alias="Key")
+    value: Optional[str] = Field(default=None, alias="Value")
 
 
-class AuthorizerConfigurationForListTools(ToolsBaseModel):
-    key_auth: Optional[KeyAuthForListTools] = Field(default=None, alias="KeyAuth")
+class TagsForListTools(ToolsBaseModel):
+    key: Optional[str] = Field(default=None, alias="Key")
+    value: Optional[str] = Field(default=None, alias="Value")
+
+
+class TlsConfigurationForGetTool(ToolsBaseModel):
+    enable_log: Optional[bool] = Field(default=None, alias="EnableLog")
+    tls_project_id: Optional[str] = Field(default=None, alias="TlsProjectId")
+    tls_topic_id: Optional[str] = Field(default=None, alias="TlsTopicId")
+
+
+class TlsConfigurationForListTools(ToolsBaseModel):
+    enable_log: Optional[bool] = Field(default=None, alias="EnableLog")
+    tls_project_id: Optional[str] = Field(default=None, alias="TlsProjectId")
+    tls_topic_id: Optional[str] = Field(default=None, alias="TlsTopicId")
+
+
+class ToolsForListTools(ToolsBaseModel):
+    apmplus_enable: Optional[bool] = Field(default=None, alias="ApmplusEnable")
+    authorizer_configuration: Optional[AuthorizerConfigurationForListTools] = Field(
+        default=None, alias="AuthorizerConfiguration"
+    )
+    command: Optional[str] = Field(default=None, alias="Command")
+    created_at: Optional[str] = Field(default=None, alias="CreatedAt")
+    description: Optional[str] = Field(default=None, alias="Description")
+    envs: Optional[list[EnvsForListTools]] = Field(default=None, alias="Envs")
+    image_url: Optional[str] = Field(default=None, alias="ImageUrl")
+    name: Optional[str] = Field(default=None, alias="Name")
+    network_configurations: Optional[list[NetworkConfigurationsForListTools]] = Field(
+        default=None, alias="NetworkConfigurations"
+    )
+    port: Optional[int] = Field(default=None, alias="Port")
+    project_name: Optional[str] = Field(default=None, alias="ProjectName")
+    role_name: Optional[str] = Field(default=None, alias="RoleName")
+    status: Optional[str] = Field(default=None, alias="Status")
+    tags: Optional[list[TagsForListTools]] = Field(default=None, alias="Tags")
+    tls_configuration: Optional[TlsConfigurationForListTools] = Field(
+        default=None, alias="TlsConfiguration"
+    )
+    tool_id: Optional[str] = Field(default=None, alias="ToolId")
+    tool_type: Optional[str] = Field(default=None, alias="ToolType")
+    updated_at: Optional[str] = Field(default=None, alias="UpdatedAt")
+
+
+class VpcConfigurationForGetTool(ToolsBaseModel):
+    security_group_ids: Optional[list[str]] = Field(
+        default=None, alias="SecurityGroupIds"
+    )
+    subnet_ids: Optional[list[str]] = Field(default=None, alias="SubnetIds")
+    vpc_id: Optional[str] = Field(default=None, alias="VpcId")
 
 
 class VpcConfigurationForListTools(ToolsBaseModel):
@@ -93,104 +155,20 @@ class VpcConfigurationForListTools(ToolsBaseModel):
     vpc_id: Optional[str] = Field(default=None, alias="VpcId")
 
 
-class NetworkConfigurationsForListTools(ToolsBaseModel):
-    endpoint: Optional[str] = Field(default=None, alias="Endpoint")
-    network_type: Optional[str] = Field(default=None, alias="NetworkType")
-    vpc_configuration: Optional[VpcConfigurationForListTools] = Field(
-        default=None, alias="VpcConfiguration"
-    )
-
-
-class TagsForListTools(ToolsBaseModel):
-    key: Optional[str] = Field(default=None, alias="Key")
-    value: Optional[str] = Field(default=None, alias="Value")
-
-
-class ToolsForListTools(ToolsBaseModel):
-    authorizer_configuration: Optional[AuthorizerConfigurationForListTools] = Field(
-        default=None, alias="AuthorizerConfiguration"
-    )
-    created_at: Optional[str] = Field(default=None, alias="CreatedAt")
-    description: Optional[str] = Field(default=None, alias="Description")
-    name: Optional[str] = Field(default=None, alias="Name")
-    network_configurations: Optional[list[NetworkConfigurationsForListTools]] = Field(
-        default=None, alias="NetworkConfigurations"
-    )
-    project_name: Optional[str] = Field(default=None, alias="ProjectName")
-    role_name: Optional[str] = Field(default=None, alias="RoleName")
-    status: Optional[str] = Field(default=None, alias="Status")
-    tags: Optional[list[TagsForListTools]] = Field(default=None, alias="Tags")
-    tool_id: Optional[str] = Field(default=None, alias="ToolId")
-    tool_type: Optional[str] = Field(default=None, alias="ToolType")
-    updated_at: Optional[str] = Field(default=None, alias="UpdatedAt")
-
-
-# UpdateTool - Request
-class UpdateToolRequest(ToolsBaseModel):
-    description: Optional[str] = Field(default=None, alias="Description")
-    tool_id: str = Field(..., alias="ToolId")
-
-
-# UpdateTool - Response
-class UpdateToolResponse(ToolsBaseModel):
-    tool_id: Optional[str] = Field(default=None, alias="ToolId")
-
-
-# GetSession - Request
-class GetSessionRequest(ToolsBaseModel):
-    session_id: str = Field(..., alias="SessionId")
-    tool_id: str = Field(..., alias="ToolId")
-
-
-# GetSession - Response
-class GetSessionResponse(ToolsBaseModel):
-    created_at: Optional[str] = Field(default=None, alias="CreatedAt")
-    endpoint: Optional[str] = Field(default=None, alias="Endpoint")
-    expire_at: Optional[str] = Field(default=None, alias="ExpireAt")
-    internal_endpoint: Optional[str] = Field(default=None, alias="InternalEndpoint")
-    name: Optional[str] = Field(default=None, alias="Name")
-    session_id: Optional[str] = Field(default=None, alias="SessionId")
-    status: Optional[str] = Field(default=None, alias="Status")
-    tool_type: Optional[str] = Field(default=None, alias="ToolType")
-
-
-# DeleteSession - Request
-class DeleteSessionRequest(ToolsBaseModel):
-    session_id: str = Field(..., alias="SessionId")
-    tool_id: Optional[str] = Field(default=None, alias="ToolId")
-
-
-# DeleteSession - Response
-class DeleteSessionResponse(ToolsBaseModel):
-    session_id: Optional[str] = Field(default=None, alias="SessionId")
-
-
 # CreateSession - Request
 class CreateSessionRequest(ToolsBaseModel):
-    name: Optional[str] = Field(default=None, alias="Name")
     tool_id: str = Field(..., alias="ToolId")
     ttl: Optional[int] = Field(default=None, alias="Ttl")
     ttl_unit: Optional[str] = Field(default=None, alias="TtlUnit")
+    user_session_id: Optional[str] = Field(default=None, alias="UserSessionId")
 
 
 # CreateSession - Response
 class CreateSessionResponse(ToolsBaseModel):
     endpoint: Optional[str] = Field(default=None, alias="Endpoint")
     internal_endpoint: Optional[str] = Field(default=None, alias="InternalEndpoint")
-    name: Optional[str] = Field(default=None, alias="Name")
     session_id: Optional[str] = Field(default=None, alias="SessionId")
-
-
-# GetSessionLogs - Request
-class GetSessionLogsRequest(ToolsBaseModel):
-    limit: Optional[int] = Field(default=None, alias="Limit")
-    session_id: str = Field(..., alias="SessionId")
-    tool_id: str = Field(..., alias="ToolId")
-
-
-# GetSessionLogs - Response
-class GetSessionLogsResponse(ToolsBaseModel):
-    logs: Optional[str] = Field(default=None, alias="Logs")
+    user_session_id: Optional[str] = Field(default=None, alias="UserSessionId")
 
 
 # CreateTool - Request
@@ -219,11 +197,22 @@ class NetworkForCreateTool(ToolsBaseModel):
 
 
 class NetworkVpcForCreateTool(ToolsBaseModel):
-    vpc_id: str = Field(..., alias="VpcId")
     security_group_ids: Optional[list[str]] = Field(
         default=None, alias="SecurityGroupIds"
     )
     subnet_ids: Optional[list[str]] = Field(default=None, alias="SubnetIds")
+    vpc_id: str = Field(..., alias="VpcId")
+
+
+class TlsForCreateTool(ToolsBaseModel):
+    enable_log: bool = Field(..., alias="EnableLog")
+    tls_project_id: Optional[str] = Field(default=None, alias="TlsProjectId")
+    tls_topic_id: Optional[str] = Field(default=None, alias="TlsTopicId")
+
+
+class EnvsItemForCreateTool(ToolsBaseModel):
+    key: str = Field(..., alias="Key")
+    value: Optional[str] = Field(default=None, alias="Value")
 
 
 class TagsItemForCreateTool(ToolsBaseModel):
@@ -232,8 +221,12 @@ class TagsItemForCreateTool(ToolsBaseModel):
 
 
 class CreateToolRequest(ToolsBaseModel):
+    apmplus_enable: Optional[bool] = Field(default=None, alias="ApmplusEnable")
+    command: Optional[str] = Field(default=None, alias="Command")
     description: Optional[str] = Field(default=None, alias="Description")
+    image_url: Optional[str] = Field(default=None, alias="ImageUrl")
     name: str = Field(..., alias="Name")
+    port: Optional[int] = Field(default=None, alias="Port")
     project_name: Optional[str] = Field(default=None, alias="ProjectName")
     role_name: Optional[str] = Field(default=None, alias="RoleName")
     tool_type: str = Field(..., alias="ToolType")
@@ -243,6 +236,10 @@ class CreateToolRequest(ToolsBaseModel):
     network_configuration: Optional[NetworkForCreateTool] = Field(
         default=None, alias="NetworkConfiguration"
     )
+    tls_configuration: Optional[TlsForCreateTool] = Field(
+        default=None, alias="TlsConfiguration"
+    )
+    envs: Optional[list[EnvsItemForCreateTool]] = Field(default=None, alias="Envs")
     tags: Optional[list[TagsItemForCreateTool]] = Field(default=None, alias="Tags")
 
 
@@ -251,32 +248,121 @@ class CreateToolResponse(ToolsBaseModel):
     tool_id: Optional[str] = Field(default=None, alias="ToolId")
 
 
+# DeleteSession - Request
+class DeleteSessionRequest(ToolsBaseModel):
+    session_id: str = Field(..., alias="SessionId")
+    tool_id: Optional[str] = Field(default=None, alias="ToolId")
+
+
+# DeleteSession - Response
+class DeleteSessionResponse(ToolsBaseModel):
+    session_id: Optional[str] = Field(default=None, alias="SessionId")
+
+
+# DeleteTool - Request
+class DeleteToolRequest(ToolsBaseModel):
+    tool_id: Optional[str] = Field(default=None, alias="ToolId")
+
+
+# DeleteTool - Response
+class DeleteToolResponse(ToolsBaseModel):
+    tool_id: Optional[str] = Field(default=None, alias="ToolId")
+
+
+# GetSession - Request
+class GetSessionRequest(ToolsBaseModel):
+    session_id: str = Field(..., alias="SessionId")
+    tool_id: str = Field(..., alias="ToolId")
+
+
+# GetSession - Response
+class GetSessionResponse(ToolsBaseModel):
+    created_at: Optional[str] = Field(default=None, alias="CreatedAt")
+    endpoint: Optional[str] = Field(default=None, alias="Endpoint")
+    expire_at: Optional[str] = Field(default=None, alias="ExpireAt")
+    internal_endpoint: Optional[str] = Field(default=None, alias="InternalEndpoint")
+    session_id: Optional[str] = Field(default=None, alias="SessionId")
+    status: Optional[str] = Field(default=None, alias="Status")
+    tool_type: Optional[str] = Field(default=None, alias="ToolType")
+    user_session_id: Optional[str] = Field(default=None, alias="UserSessionId")
+
+
+# GetSessionLogs - Request
+class GetSessionLogsRequest(ToolsBaseModel):
+    limit: Optional[int] = Field(default=None, alias="Limit")
+    session_id: str = Field(..., alias="SessionId")
+    tool_id: str = Field(..., alias="ToolId")
+
+
+# GetSessionLogs - Response
+class GetSessionLogsResponse(ToolsBaseModel):
+    logs: Optional[str] = Field(default=None, alias="Logs")
+
+
 # GetTool - Request
 class GetToolRequest(ToolsBaseModel):
-    tool_id: Optional[str] = Field(default=None, alias="ToolId")
+    tool_id: str = Field(..., alias="ToolId")
 
 
 # GetTool - Response
 class GetToolResponse(ToolsBaseModel):
+    apmplus_enable: Optional[bool] = Field(default=None, alias="ApmplusEnable")
     associated_runtimes: Optional[list[AssociatedRuntimesForGetTool]] = Field(
         default=None, alias="AssociatedRuntimes"
     )
     authorizer_configuration: Optional[AuthorizerConfigurationForGetTool] = Field(
         default=None, alias="AuthorizerConfiguration"
     )
+    command: Optional[str] = Field(default=None, alias="Command")
     created_at: Optional[str] = Field(default=None, alias="CreatedAt")
     description: Optional[str] = Field(default=None, alias="Description")
+    envs: Optional[list[EnvsForGetTool]] = Field(default=None, alias="Envs")
+    image_url: Optional[str] = Field(default=None, alias="ImageUrl")
     name: Optional[str] = Field(default=None, alias="Name")
     network_configurations: Optional[list[NetworkConfigurationsForGetTool]] = Field(
         default=None, alias="NetworkConfigurations"
     )
+    port: Optional[int] = Field(default=None, alias="Port")
     project_name: Optional[str] = Field(default=None, alias="ProjectName")
     role_name: Optional[str] = Field(default=None, alias="RoleName")
     status: Optional[str] = Field(default=None, alias="Status")
     tags: Optional[list[TagsForGetTool]] = Field(default=None, alias="Tags")
+    tls_configuration: Optional[TlsConfigurationForGetTool] = Field(
+        default=None, alias="TlsConfiguration"
+    )
     tool_id: Optional[str] = Field(default=None, alias="ToolId")
     tool_type: Optional[str] = Field(default=None, alias="ToolType")
     updated_at: Optional[str] = Field(default=None, alias="UpdatedAt")
+
+
+# ListSessions - Request
+class FiltersItemForListSessions(ToolsBaseModel):
+    name: Optional[str] = Field(default=None, alias="Name")
+    name_contains: Optional[str] = Field(default=None, alias="NameContains")
+    values: Optional[list[str]] = Field(default=None, alias="Values")
+
+
+class ListSessionsRequest(ToolsBaseModel):
+    create_time_after: Optional[str] = Field(default=None, alias="CreateTimeAfter")
+    create_time_before: Optional[str] = Field(default=None, alias="CreateTimeBefore")
+    expire_time_after: Optional[str] = Field(default=None, alias="ExpireTimeAfter")
+    expire_time_before: Optional[str] = Field(default=None, alias="ExpireTimeBefore")
+    max_results: Optional[int] = Field(default=None, alias="MaxResults")
+    next_token: Optional[str] = Field(default=None, alias="NextToken")
+    page_number: Optional[int] = Field(default=None, alias="PageNumber")
+    page_size: Optional[int] = Field(default=None, alias="PageSize")
+    tool_id: str = Field(..., alias="ToolId")
+    filters: Optional[list[FiltersItemForListSessions]] = Field(
+        default=None, alias="Filters"
+    )
+
+
+# ListSessions - Response
+class ListSessionsResponse(ToolsBaseModel):
+    next_token: Optional[str] = Field(default=None, alias="NextToken")
+    session_infos: Optional[list[SessionInfosForListSessions]] = Field(
+        default=None, alias="SessionInfos"
+    )
 
 
 # ListTools - Request
@@ -313,52 +399,6 @@ class ListToolsRequest(ToolsBaseModel):
 class ListToolsResponse(ToolsBaseModel):
     next_token: Optional[str] = Field(default=None, alias="NextToken")
     tools: Optional[list[ToolsForListTools]] = Field(default=None, alias="Tools")
-    page_number: Optional[int] = Field(default=None, alias="PageNumber")
-    page_size: Optional[int] = Field(default=None, alias="PageSize")
-    total_count: Optional[int] = Field(default=None, alias="TotalCount")
-
-
-# ListSessions - Request
-class FiltersItemForListSessions(ToolsBaseModel):
-    name: Optional[str] = Field(default=None, alias="Name")
-    name_contains: Optional[str] = Field(default=None, alias="NameContains")
-    values: Optional[list[str]] = Field(default=None, alias="Values")
-
-
-class ListSessionsRequest(ToolsBaseModel):
-    create_time_after: Optional[str] = Field(default=None, alias="CreateTimeAfter")
-    create_time_before: Optional[str] = Field(default=None, alias="CreateTimeBefore")
-    expire_time_after: Optional[str] = Field(default=None, alias="ExpireTimeAfter")
-    expire_time_before: Optional[str] = Field(default=None, alias="ExpireTimeBefore")
-    max_results: Optional[int] = Field(default=None, alias="MaxResults")
-    next_token: Optional[str] = Field(default=None, alias="NextToken")
-    page_number: Optional[int] = Field(default=None, alias="PageNumber")
-    page_size: Optional[int] = Field(default=None, alias="PageSize")
-    tool_id: str = Field(..., alias="ToolId")
-    filters: Optional[list[FiltersItemForListSessions]] = Field(
-        default=None, alias="Filters"
-    )
-
-
-# ListSessions - Response
-class ListSessionsResponse(ToolsBaseModel):
-    next_token: Optional[str] = Field(default=None, alias="NextToken")
-    session_infos: Optional[list[SessionInfosForListSessions]] = Field(
-        default=None, alias="SessionInfos"
-    )
-    page_number: Optional[int] = Field(default=None, alias="PageNumber")
-    page_size: Optional[int] = Field(default=None, alias="PageSize")
-    total_count: Optional[int] = Field(default=None, alias="TotalCount")
-
-
-# DeleteTool - Request
-class DeleteToolRequest(ToolsBaseModel):
-    tool_id: Optional[str] = Field(default=None, alias="ToolId")
-
-
-# DeleteTool - Response
-class DeleteToolResponse(ToolsBaseModel):
-    tool_id: Optional[str] = Field(default=None, alias="ToolId")
 
 
 # SetSessionTtl - Request
@@ -373,4 +413,26 @@ class SetSessionTtlRequest(ToolsBaseModel):
 class SetSessionTtlResponse(ToolsBaseModel):
     expire_at: Optional[str] = Field(default=None, alias="ExpireAt")
     session_id: Optional[str] = Field(default=None, alias="SessionId")
+    tool_id: Optional[str] = Field(default=None, alias="ToolId")
+
+
+# UpdateTool - Request
+class EnvsItemForUpdateTool(ToolsBaseModel):
+    key: str = Field(..., alias="Key")
+    value: Optional[str] = Field(default=None, alias="Value")
+
+
+class UpdateToolRequest(ToolsBaseModel):
+    apmplus_enable: Optional[bool] = Field(default=None, alias="ApmplusEnable")
+    command: Optional[str] = Field(default=None, alias="Command")
+    description: Optional[str] = Field(default=None, alias="Description")
+    image_url: Optional[str] = Field(default=None, alias="ImageUrl")
+    port: Optional[int] = Field(default=None, alias="Port")
+    tool_id: str = Field(..., alias="ToolId")
+    tool_type: Optional[str] = Field(default=None, alias="ToolType")
+    envs: Optional[list[EnvsItemForUpdateTool]] = Field(default=None, alias="Envs")
+
+
+# UpdateTool - Response
+class UpdateToolResponse(ToolsBaseModel):
     tool_id: Optional[str] = Field(default=None, alias="ToolId")

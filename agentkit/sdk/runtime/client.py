@@ -26,12 +26,16 @@ from .types import (
     DeleteRuntimeResponse,
     GetRuntimeCozeTokenRequest,
     GetRuntimeCozeTokenResponse,
+    GetRuntimeInstanceLogsRequest,
+    GetRuntimeInstanceLogsResponse,
     GetRuntimeRequest,
     GetRuntimeResponse,
     GetRuntimeVersionRequest,
     GetRuntimeVersionResponse,
     ListRuntimeCrRegistriesRequest,
     ListRuntimeCrRegistriesResponse,
+    ListRuntimeInstancesRequest,
+    ListRuntimeInstancesResponse,
     ListRuntimeVersionsRequest,
     ListRuntimeVersionsResponse,
     ListRuntimesRequest,
@@ -47,16 +51,18 @@ class AgentkitRuntimeClient(BaseAgentkitClient):
     """AgentKit Runtime Management Service"""
 
     API_ACTIONS: Dict[str, str] = {
-        "UpdateRuntime": "UpdateRuntime",
+        "CreateRuntime": "CreateRuntime",
+        "DeleteRuntime": "DeleteRuntime",
+        "GetRuntime": "GetRuntime",
+        "GetRuntimeCozeToken": "GetRuntimeCozeToken",
+        "GetRuntimeInstanceLogs": "GetRuntimeInstanceLogs",
         "GetRuntimeVersion": "GetRuntimeVersion",
         "ListRuntimeCrRegistries": "ListRuntimeCrRegistries",
+        "ListRuntimeInstances": "ListRuntimeInstances",
+        "ListRuntimeVersions": "ListRuntimeVersions",
         "ListRuntimes": "ListRuntimes",
         "ReleaseRuntime": "ReleaseRuntime",
-        "CreateRuntime": "CreateRuntime",
-        "GetRuntime": "GetRuntime",
-        "ListRuntimeVersions": "ListRuntimeVersions",
-        "GetRuntimeCozeToken": "GetRuntimeCozeToken",
-        "DeleteRuntime": "DeleteRuntime",
+        "UpdateRuntime": "UpdateRuntime",
     }
 
     def __init__(
@@ -74,11 +80,43 @@ class AgentkitRuntimeClient(BaseAgentkitClient):
             service_name="runtime",
         )
 
-    def update_runtime(self, request: UpdateRuntimeRequest) -> UpdateRuntimeResponse:
+    def create_runtime(self, request: CreateRuntimeRequest) -> CreateRuntimeResponse:
         return self._invoke_api(
-            api_action="UpdateRuntime",
+            api_action="CreateRuntime",
             request=request,
-            response_type=UpdateRuntimeResponse,
+            response_type=CreateRuntimeResponse,
+        )
+
+    def delete_runtime(self, request: DeleteRuntimeRequest) -> DeleteRuntimeResponse:
+        return self._invoke_api(
+            api_action="DeleteRuntime",
+            request=request,
+            response_type=DeleteRuntimeResponse,
+        )
+
+    def get_runtime(self, request: GetRuntimeRequest) -> GetRuntimeResponse:
+        return self._invoke_api(
+            api_action="GetRuntime",
+            request=request,
+            response_type=GetRuntimeResponse,
+        )
+
+    def get_runtime_coze_token(
+        self, request: GetRuntimeCozeTokenRequest
+    ) -> GetRuntimeCozeTokenResponse:
+        return self._invoke_api(
+            api_action="GetRuntimeCozeToken",
+            request=request,
+            response_type=GetRuntimeCozeTokenResponse,
+        )
+
+    def get_runtime_instance_logs(
+        self, request: GetRuntimeInstanceLogsRequest
+    ) -> GetRuntimeInstanceLogsResponse:
+        return self._invoke_api(
+            api_action="GetRuntimeInstanceLogs",
+            request=request,
+            response_type=GetRuntimeInstanceLogsResponse,
         )
 
     def get_runtime_version(
@@ -99,6 +137,24 @@ class AgentkitRuntimeClient(BaseAgentkitClient):
             response_type=ListRuntimeCrRegistriesResponse,
         )
 
+    def list_runtime_instances(
+        self, request: ListRuntimeInstancesRequest
+    ) -> ListRuntimeInstancesResponse:
+        return self._invoke_api(
+            api_action="ListRuntimeInstances",
+            request=request,
+            response_type=ListRuntimeInstancesResponse,
+        )
+
+    def list_runtime_versions(
+        self, request: ListRuntimeVersionsRequest
+    ) -> ListRuntimeVersionsResponse:
+        return self._invoke_api(
+            api_action="ListRuntimeVersions",
+            request=request,
+            response_type=ListRuntimeVersionsResponse,
+        )
+
     def list_runtimes(self, request: ListRuntimesRequest) -> ListRuntimesResponse:
         return self._invoke_api(
             api_action="ListRuntimes",
@@ -113,41 +169,9 @@ class AgentkitRuntimeClient(BaseAgentkitClient):
             response_type=ReleaseRuntimeResponse,
         )
 
-    def create_runtime(self, request: CreateRuntimeRequest) -> CreateRuntimeResponse:
+    def update_runtime(self, request: UpdateRuntimeRequest) -> UpdateRuntimeResponse:
         return self._invoke_api(
-            api_action="CreateRuntime",
+            api_action="UpdateRuntime",
             request=request,
-            response_type=CreateRuntimeResponse,
-        )
-
-    def get_runtime(self, request: GetRuntimeRequest) -> GetRuntimeResponse:
-        return self._invoke_api(
-            api_action="GetRuntime",
-            request=request,
-            response_type=GetRuntimeResponse,
-        )
-
-    def list_runtime_versions(
-        self, request: ListRuntimeVersionsRequest
-    ) -> ListRuntimeVersionsResponse:
-        return self._invoke_api(
-            api_action="ListRuntimeVersions",
-            request=request,
-            response_type=ListRuntimeVersionsResponse,
-        )
-
-    def get_runtime_coze_token(
-        self, request: GetRuntimeCozeTokenRequest
-    ) -> GetRuntimeCozeTokenResponse:
-        return self._invoke_api(
-            api_action="GetRuntimeCozeToken",
-            request=request,
-            response_type=GetRuntimeCozeTokenResponse,
-        )
-
-    def delete_runtime(self, request: DeleteRuntimeRequest) -> DeleteRuntimeResponse:
-        return self._invoke_api(
-            api_action="DeleteRuntime",
-            request=request,
-            response_type=DeleteRuntimeResponse,
+            response_type=UpdateRuntimeResponse,
         )
