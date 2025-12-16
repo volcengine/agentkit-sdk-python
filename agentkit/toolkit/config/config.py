@@ -42,7 +42,7 @@ class CommonConfig(AutoSerializableMixin):
         },
     )
     entry_point: str = field(
-        default="",
+        default="agent.py",
         metadata={
             "description": "Agent application entry file (path allowed), e.g. simple_agent.py or main.go or build.sh",
             "icon": "📝",
@@ -110,7 +110,7 @@ class CommonConfig(AutoSerializableMixin):
         },
     )
     launch_type: str = field(
-        default="local",
+        default="cloud",
         metadata={
             "description": "Deployment and runtime mode, defaults to local (local build and deploy), optional hybrid (local build, cloud deploy)",
             "icon": "🚀",
