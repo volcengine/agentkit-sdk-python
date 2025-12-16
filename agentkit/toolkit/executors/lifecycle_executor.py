@@ -144,23 +144,6 @@ class LifecycleExecutor(BaseExecutor):
 
             # Preflight check: verify required cloud services for both build and deploy
             # We do this once at the start for better UX (single prompt for all missing services)
-            # Override preflight_mode from global config defaults if configured
-            try:
-                from agentkit.toolkit.config.global_config import get_global_config
-
-                gc = get_global_config()
-                gm = getattr(getattr(gc, "defaults", None), "preflight_mode", None)
-                if gm:
-                    gm_map = {
-                        "prompt": PreflightMode.PROMPT,
-                        "fail": PreflightMode.FAIL,
-                        "warn": PreflightMode.WARN,
-                        "skip": PreflightMode.SKIP,
-                    }
-                    preflight_mode = gm_map.get(gm.lower(), preflight_mode)
-            except Exception:
-                pass
-
             if preflight_mode != PreflightMode.SKIP:
                 # Load config first to get launch_type
                 config = self._load_config(config_dict, config_file)

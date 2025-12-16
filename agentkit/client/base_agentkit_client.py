@@ -20,8 +20,7 @@ Provides common initialization and API invocation logic.
 from typing import Any, Dict, Union, Optional
 
 from agentkit.client.base_service_client import BaseServiceClient, ApiConfig
-from agentkit.utils.ve_sign import get_volc_agentkit_host_info
-from agentkit.toolkit.config.global_config import get_global_config
+from agentkit.utils.ve_sign import get_volc_agentkit_host_info, get_volc_agentkit_scheme
 
 
 class BaseAgentkitClient(BaseServiceClient):
@@ -78,13 +77,11 @@ class BaseAgentkitClient(BaseServiceClient):
             Dictionary with host, api_version, and service
         """
         host, api_version, service = get_volc_agentkit_host_info()
-        gc = get_global_config()
-        scheme = gc.agentkit_schema or "https"
         return {
-            "host": gc.agentkit_host or host,
+            "host": host,
             "api_version": api_version,
             "service": service,
-            "scheme": scheme,
+            "scheme": get_volc_agentkit_scheme(),
         }
 
     def _get(self, api_action: str, params: Dict[str, Any] = None) -> str:
