@@ -29,6 +29,10 @@ from agentkit.toolkit.cli.cli_deploy import deploy_command
 from agentkit.toolkit.cli.cli_launch import launch_command
 from agentkit.toolkit.cli.cli_status import status_command
 from agentkit.toolkit.cli.cli_destroy import destroy_command
+from agentkit.toolkit.cli.cli_memory import memory_app
+from agentkit.toolkit.cli.cli_knowledge import knowledge_app
+from agentkit.toolkit.cli.cli_tools import tools_app
+from agentkit.toolkit.cli.cli_runtime import runtime_app
 
 # Note: Avoid importing heavy packages at the top to keep CLI startup fast
 
@@ -91,6 +95,12 @@ app.command(name="deploy")(deploy_command)
 app.command(name="launch")(launch_command)
 app.command(name="status")(status_command)
 app.command(name="destroy")(destroy_command)
+
+# Sub-app groups
+app.add_typer(memory_app, name="memory")
+app.add_typer(knowledge_app, name="knowledge")
+app.add_typer(tools_app, name="tools")
+app.add_typer(runtime_app, name="runtime")
 
 
 if __name__ == "__main__":

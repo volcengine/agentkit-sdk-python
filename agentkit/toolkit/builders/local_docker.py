@@ -322,7 +322,7 @@ class LocalDockerBuilder(Builder):
 
                 StringIO()
 
-                # 使用 renderer 渲染到字符串
+                # Use renderer to render to string
                 template = renderer.env.get_template(docker_config.template_name)
                 rendered = template.render(**context)
                 return rendered
@@ -372,7 +372,7 @@ class LocalDockerBuilder(Builder):
                     image=ImageInfo(
                         repository=image_name,
                         tag=image_tag,
-                        digest=image_id,  # Docker image ID 作为 digest
+                        digest=image_id,  # Docker image ID as digest
                     ),
                     build_timestamp=datetime.now(),
                     build_logs=build_logs,
