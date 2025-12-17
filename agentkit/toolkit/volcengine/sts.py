@@ -56,21 +56,13 @@ class VeSTS(BaseServiceClient):
         session_token: str = "",
     ) -> None:
         super().__init__(
+            service="sts",
             access_key=access_key,
             secret_key=secret_key,
             region=region,
             session_token=session_token,
             service_name="sts",
-            credential_env_prefix="STS",
         )
-
-    def _get_service_config(self) -> Dict[str, str]:
-        """Get STS service configuration"""
-        return {
-            "host": "sts.volcengineapi.com",
-            "api_version": "2018-01-01",
-            "service": "sts",
-        }
 
     def get_caller_identity(self) -> Optional[GetCallerIdentityResponse]:
         """

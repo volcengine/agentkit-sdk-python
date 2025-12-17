@@ -237,16 +237,16 @@ class BaseExecutor:
             )
         return strategy_class
 
-    def _preflight_check(self, operation: str, launch_type: str) -> PreflightResult:
+    def _preflight_check(
+        self, operation: str, launch_type: str, region: Optional[str] = None
+    ) -> PreflightResult:
         """
-        Execute preflight service status check.
-
-        Checks whether all required cloud services for an operation are enabled.
-        The required services are defined in each Strategy's REQUIRED_SERVICES.
+        Check if required cloud services are enabled.
 
         Args:
-            operation: Operation name ('build', 'deploy', etc.)
             launch_type: Launch type (local/cloud/hybrid)
+            operation: Operation name (e.g., 'build', 'deploy')
+            region: Optional region override
 
         Returns:
             PreflightResult with passed status and any missing services
@@ -265,7 +265,7 @@ class BaseExecutor:
         try:
             from agentkit.sdk.account.client import AgentkitAccountClient
 
-            client = AgentkitAccountClient()
+            client = AgentkitAccountClient(region=region)
             statuses = client.get_services_status(required_services)
 
             missing = [name for name, status in statuses.items() if status != "Enabled"]
@@ -282,6 +282,37 @@ class BaseExecutor:
             # This prevents blocking users when the account service is unavailable
             self.logger.warning(f"Failed to check service status: {e}")
             return PreflightResult(passed=True, missing_services=[])
+
+    def _resolve_account_region(self, config, launch_type: str) -> Optional[str]:
+        """
+        Resolve region for AgentkitAccountClient from configuration.
+
+        Args:
+            config: AgentkitConfigManager instance
+            launch_type: Launch type string
+
+        Returns:
+            Region string or None
+        """
+        if not config:
+            return None
+
+        strategy_cfg = config.get_strategy_config(launch_type)
+        if not strategy_cfg:
+            return None
+
+        # Use Resolver for consistent logic
+        try:
+            from agentkit.toolkit.config.region_resolver import RegionConfigResolver
+
+            # Only resolve if 'region' is present
+            if strategy_cfg.get("region"):
+                resolver = RegionConfigResolver.from_dict(strategy_cfg)
+                return resolver.resolve("agentkit")
+        except Exception as e:
+            self.logger.warning(f"Failed to resolve region: {e}")
+
+        return None
 
     def _handle_preflight_result(
         self, result: PreflightResult, mode: PreflightMode

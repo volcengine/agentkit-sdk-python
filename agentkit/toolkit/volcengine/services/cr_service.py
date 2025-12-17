@@ -16,7 +16,9 @@ import logging
 from typing import Dict, Any, Optional, Tuple
 from dataclasses import dataclass, field
 from agentkit.utils.misc import generate_random_id
-from agentkit.utils.ve_sign import get_volc_ak_sk_region
+from agentkit.platform import (
+    VolcConfiguration,
+)
 import agentkit.toolkit.volcengine.cr as ve_cr
 import agentkit.toolkit.config as config
 from agentkit.toolkit.config import AUTO_CREATE_VE, DEFAULT_CR_INSTANCE_TEMPLATE_NAME
@@ -186,11 +188,28 @@ class CRService:
         self._vecr_client = None
         self._init_client()
 
-    def _init_client(self) -> None:
-        """Initialize the CR client with credentials from environment."""
+    def _init_client(self, region: Optional[str] = None) -> None:
+        """Initialize the CR client with credentials from environment.
+
+        Args:
+            region: Optional region override.
+        """
         try:
-            ak, sk, region = get_volc_ak_sk_region("CR")
-            self._vecr_client = ve_cr.VeCR(access_key=ak, secret_key=sk, region=region)
+            if region and isinstance(region, str):
+                region = region.strip() or None
+
+            config = VolcConfiguration(region=region)
+            creds = config.get_service_credentials("cr")
+            endpoint = config.get_service_endpoint("cr")
+
+            self._vecr_client = ve_cr.VeCR(
+                access_key=creds.access_key,
+                secret_key=creds.secret_key,
+                region=endpoint.region,
+            )
+            # Expose the actual region resolved by VolcConfiguration
+            self.actual_region = endpoint.region
+
         except Exception as e:
             logger.error(f"Failed to initialize CR client: {str(e)}")
             raise
@@ -212,6 +231,9 @@ class CRService:
             CRServiceResult: Operation result with resource details and registry URL.
         """
         try:
+            if getattr(cr_config, "region", None):
+                self._init_client(region=cr_config.region)
+
             result = CRServiceResult()
 
             if not self._ensure_cr_instance(cr_config, result):
@@ -395,7 +417,8 @@ class CRService:
         return True
 
     def ensure_public_endpoint(self, cr_config: CRServiceConfig) -> CRServiceResult:
-        """Enable public endpoint access for the CR instance if not already enabled."""
+        if getattr(cr_config, "region", None):
+            self._init_client(region=cr_config.region)
         result = CRServiceResult()
         try:
             public_endpoint = self._vecr_client._get_public_endpoint(
@@ -452,6 +475,8 @@ class CRService:
         Returns:
             Tuple of (success: bool, remote_image_url_or_error_message: str).
         """
+        if getattr(cr_config, "region", None):
+            self._init_client(region=cr_config.region)
         try:
             from agentkit.toolkit.docker.container import DockerManager
         except ImportError:
@@ -511,20 +536,6 @@ class CRService:
             self.config_callback.on_config_update(config_dict)
         except Exception as e:
             logger.warning(f"Failed to notify config update: {str(e)}")
-
-    def get_cr_config(self) -> Dict[str, Any]:
-        """Get CR configuration for pipeline template rendering."""
-        if not self._vecr_client:
-            return {}
-
-        try:
-            return {
-                "cr_domain": self._vecr_client._get_default_domain(instance_name=""),
-                "cr_region": self._vecr_client.region,
-            }
-        except Exception as e:
-            logger.warning(f"Failed to retrieve CR configuration: {str(e)}")
-            return {}
 
     @staticmethod
     def generate_cr_instance_name() -> str:

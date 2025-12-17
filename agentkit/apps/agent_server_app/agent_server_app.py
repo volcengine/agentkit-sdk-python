@@ -103,9 +103,7 @@ class AgentkitAgentServerApp(BaseAgentkitApp):
         @asynccontextmanager
         async def lifespan(app: FastAPI):
             # trigger A2A server app startup
-            logger.info(
-                "Triggering A2A server app startup within API server..."
-            )
+            logger.info("Triggering A2A server app startup within API server...")
             for handler in _a2a_server_app.router.on_startup:
                 await handler()
             yield
@@ -124,18 +122,14 @@ class AgentkitAgentServerApp(BaseAgentkitApp):
             # Extract headers (fallback keys supported)
             headers = request.headers
             user_id = (
-                headers.get("user_id")
-                or headers.get("x-user-id")
-                or "agentkit_user"
+                headers.get("user_id") or headers.get("x-user-id") or "agentkit_user"
             )
             session_id = headers.get("session_id") or ""
 
             # Determine app_name from loader
             app_names = self.server.agent_loader.list_agents()
             if not app_names:
-                raise HTTPException(
-                    status_code=404, detail="No agents configured"
-                )
+                raise HTTPException(status_code=404, detail="No agents configured")
             app_name = app_names[0]
 
             # Parse payload and convert to ADK Content
@@ -184,9 +178,7 @@ class AgentkitAgentServerApp(BaseAgentkitApp):
                             user_id=user_id,
                             session_id=session_id,
                             new_message=content,
-                            run_config=RunConfig(
-                                streaming_mode=StreamingMode.SSE
-                            ),
+                            run_config=RunConfig(streaming_mode=StreamingMode.SSE),
                         )
                     ) as agen:
                         async for event in agen:

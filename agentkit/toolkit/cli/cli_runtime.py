@@ -91,10 +91,18 @@ def create_runtime_command(
     json_body: Optional[str] = typer.Option(
         None, "--json", help="Full JSON body for CreateRuntime"
     ),
+    region: Optional[str] = typer.Option(
+        None,
+        "--region",
+        help=(
+            "Region override for this command (e.g. cn-beijing, cn-shanghai). "
+            "Defaults to VOLCENGINE_AGENTKIT_REGION/VOLCENGINE_REGION/global config."
+        ),
+    ),
 ):
     """Create a Runtime."""
     try:
-        client = AgentkitRuntimeClient()
+        client = AgentkitRuntimeClient(region=(region or "").strip())
         if json_body:
             payload = json.loads(json_body)
             req = rt.CreateRuntimeRequest(**payload)
@@ -184,10 +192,18 @@ def create_runtime_command(
 def get_runtime_command(
     runtime_id: str = typer.Option(..., "--runtime-id", "-r", help="Runtime ID"),
     output: str = typer.Option("yaml", "--output", help="Output format: json|yaml"),
+    region: Optional[str] = typer.Option(
+        None,
+        "--region",
+        help=(
+            "Region override for this command (e.g. cn-beijing, cn-shanghai). "
+            "Defaults to VOLCENGINE_AGENTKIT_REGION/VOLCENGINE_REGION/global config."
+        ),
+    ),
 ):
     """Get runtime details."""
     try:
-        client = AgentkitRuntimeClient()
+        client = AgentkitRuntimeClient(region=(region or "").strip())
         req = rt.GetRuntimeRequest(runtime_id=runtime_id)
         resp = client.get_runtime(req)
         data = resp.model_dump(by_alias=True, exclude_none=True)
@@ -226,10 +242,18 @@ def update_runtime_command(
     json_body: Optional[str] = typer.Option(
         None, "--json", help="Full JSON body for UpdateRuntime"
     ),
+    region: Optional[str] = typer.Option(
+        None,
+        "--region",
+        help=(
+            "Region override for this command (e.g. cn-beijing, cn-shanghai). "
+            "Defaults to VOLCENGINE_AGENTKIT_REGION/VOLCENGINE_REGION/global config."
+        ),
+    ),
 ):
     """Update runtime metadata and associations."""
     try:
-        client = AgentkitRuntimeClient()
+        client = AgentkitRuntimeClient(region=(region or "").strip())
         if json_body:
             payload = json.loads(json_body)
             req = rt.UpdateRuntimeRequest(**payload)
@@ -274,12 +298,20 @@ def update_runtime_command(
 def delete_runtime_command(
     runtime_id: str = typer.Option(..., "--runtime-id", "-r", help="Runtime ID"),
     force: bool = typer.Option(False, "--force", help="Skip confirmation"),
+    region: Optional[str] = typer.Option(
+        None,
+        "--region",
+        help=(
+            "Region override for this command (e.g. cn-beijing, cn-shanghai). "
+            "Defaults to VOLCENGINE_AGENTKIT_REGION/VOLCENGINE_REGION/global config."
+        ),
+    ),
 ):
     """Delete runtime."""
     try:
         if not force:
             typer.confirm("Are you sure you want to delete this runtime?", abort=True)
-        client = AgentkitRuntimeClient()
+        client = AgentkitRuntimeClient(region=(region or "").strip())
         req = rt.DeleteRuntimeRequest(runtime_id=runtime_id)
         resp = client.delete_runtime(req)
         console.print(
@@ -399,6 +431,14 @@ def list_runtimes_command(
     quiet: bool = typer.Option(
         False, "--quiet", "-q", help="Print only RuntimeId values"
     ),
+    region: Optional[str] = typer.Option(
+        None,
+        "--region",
+        help=(
+            "Region override for this command (e.g. cn-beijing, cn-shanghai). "
+            "Defaults to VOLCENGINE_AGENTKIT_REGION/VOLCENGINE_REGION/global config."
+        ),
+    ),
 ):
     """List runtimes with advanced filtering and cursor pagination.
 
@@ -409,7 +449,7 @@ def list_runtimes_command(
     - Sorting: --sort-by, --sort-order
     """
     try:
-        client = AgentkitRuntimeClient()
+        client = AgentkitRuntimeClient(region=(region or "").strip())
 
         # Build filters array according to API specification
         filters = []
@@ -600,10 +640,18 @@ def release_runtime_command(
     version_number: Optional[int] = typer.Option(
         None, "--version-number", help="Version to release"
     ),
+    region: Optional[str] = typer.Option(
+        None,
+        "--region",
+        help=(
+            "Region override for this command (e.g. cn-beijing, cn-shanghai). "
+            "Defaults to VOLCENGINE_AGENTKIT_REGION/VOLCENGINE_REGION/global config."
+        ),
+    ),
 ):
     """Release a runtime version (make it active)."""
     try:
-        client = AgentkitRuntimeClient()
+        client = AgentkitRuntimeClient(region=(region or "").strip())
         req = rt.ReleaseRuntimeRequest(
             runtime_id=runtime_id, version_number=version_number
         )
@@ -627,10 +675,18 @@ def get_runtime_version_command(
         None, "--version-number", help="Version number"
     ),
     output: str = typer.Option("yaml", "--output", help="Output format: json|yaml"),
+    region: Optional[str] = typer.Option(
+        None,
+        "--region",
+        help=(
+            "Region override for this command (e.g. cn-beijing, cn-shanghai). "
+            "Defaults to VOLCENGINE_AGENTKIT_REGION/VOLCENGINE_REGION/global config."
+        ),
+    ),
 ):
     """Get a specific runtime version details."""
     try:
-        client = AgentkitRuntimeClient()
+        client = AgentkitRuntimeClient(region=(region or "").strip())
         req = rt.GetRuntimeVersionRequest(
             runtime_id=runtime_id, version_number=version_number
         )
@@ -661,10 +717,18 @@ def list_runtime_versions_command(
     output: str = typer.Option(
         "table", "--output", help="Output format: table|json|yaml"
     ),
+    region: Optional[str] = typer.Option(
+        None,
+        "--region",
+        help=(
+            "Region override for this command (e.g. cn-beijing, cn-shanghai). "
+            "Defaults to VOLCENGINE_AGENTKIT_REGION/VOLCENGINE_REGION/global config."
+        ),
+    ),
 ):
     """List runtime versions."""
     try:
-        client = AgentkitRuntimeClient()
+        client = AgentkitRuntimeClient(region=(region or "").strip())
         req = rt.ListRuntimeVersionsRequest(
             runtime_id=runtime_id, page_number=page_number, page_size=page_size
         )

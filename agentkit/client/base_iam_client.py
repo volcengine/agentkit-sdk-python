@@ -20,7 +20,6 @@ Uses the same volcengine.base.Service approach as AgentKit services.
 from typing import Dict, Union
 
 from agentkit.client.base_service_client import BaseServiceClient, ApiConfig
-from agentkit.utils.ve_sign import get_volc_iam_host_scheme
 
 
 class BaseIAMClient(BaseServiceClient):
@@ -64,25 +63,10 @@ class BaseIAMClient(BaseServiceClient):
             service_name: Service name for logging
         """
         super().__init__(
+            service="iam",
             access_key=access_key,
             secret_key=secret_key,
             region=region,
             session_token=session_token,
             service_name=service_name,
-            credential_env_prefix="IAM",
         )
-
-    def _get_service_config(self) -> Dict[str, str]:
-        """
-        Get IAM service configuration.
-
-        Returns:
-            Dictionary with host, api_version, and service
-        """
-        host, scheme = get_volc_iam_host_scheme()
-        return {
-            "host": host or self.IAM_HOST,
-            "api_version": self.IAM_API_VERSION,
-            "service": self.IAM_SERVICE_CODE,
-            "scheme": scheme,
-        }

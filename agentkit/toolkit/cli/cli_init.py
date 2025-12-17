@@ -382,6 +382,9 @@ def init_command(
 
                 # Check if any relevant config is set
                 config_items = []
+                if global_cfg.region:
+                    config_items.append(f"Region: [yellow]{global_cfg.region}[/yellow]")
+                    has_config = True
                 if global_cfg.cr.instance_name:
                     config_items.append(
                         f"CR Instance: [yellow]{global_cfg.cr.instance_name}[/yellow]"
@@ -402,15 +405,9 @@ def init_command(
                         f"TOS Prefix: [yellow]{global_cfg.tos.prefix}[/yellow]"
                     )
                     has_config = True
-                if global_cfg.tos.region:
-                    config_items.append(
-                        f"TOS Region: [yellow]{global_cfg.tos.region}[/yellow]"
-                    )
-                    has_config = True
-
                 if has_config:
                     console.print(
-                        "\n[cyan]ℹ️  Detected global configuration. The following fields will use global defaults:[/cyan]"
+                        "\n[bold][cyan]ℹ️  Detected global configuration. The following fields will use global defaults:[/cyan][/bold]"
                     )
                     for item in config_items:
                         console.print(f"  • {item}")

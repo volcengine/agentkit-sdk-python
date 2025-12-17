@@ -475,12 +475,10 @@ class InitExecutor(BaseExecutor):
             # Create config directly to avoid auto-injection from global config
             cloud_config = CloudStrategyConfig()
 
-            # Region: prefer global volcengine.region if available
             global_region = None
-            if global_config and getattr(global_config.volcengine, "region", None):
-                global_region = global_config.volcengine.region
+            if global_config and global_config.region:
+                global_region = global_config.region
             cloud_config.region = global_region or "cn-beijing"
-            cloud_config.cr_region = global_region or "cn-beijing"
 
             # Empty string means "inherit from global config at runtime"
             if global_config and global_config.cr.instance_name:
@@ -506,12 +504,6 @@ class InitExecutor(BaseExecutor):
             else:
                 cloud_config.tos_prefix = "agentkit-builds"
 
-            # TOS region: prefer explicit value from global.tos.region; otherwise use global volcengine.region
-            if global_config and getattr(global_config.tos, "region", None):
-                cloud_config.tos_region = global_config.tos.region
-            else:
-                cloud_config.tos_region = cloud_config.region
-
             # Project-specific values (always set, not inherited)
             cloud_config.cr_repo_name = common_config.agent_name
             cloud_config.image_tag = DEFAULT_IMAGE_TAG
@@ -526,8 +518,8 @@ class InitExecutor(BaseExecutor):
             hybrid_config = HybridStrategyConfig()
             # Region: prefer global volcengine.region
             global_region = None
-            if global_config and getattr(global_config.volcengine, "region", None):
-                global_region = global_config.volcengine.region
+            if global_config and global_config.region:
+                global_region = global_config.region
             hybrid_config.region = global_region or "cn-beijing"
 
             if global_config and global_config.cr.instance_name:

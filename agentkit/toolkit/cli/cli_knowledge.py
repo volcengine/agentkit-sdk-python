@@ -120,10 +120,18 @@ def add_command(
     knowledge_bases_json: Optional[str] = typer.Option(
         None, "--knowledge-bases-json", help="JSON array of knowledge bases to add"
     ),
+    region: Optional[str] = typer.Option(
+        None,
+        "--region",
+        help=(
+            "Region override for this command (e.g. cn-beijing, cn-shanghai). "
+            "Defaults to VOLCENGINE_AGENTKIT_REGION/VOLCENGINE_REGION/global config."
+        ),
+    ),
 ):
     """Add external knowledge bases."""
     try:
-        client = AgentkitKnowledgeClient()
+        client = AgentkitKnowledgeClient(region=(region or "").strip())
 
         items: List[knowledge_types.KnowledgeBasesItemForAddKnowledgeBase] = []
         if knowledge_bases_json:
@@ -227,6 +235,14 @@ def list_command(
     sleep_ms: int = typer.Option(
         0, "--sleep-ms", help="Sleep milliseconds between batches"
     ),
+    region: Optional[str] = typer.Option(
+        None,
+        "--region",
+        help=(
+            "Region override for this command (e.g. cn-beijing, cn-shanghai). "
+            "Defaults to VOLCENGINE_AGENTKIT_REGION/VOLCENGINE_REGION/global config."
+        ),
+    ),
     output: str = typer.Option(
         "table", "--output", help="Output format: table|json|yaml"
     ),
@@ -271,7 +287,7 @@ def list_command(
       agentkit knowledge list --output json          # Output in JSON format
     """
     try:
-        client = AgentkitKnowledgeClient()
+        client = AgentkitKnowledgeClient(region=(region or "").strip())
 
         # Allowed status values for knowledge bases
         allowed_status = {
@@ -465,10 +481,18 @@ def list_command(
 def show_command(
     knowledge_id: str = typer.Option(..., "--knowledge-id", "-k", help="Knowledge ID"),
     output: str = typer.Option("yaml", "--output", help="Output format: json|yaml"),
+    region: Optional[str] = typer.Option(
+        None,
+        "--region",
+        help=(
+            "Region override for this command (e.g. cn-beijing, cn-shanghai). "
+            "Defaults to VOLCENGINE_AGENTKIT_REGION/VOLCENGINE_REGION/global config."
+        ),
+    ),
 ):
     """Show knowledge base details."""
     try:
-        client = AgentkitKnowledgeClient()
+        client = AgentkitKnowledgeClient(region=(region or "").strip())
         req = knowledge_types.GetKnowledgeBaseRequest(knowledge_id=knowledge_id)
         resp = client.get_knowledge_base(req)
         data = resp.model_dump(by_alias=True, exclude_none=True)
@@ -507,10 +531,18 @@ def update_command(
     json_body: Optional[str] = typer.Option(
         None, "--json", help="Full JSON body for UpdateKnowledgeBase"
     ),
+    region: Optional[str] = typer.Option(
+        None,
+        "--region",
+        help=(
+            "Region override for this command (e.g. cn-beijing, cn-shanghai). "
+            "Defaults to VOLCENGINE_AGENTKIT_REGION/VOLCENGINE_REGION/global config."
+        ),
+    ),
 ):
     """Update knowledge base (description, VPC)."""
     try:
-        client = AgentkitKnowledgeClient()
+        client = AgentkitKnowledgeClient(region=(region or "").strip())
 
         if json_body:
             payload = json.loads(json_body)
@@ -555,6 +587,14 @@ def update_command(
 def delete_command(
     knowledge_id: str = typer.Option(..., "--knowledge-id", "-k", help="Knowledge ID"),
     force: bool = typer.Option(False, "--force", help="Skip confirmation"),
+    region: Optional[str] = typer.Option(
+        None,
+        "--region",
+        help=(
+            "Region override for this command (e.g. cn-beijing, cn-shanghai). "
+            "Defaults to VOLCENGINE_AGENTKIT_REGION/VOLCENGINE_REGION/global config."
+        ),
+    ),
 ):
     """Delete knowledge base."""
     try:
@@ -562,7 +602,7 @@ def delete_command(
             typer.confirm(
                 "Are you sure you want to delete this knowledge base?", abort=True
             )
-        client = AgentkitKnowledgeClient()
+        client = AgentkitKnowledgeClient(region=(region or "").strip())
         req = knowledge_types.DeleteKnowledgeBaseRequest(knowledge_id=knowledge_id)
         resp = client.delete_knowledge_base(req)
         console.print(
@@ -588,10 +628,18 @@ def delete_command(
 def conn_command(
     knowledge_id: str = typer.Option(..., "--knowledge-id", "-k", help="Knowledge ID"),
     output: str = typer.Option("yaml", "--output", help="Output format: json|yaml"),
+    region: Optional[str] = typer.Option(
+        None,
+        "--region",
+        help=(
+            "Region override for this command (e.g. cn-beijing, cn-shanghai). "
+            "Defaults to VOLCENGINE_AGENTKIT_REGION/VOLCENGINE_REGION/global config."
+        ),
+    ),
 ):
     """Get connection info for a knowledge base."""
     try:
-        client = AgentkitKnowledgeClient()
+        client = AgentkitKnowledgeClient(region=(region or "").strip())
         req = knowledge_types.GetKnowledgeConnectionInfoRequest(
             knowledge_id=knowledge_id
         )

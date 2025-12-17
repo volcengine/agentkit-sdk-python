@@ -34,21 +34,15 @@ logger = logging.getLogger(__name__)
 class TOSServiceConfig(AutoSerializableMixin):
     """Configuration for TOS (Tos Object Storage) service."""
 
-    region: str = field(default="cn-beijing", metadata={"description": "Cloud region"})
+    region: str = field(default="", metadata={"description": "Cloud region"})
     endpoint: str = field(
         default="",
         metadata={
-            "description": "Custom endpoint URL; if empty, auto-generated from region"
+            "description": "Custom endpoint URL; if empty, resolved from PlatformConfig"
         },
     )
     bucket: str = field(default="", metadata={"description": "Bucket name"})
     prefix: str = field(default="", metadata={"description": "Object key prefix"})
-
-    def get_endpoint(self) -> str:
-        """Get the TOS endpoint URL, using custom endpoint if provided, otherwise construct from region."""
-        if self.endpoint:
-            return self.endpoint
-        return f"tos-{self.region}.volces.com"
 
 
 class TOSService:
@@ -70,22 +64,28 @@ class TOSService:
         self.client = None
         self._init_client()
 
-    def _init_client(self):
-        """Initialize TOS client with credentials from Volcano Engine."""
+    def _init_client(self) -> None:
+        """Initialize the TOS client."""
         try:
-            from agentkit.utils.ve_sign import get_volc_ak_sk_region
+            from agentkit.platform import VolcConfiguration
 
-            access_key, secret_key, region = get_volc_ak_sk_region("TOS")
-
-            # Override config region if not explicitly set and region is available
-            if not self.config.region and region:
-                self.config.region = region
+            # Use configured region if available
+            region = self.config.region.strip() if self.config.region else None
+            config = VolcConfiguration(region=region)
+            creds = config.get_service_credentials("tos")
+            ep = config.get_service_endpoint("tos")
 
             self.client = tos.TosClientV2(
-                access_key, secret_key, self.config.get_endpoint(), self.config.region
+                creds.access_key,
+                creds.secret_key,
+                ep.host,
+                ep.region,
             )
+            # Expose the actual region resolved by VolcConfiguration
+            self.actual_region = ep.region
+
             logger.info(
-                f"TOS client initialized: bucket={self.config.bucket}, region={self.config.region}"
+                f"TOS client initialized: bucket={self.config.bucket}, region={ep.region}"
             )
 
         except Exception as e:
@@ -117,7 +117,7 @@ class TOSService:
                 bucket=self.config.bucket, key=object_key, file_path=local_path
             )
 
-            url = f"https://{self.config.bucket}.{self.config.get_endpoint()}/{object_key}"
+            url = f"https://{self.config.bucket}.{self.config.endpoint}/{object_key}"
             logger.info(f"File uploaded successfully: {url}")
             return url
 

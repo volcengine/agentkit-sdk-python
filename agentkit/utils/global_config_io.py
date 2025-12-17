@@ -86,6 +86,22 @@ def get_path_value(data: Any, *keys: str) -> Any:
     return cur
 
 
+def get_global_config_value(
+    *keys: str,
+    fallback_keys: Optional[Tuple[str, ...]] = None,
+    config_path: Optional[Path] = None,
+) -> Any:
+    data = read_global_config_dict(config_path)
+    v = get_path_value(data, *keys)
+    if v is not None and v != "":
+        return v
+    if fallback_keys:
+        v2 = get_path_value(data, *fallback_keys)
+        if v2 is not None and v2 != "":
+            return v2
+    return None
+
+
 def get_global_config_str(
     *keys: str,
     fallback_keys: Optional[Tuple[str, ...]] = None,

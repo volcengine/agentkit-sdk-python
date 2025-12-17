@@ -191,10 +191,18 @@ def create_command(
     json_body: Optional[str] = typer.Option(
         None, "--json", help="Full JSON body for CreateMemoryCollection"
     ),
+    region: Optional[str] = typer.Option(
+        None,
+        "--region",
+        help=(
+            "Region override for this command (e.g. cn-beijing, cn-shanghai). "
+            "Defaults to VOLCENGINE_AGENTKIT_REGION/VOLCENGINE_REGION/global config."
+        ),
+    ),
 ):
     """Create a managed memory collection."""
     try:
-        client = AgentkitMemoryClient()
+        client = AgentkitMemoryClient(region=(region or "").strip())
 
         if json_body:
             payload = json.loads(json_body)
@@ -360,10 +368,18 @@ def add_command(
     collections_json: Optional[str] = typer.Option(
         None, "--collections-json", help="JSON array of collections to add"
     ),
+    region: Optional[str] = typer.Option(
+        None,
+        "--region",
+        help=(
+            "Region override for this command (e.g. cn-beijing, cn-shanghai). "
+            "Defaults to VOLCENGINE_AGENTKIT_REGION/VOLCENGINE_REGION/global config."
+        ),
+    ),
 ):
     """Add external provider collections."""
     try:
-        client = AgentkitMemoryClient()
+        client = AgentkitMemoryClient(region=(region or "").strip())
 
         items: List[memory_types.CollectionsItemForAddMemoryCollection] = []
         if collections_json:
@@ -507,10 +523,18 @@ def list_command(
     no_color: bool = typer.Option(
         False, "--no-color", "-nc", help="Disable colored output for tables/panels"
     ),
+    region: Optional[str] = typer.Option(
+        None,
+        "--region",
+        help=(
+            "Region override for this command (e.g. cn-beijing, cn-shanghai). "
+            "Defaults to VOLCENGINE_AGENTKIT_REGION/VOLCENGINE_REGION/global config."
+        ),
+    ),
 ):
     """List memory collections with cursor pagination (limit/next-token)."""
     try:
-        client = AgentkitMemoryClient()
+        client = AgentkitMemoryClient(region=(region or "").strip())
 
         filters: List[memory_types.FiltersItemForListMemoryCollections] = []
 
@@ -670,10 +694,18 @@ def list_command(
 def show_command(
     memory_id: str = typer.Option(..., "--memory-id", "-m", help="Memory ID"),
     output: str = typer.Option("yaml", "--output", help="Output format: json|yaml"),
+    region: Optional[str] = typer.Option(
+        None,
+        "--region",
+        help=(
+            "Region override for this command (e.g. cn-beijing, cn-shanghai). "
+            "Defaults to VOLCENGINE_AGENTKIT_REGION/VOLCENGINE_REGION/global config."
+        ),
+    ),
 ):
     """Show memory collection details."""
     try:
-        client = AgentkitMemoryClient()
+        client = AgentkitMemoryClient(region=(region or "").strip())
         req = memory_types.GetMemoryCollectionRequest(memory_id=memory_id)
         resp = client.get_memory_collection(req)
         data = resp.model_dump(by_alias=True, exclude_none=True)
@@ -728,10 +760,18 @@ def update_command(
     json_body: Optional[str] = typer.Option(
         None, "--json", help="Full JSON body for UpdateMemoryCollection"
     ),
+    region: Optional[str] = typer.Option(
+        None,
+        "--region",
+        help=(
+            "Region override for this command (e.g. cn-beijing, cn-shanghai). "
+            "Defaults to VOLCENGINE_AGENTKIT_REGION/VOLCENGINE_REGION/global config."
+        ),
+    ),
 ):
     """Update memory collection (description, strategies, VPC)."""
     try:
-        client = AgentkitMemoryClient()
+        client = AgentkitMemoryClient(region=(region or "").strip())
 
         if json_body:
             payload = json.loads(json_body)
@@ -854,12 +894,20 @@ def update_command(
 def delete_command(
     memory_id: str = typer.Option(..., "--memory-id", "-m", help="Memory ID"),
     force: bool = typer.Option(False, "--force", help="Skip confirmation"),
+    region: Optional[str] = typer.Option(
+        None,
+        "--region",
+        help=(
+            "Region override for this command (e.g. cn-beijing, cn-shanghai). "
+            "Defaults to VOLCENGINE_AGENTKIT_REGION/VOLCENGINE_REGION/global config."
+        ),
+    ),
 ):
     """Delete memory collection."""
     try:
         if not force:
             typer.confirm("Are you sure you want to delete this memory?", abort=True)
-        client = AgentkitMemoryClient()
+        client = AgentkitMemoryClient(region=(region or "").strip())
         req = memory_types.DeleteMemoryCollectionRequest(memory_id=memory_id)
         resp = client.delete_memory_collection(req)
         console.print(
@@ -885,10 +933,18 @@ def delete_command(
 def conn_command(
     memory_id: str = typer.Option(..., "--memory-id", "-m", help="Memory ID"),
     output: str = typer.Option("yaml", "--output", help="Output format: json|yaml"),
+    region: Optional[str] = typer.Option(
+        None,
+        "--region",
+        help=(
+            "Region override for this command (e.g. cn-beijing, cn-shanghai). "
+            "Defaults to VOLCENGINE_AGENTKIT_REGION/VOLCENGINE_REGION/global config."
+        ),
+    ),
 ):
     """Get connection info for a memory collection."""
     try:
-        client = AgentkitMemoryClient()
+        client = AgentkitMemoryClient(region=(region or "").strip())
         req = memory_types.GetMemoryConnectionInfoRequest(memory_id=memory_id)
         resp = client.get_memory_connection_info(req)
         data = resp.model_dump(by_alias=True, exclude_none=True)

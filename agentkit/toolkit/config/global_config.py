@@ -46,13 +46,11 @@ class VolcengineCredentials:
 
     access_key: str = ""
     secret_key: str = ""
-    region: str = "cn-beijing"
 
     def to_dict(self):
         return {
             "access_key": self.access_key,
             "secret_key": self.secret_key,
-            "region": self.region,
         }
 
     @classmethod
@@ -60,7 +58,6 @@ class VolcengineCredentials:
         return cls(
             access_key=data.get("access_key", ""),
             secret_key=data.get("secret_key", ""),
-            region=data.get("region", "cn-beijing"),
         )
 
 
@@ -76,16 +73,12 @@ class CRGlobalConfig:
     auto_create_instance_type: str = (
         "Micro"  # Instance type when auto-creating: "Micro" or "Enterprise"
     )
-    host: str = ""
-    schema: str = "https"
 
     def to_dict(self):
         return {
             "instance_name": self.instance_name,
             "namespace_name": self.namespace_name,
             "auto_create_instance_type": self.auto_create_instance_type,
-            "host": self.host,
-            "schema": self.schema,
         }
 
     @classmethod
@@ -94,8 +87,6 @@ class CRGlobalConfig:
             instance_name=data.get("instance_name", ""),
             namespace_name=data.get("namespace_name", ""),
             auto_create_instance_type=data.get("auto_create_instance_type", "Micro"),
-            host=data.get("host", ""),
-            schema=data.get("schema", "https"),
         )
 
 
@@ -103,18 +94,16 @@ class CRGlobalConfig:
 class TOSGlobalConfig:
     """TOS (object storage) global configuration.
 
-    Used when project config `tos_bucket`, `tos_prefix` or `tos_region` is empty or "Auto".
+    Used when project config `tos_bucket` or `tos_prefix` is empty or "Auto".
     """
 
     bucket: str = ""
     prefix: str = ""
-    region: str = ""
 
     def to_dict(self):
         return {
             "bucket": self.bucket,
             "prefix": self.prefix,
-            "region": self.region,
         }
 
     @classmethod
@@ -122,7 +111,6 @@ class TOSGlobalConfig:
         return cls(
             bucket=data.get("bucket", ""),
             prefix=data.get("prefix", ""),
-            region=data.get("region", ""),
         )
 
 
@@ -133,13 +121,12 @@ class GlobalConfig:
     Stored in ``~/.agentkit/config.yaml`` and shared across projects.
     """
 
+    region: str = ""
+
     volcengine: VolcengineCredentials = field(default_factory=VolcengineCredentials)
     cr: CRGlobalConfig = field(default_factory=CRGlobalConfig)
     tos: TOSGlobalConfig = field(default_factory=TOSGlobalConfig)
-    agentkit_host: str = ""
-    agentkit_schema: str = "https"
-    iam_host: str = ""
-    iam_schema: str = "https"
+    region_policy: dict = field(default_factory=dict)
 
     @dataclass
     class Defaults:
@@ -175,17 +162,11 @@ class GlobalConfig:
 
     def to_dict(self):
         base = {
+            "region": self.region,
             "volcengine": self.volcengine.to_dict(),
             "cr": self.cr.to_dict(),
             "tos": self.tos.to_dict(),
-            "agentkit": {
-                "host": self.agentkit_host,
-                "schema": self.agentkit_schema,
-            },
-            "iam": {
-                "host": self.iam_host,
-                "schema": self.iam_schema,
-            },
+            "region_policy": self.region_policy,
         }
         defaults_dict = self.defaults.to_dict()
         if defaults_dict:
@@ -194,14 +175,17 @@ class GlobalConfig:
 
     @classmethod
     def from_dict(cls, data: dict):
+        # Fallback: check nested volcengine.region if top-level region is missing
+        region = data.get("region", "")
+        if not region:
+            region = data.get("volcengine", {}).get("region", "")
+
         return cls(
+            region=region,
             volcengine=VolcengineCredentials.from_dict(data.get("volcengine", {})),
             cr=CRGlobalConfig.from_dict(data.get("cr", {})),
             tos=TOSGlobalConfig.from_dict(data.get("tos", {})),
-            agentkit_host=(data.get("agentkit", {}) or {}).get("host", ""),
-            agentkit_schema=(data.get("agentkit", {}) or {}).get("schema", "https"),
-            iam_host=(data.get("iam", {}) or {}).get("host", ""),
-            iam_schema=(data.get("iam", {}) or {}).get("schema", "https"),
+            region_policy=data.get("region_policy", {}),
             defaults=GlobalConfig.Defaults.from_dict(data.get("defaults", {}) or {}),
         )
 
@@ -391,21 +375,6 @@ def apply_global_config_defaults(
                 {
                     "tos_bucket": ("tos", "bucket"),
                     "tos_prefix": ("tos", "prefix"),
-                    "tos_region": ("tos", "region"),
-                }
-            )
-
-        # Region fields (cloud/hybrid) inherit from global volcengine.region when project missing
-        if isinstance(config_obj, (HybridStrategyConfig, CloudStrategyConfig)):
-            field_mappings.update(
-                {
-                    "region": ("volcengine", "region"),
-                }
-            )
-        if isinstance(config_obj, CloudStrategyConfig):
-            field_mappings.update(
-                {
-                    "cr_region": ("volcengine", "region"),
                 }
             )
 

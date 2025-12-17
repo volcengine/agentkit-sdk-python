@@ -42,6 +42,7 @@ from agentkit.toolkit.runners.ve_agentkit import (
 )
 from agentkit.toolkit.volcengine.services import CRService, CRServiceConfig
 from agentkit.toolkit.models import ConfigUpdates
+from agentkit.toolkit.config.region_resolver import RegionConfigResolver
 
 
 class HybridStrategy(Strategy):
@@ -329,11 +330,14 @@ class HybridStrategy(Strategy):
             return config_updates
 
         # Ensure CR resources exist (instance/namespace/repo)
+        resolver = RegionConfigResolver.from_strategy_config(strategy_config)
+
         cr_cfg = CRServiceConfig(
             instance_name=strategy_config.cr_instance_name,
             namespace_name=strategy_config.cr_namespace_name,
             repo_name=cr_repo_name,
             auto_create_instance_type=strategy_config.cr_auto_create_instance_type,
+            region=resolver.resolve("cr"),
         )
         cr_service = CRService(reporter=self.reporter)
         ensure_result = cr_service.ensure_cr_resources(
@@ -490,6 +494,8 @@ class HybridStrategy(Strategy):
             common_config, strategy_config.to_dict(), project_dir
         )
 
+        resolver = RegionConfigResolver.from_strategy_config(strategy_config)
+
         return VeAgentkitRunnerConfig(
             common_config=common_config,
             runtime_id=strategy_config.runtime_id or AUTO_CREATE_VE,
@@ -503,6 +509,7 @@ class HybridStrategy(Strategy):
             runtime_jwt_discovery_url=strategy_config.runtime_jwt_discovery_url,
             runtime_jwt_allowed_clients=strategy_config.runtime_jwt_allowed_clients,
             image_url=strategy_config.cr_image_full_url,
+            region=resolver.resolve("agentkit"),
         )
 
     # _push_to_cr removed: logic is handled inline within _handle_cr_push

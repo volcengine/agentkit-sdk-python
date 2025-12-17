@@ -15,6 +15,7 @@
 import logging
 import time
 
+from agentkit.platform import resolve_endpoint, VolcConfiguration
 from agentkit.utils.ve_sign import ve_request
 
 logger = logging.getLogger(__name__)
@@ -28,18 +29,17 @@ class VeCR:
     def __init__(self, access_key: str, secret_key: str, region: str = "cn-beijing"):
         self.ak = access_key
         self.sk = secret_key
-        self.region = region
-        self.version = "2022-05-12"
-        try:
-            from agentkit.toolkit.config.global_config import get_global_config
 
-            gc = get_global_config()
-            default_host = f"cr.{self.region}.volcengineapi.com"
-            self.host = gc.cr.host or default_host
-            self.scheme = gc.cr.schema or "https"
-        except Exception:
-            self.host = f"cr.{self.region}.volcengineapi.com"
-            self.scheme = "https"
+        config = VolcConfiguration(region=region or None)
+        ep = resolve_endpoint(
+            "cr",
+            region=region or None,
+            platform_config=config,
+        )
+        self.region = ep.region
+        self.version = ep.api_version
+        self.host = ep.host
+        self.scheme = ep.scheme
 
     def _create_instance(
         self,

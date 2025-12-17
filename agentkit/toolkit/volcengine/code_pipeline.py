@@ -16,7 +16,10 @@ import requests
 
 import logging
 
-from agentkit.utils.ve_sign import ve_request, get_volc_ak_sk_region
+from agentkit.utils.ve_sign import ve_request
+from agentkit.platform import (
+    VolcConfiguration,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -28,19 +31,32 @@ class VeCodePipeline:
         secret_key: str = "",
         region: str = "",
     ) -> None:
-        if not any([access_key, secret_key, region]):
-            access_key, secret_key, region = get_volc_ak_sk_region("CP")
+        # Use provided region or None to trigger auto-detection in VolcConfiguration
+        config = VolcConfiguration(
+            access_key=access_key or None,
+            secret_key=secret_key or None,
+            region=region or None,
+        )
+
+        # If credentials not fully provided, resolve them
+        if not any([access_key, secret_key]):
+            creds = config.get_service_credentials("cp")
+            self.volcengine_access_key = creds.access_key
+            self.volcengine_secret_key = creds.secret_key
+        elif not all([access_key, secret_key]):
+            raise ValueError(
+                "Error create cp instance: missing access key or secret key",
+            )
         else:
-            if not all([access_key, secret_key, region]):
-                raise ValueError(
-                    "Error create cr instance: missing access key, secret key or region"
-                )
-        self.volcengine_access_key = access_key
-        self.volcengine_secret_key = secret_key
-        self.region = region
-        self.service = "CP"
-        self.version = "2023-05-01"
-        self.host = "open.volcengineapi.com"
+            self.volcengine_access_key = access_key
+            self.volcengine_secret_key = secret_key
+
+        endpoint = config.get_service_endpoint("cp")
+
+        self.region = endpoint.region
+        self.service = endpoint.service
+        self.version = endpoint.api_version
+        self.host = endpoint.host
         self.content_type = "application/json"
 
     def _get_default_workspace(self) -> str:
