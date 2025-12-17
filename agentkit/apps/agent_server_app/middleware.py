@@ -43,8 +43,8 @@ class AgentkitTelemetryHTTPMiddleware:
         }
 
         # Currently unable to retrieve user_id and session_id from headers; keep logic for future use
-        user_id = headers.get("user_id") or headers.get("x-user-id") or ""
-        session_id = headers.get("session_id") or headers.get("x-session-id") or ""
+        user_id = headers.get("user_id")
+        session_id = headers.get("session_id")
         headers["user_id"] = user_id
         headers["session_id"] = session_id
         telemetry.trace_agent_server(

@@ -104,8 +104,7 @@ class AgentkitAgentServerApp(BaseAgentkitApp):
             )
             session_id = (
                 headers.get("session_id")
-                or headers.get("x-session-id")
-                or "agentkit_sample_session"
+                or ""
             )
 
             # Determine app_name from loader
