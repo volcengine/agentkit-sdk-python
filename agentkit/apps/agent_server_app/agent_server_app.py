@@ -102,10 +102,7 @@ class AgentkitAgentServerApp(BaseAgentkitApp):
             user_id = (
                 headers.get("user_id") or headers.get("x-user-id") or "agentkit_user"
             )
-            session_id = (
-                headers.get("session_id")
-                or ""
-            )
+            session_id = headers.get("session_id") or ""
 
             # Determine app_name from loader
             app_names = self.server.agent_loader.list_agents()
