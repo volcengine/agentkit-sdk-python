@@ -26,7 +26,10 @@ from volcengine.base.Service import Service
 from volcengine.Credentials import Credentials
 from volcengine.ServiceInfo import ServiceInfo
 
-from agentkit.utils.ve_sign import get_volc_ak_sk_region
+from agentkit.utils.ve_sign import (
+    get_volc_ak_sk_region,
+    ensure_x_custom_source_header,
+)
 
 T = TypeVar("T")
 
@@ -73,7 +76,7 @@ class BaseServiceClient(Service):
         session_token: str = "",
         service_name: str = "",
         credential_env_prefix: str = "",
-        header: Optional[Dict[str, Any]] = {"Accept": "application/json"},
+        header: Optional[Dict[str, Any]] = None,
     ) -> None:
         """
         Initialize the service client.
@@ -105,6 +108,15 @@ class BaseServiceClient(Service):
         self.session_token = session_token
         self.service_name = service_name
 
+        if header is None:
+            effective_header: Dict[str, Any] = {"Accept": "application/json"}
+        else:
+            effective_header = header.copy()
+            if "Accept" not in effective_header:
+                effective_header = {"Accept": "application/json", **effective_header}
+
+        effective_header = ensure_x_custom_source_header(effective_header)
+
         # Get service-specific configuration from subclass
         config = self._get_service_config()
         self.host = config["host"]
@@ -115,7 +127,7 @@ class BaseServiceClient(Service):
         # Create ServiceInfo
         self.service_info = ServiceInfo(
             host=self.host,
-            header=header,
+            header=effective_header,
             credentials=Credentials(
                 ak=self.access_key,
                 sk=self.secret_key,

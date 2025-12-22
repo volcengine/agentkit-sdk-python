@@ -16,6 +16,7 @@ import datetime
 import hashlib
 import hmac
 import os
+import platform
 import requests
 from urllib.parse import quote
 from agentkit.utils.global_config_io import get_global_config_str
@@ -27,6 +28,63 @@ Region = ""
 Host = ""
 ContentType = ""
 Scheme = "https"
+
+
+MAX_X_CUSTOM_SOURCE_LENGTH = 256
+
+
+def _get_os_tag() -> str:
+    system = platform.system().lower()
+    if "linux" in system:
+        return "linux"
+    if "windows" in system:
+        return "windows"
+    if "darwin" in system or "mac" in system:
+        return "macos"
+    return "unknown"
+
+
+def _get_entry() -> str:
+    value = os.getenv("AGENTKIT_CLIENT_TYPE", "").strip().lower()
+    if value in ("cli", "sdk"):
+        return value
+    return "sdk"
+
+
+def _get_sdk_version() -> str:
+    try:
+        from agentkit.version import VERSION
+
+        if VERSION:
+            return VERSION
+    except Exception:
+        pass
+    return "unknown"
+
+
+def build_x_custom_source_header() -> str:
+    sdk_name = "agentkit-sdk-python"
+    version = _get_sdk_version()
+    entry = _get_entry()
+    os_tag = _get_os_tag()
+    product = f"{sdk_name}/{version}"
+    parts = ["schema=v1", f"entry={entry}", f"os={os_tag}"]
+    inner = "; ".join(parts)
+    value = product
+    if inner:
+        value = f"{product} ({inner})"
+    if len(value) <= MAX_X_CUSTOM_SOURCE_LENGTH:
+        return value
+    if len(product) <= MAX_X_CUSTOM_SOURCE_LENGTH:
+        return product
+    return value[:MAX_X_CUSTOM_SOURCE_LENGTH]
+
+
+def ensure_x_custom_source_header(header: dict | None) -> dict:
+    base = header.copy() if header is not None else {}
+    if "X-Custom-Request-Context" not in base:
+        base["X-Custom-Request-Context"] = build_x_custom_source_header()
+    return base
 
 
 def norm_query(params):
@@ -146,6 +204,7 @@ def request(method, date, query, header, ak, sk, action, body):
             signature,
         )
     )
+    header = ensure_x_custom_source_header(header)
     header = {**header, **sign_result}
     # header = {**header, **{"X-Security-Token": SessionToken}}
     # 第六步：将 Signature 签名写入 HTTP Header 中，并发送 HTTP 请求。
@@ -168,7 +227,7 @@ def ve_request(
     version: str,
     region: str,
     host: str,
-    header: dict = {},
+    header: dict | None = None,
     content_type: str = "application/json",
     scheme: str = "https",
 ):
@@ -199,7 +258,7 @@ def ve_request(
 
     try:
         response_body = request(
-            "POST", now, {}, header, AK, SK, action, json.dumps(request_body)
+            "POST", now, {}, header or {}, AK, SK, action, json.dumps(request_body)
         )
         check_error(response_body)
         return response_body

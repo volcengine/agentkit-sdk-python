@@ -14,6 +14,8 @@
 
 """AgentKit CLI - Main entry point for AgentKit Starter Toolkit."""
 
+import os
+
 import typer
 from rich.panel import Panel
 from rich.console import Console
@@ -77,6 +79,7 @@ def main(
     ),
 ):
     """AgentKit CLI - Deploy AI agents with ease."""
+    os.environ.setdefault("AGENTKIT_CLIENT_TYPE", "cli")
     # If no subcommand is provided, show logo
     if ctx.invoked_subcommand is None:
         show_logo()
