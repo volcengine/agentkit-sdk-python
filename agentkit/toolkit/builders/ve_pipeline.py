@@ -32,7 +32,11 @@ from agentkit.toolkit.config.dataclass_utils import AutoSerializableMixin
 from agentkit.toolkit.models import BuildResult, ImageInfo
 from agentkit.toolkit.reporter import Reporter
 from agentkit.toolkit.errors import ErrorCode
-from agentkit.utils.misc import generate_random_id, calculate_nonlinear_progress
+from agentkit.utils.misc import (
+    generate_random_id,
+    calculate_nonlinear_progress,
+    retry,
+)
 from agentkit.toolkit.volcengine.services import CRServiceConfig
 from .base import Builder
 
@@ -1303,11 +1307,12 @@ class VeCPCRBuilder(Builder):
 
                 while True:
                     try:
-                        # Get pipeline run status
-                        status = cp_client.get_pipeline_run_status(
-                            workspace_id=workspace_id,
-                            pipeline_id=pipeline_id,
-                            run_id=run_id,
+                        status = retry(
+                            lambda: cp_client.get_pipeline_run_status(
+                                workspace_id=workspace_id,
+                                pipeline_id=pipeline_id,
+                                run_id=run_id,
+                            )
                         )
 
                         # Update progress description

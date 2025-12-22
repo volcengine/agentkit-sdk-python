@@ -72,10 +72,10 @@ class Telemetry:
             value=safe_serialize_to_json_string(headers),
         )
 
-        session_id = headers.get("session_id") or headers.get("x-session-id") or ""
+        session_id = headers.get("session_id")
         if session_id:
             span.set_attribute(key="gen_ai.session.id", value=session_id)
-        user_id = headers.get("user_id") or headers.get("x-user-id") or ""
+        user_id = headers.get("user_id")
         if user_id:
             span.set_attribute(key="gen_ai.user.id", value=user_id)
 

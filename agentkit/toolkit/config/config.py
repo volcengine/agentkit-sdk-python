@@ -297,7 +297,13 @@ class AgentkitConfigManager:
         """Save configuration file"""
         os.makedirs(self.config_path.parent, exist_ok=True)
         with open(self.config_path, "w", encoding="utf-8") as f:
-            yaml.dump(self._data, f, default_flow_style=False, sort_keys=False)
+            yaml.dump(
+                self._data,
+                f,
+                default_flow_style=False,
+                sort_keys=False,
+                allow_unicode=True,
+            )
 
     def get_common_config(self) -> CommonConfig:
         """Get common configuration"""
