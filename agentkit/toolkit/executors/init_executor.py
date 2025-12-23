@@ -50,6 +50,7 @@ from agentkit.toolkit.config.constants import (
     DEFAULT_CR_INSTANCE_TEMPLATE_NAME,
     DEFAULT_TOS_BUCKET_TEMPLATE_NAME,
 )
+from agentkit.toolkit.docker.utils import create_dockerignore_file
 
 
 TEMPLATES = {
@@ -593,41 +594,8 @@ class InitExecutor(BaseExecutor):
 
     def _create_dockerignore(self, target_dir: Path):
         """Create .dockerignore file."""
-        dockerignore_file_path = target_dir / ".dockerignore"
-        if dockerignore_file_path.exists():
-            self.logger.info("File .dockerignore already exists, skipping")
-            return
-
-        dockerignore_content = """# AgentKit configuration
-agentkit.yaml
-agentkit*.yaml
-
-# Python cache
-__pycache__/
-*.py[cod]
-*$py.class
-
-# Virtual environments
-.venv/
-venv/
-ENV/
-env/
-
-# IDE
-.vscode/
-.idea/
-.windsurf/
-
-# Git
-.git/
-.gitignore
-
-# Docker
-Dockerfile*
-.dockerignore
-"""
-        dockerignore_file_path.write_text(dockerignore_content, encoding="utf-8")
-        self.created_files.append(".dockerignore")
+        if create_dockerignore_file(str(target_dir)):
+            self.created_files.append(".dockerignore")
 
     def init_from_agent_file(
         self,
