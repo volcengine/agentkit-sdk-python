@@ -19,6 +19,8 @@ import logging
 import docker
 from docker.errors import DockerException, ImageNotFound
 
+from agentkit.toolkit.docker.utils import create_dockerignore_file
+
 logger = logging.getLogger(__name__)
 
 
@@ -84,10 +86,8 @@ class DockerfileRenderer:
 
             # Create .dockerignore file if requested
             if create_dockerignore:
-                dockerignore_path = os.path.join(
-                    output_dir or os.path.dirname(output_path), ".dockerignore"
-                )
-                self.create_dockerignore(dockerignore_path, dockerignore_entries)
+                target_dir = output_dir or os.path.dirname(output_path)
+                create_dockerignore_file(target_dir, dockerignore_entries)
 
             return rendered_content
 
@@ -106,6 +106,8 @@ class DockerfileRenderer:
         """
         Create .dockerignore file with default and additional entries.
 
+        Deprecated: Use agentkit.toolkit.docker.utils.create_dockerignore_file instead.
+
         Args:
             dockerignore_path: Path to .dockerignore file
             additional_entries: Additional entries to add to .dockerignore
@@ -113,62 +115,8 @@ class DockerfileRenderer:
         Raises:
             IOError: When file write fails
         """
-        try:
-            # Check if .dockerignore already exists
-            if os.path.exists(dockerignore_path):
-                logger.info(
-                    f".dockerignore already exists at: {dockerignore_path}, skipping creation"
-                )
-                return
-
-            # Default entries to exclude
-            default_entries = [
-                "# AgentKit configuration",
-                "agentkit.yaml",
-                "agentkit*.yaml",
-                "",
-                "# Python cache",
-                "__pycache__/",
-                "*.py[cod]",
-                "*$py.class",
-                "",
-                "# Virtual environments",
-                ".venv/",
-                "venv/",
-                "ENV/",
-                "env/",
-                "",
-                "# IDE",
-                ".vscode/",
-                ".idea/",
-                ".windsurf/",
-                "",
-                "# Git",
-                ".git/",
-                ".gitignore",
-                "",
-                "# Docker",
-                "Dockerfile*",
-                ".dockerignore",
-            ]
-
-            # Combine default and additional entries
-            all_entries = default_entries.copy()
-            if additional_entries:
-                all_entries.append("")
-                all_entries.append("# Additional entries")
-                all_entries.extend(additional_entries)
-
-            # Write .dockerignore file
-            with open(dockerignore_path, "w", encoding="utf-8") as f:
-                f.write("\n".join(all_entries))
-                f.write("\n")  # End with newline
-
-            logger.info(f"Successfully created .dockerignore at: {dockerignore_path}")
-
-        except Exception as e:
-            logger.error(f"Error creating .dockerignore: {str(e)}")
-            raise
+        target_dir = os.path.dirname(dockerignore_path)
+        create_dockerignore_file(target_dir, additional_entries)
 
 
 class DockerManager:

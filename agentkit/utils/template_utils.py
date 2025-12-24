@@ -106,10 +106,11 @@ def render_template_safe(
     template_str: str,
     fallback: Optional[str] = None,
     extra_vars: Optional[Dict[str, str]] = None,
+    sensitive: bool = False,
 ) -> str:
     """Render template safely, falling back to provided value on failure."""
     try:
-        return render_template(template_str, extra_vars)
+        return render_template(template_str, extra_vars, sensitive=sensitive)
     except Exception as e:
         logger.warning(f"Template rendering failed, using fallback value: {e}")
         return fallback if fallback is not None else template_str
@@ -120,7 +121,9 @@ def render_template_safe(
 
 # Optimized: fetch account_id only when needed
 def render_template(
-    template_str: str, extra_vars: Optional[Dict[str, str]] = None
+    template_str: str,
+    extra_vars: Optional[Dict[str, str]] = None,
+    sensitive: bool = False,
 ) -> str:
     """Render template string with builtin and optional variables.
 
@@ -128,12 +131,16 @@ def render_template(
     """
     # Fast-path: no placeholders
     if not template_str or "{{" not in template_str:
-        logger.debug("Skip rendering (no placeholders): %r", template_str)
+        if not sensitive:
+            logger.debug("Skip rendering (no placeholders): %r", template_str)
         return template_str
 
     # Extract placeholders
     placeholders = [m.strip() for m in P_VAR.findall(template_str)]
-    logger.debug("Render start: raw=%r, placeholders=%s", template_str, placeholders)
+    if not sensitive:
+        logger.debug(
+            "Render start: raw=%r, placeholders=%s", template_str, placeholders
+        )
 
     needs_account_id = any(p.replace(" ", "") == "account_id" for p in placeholders)
     logger.debug("Needs account_id: %s", needs_account_id)
@@ -182,5 +189,6 @@ def render_template(
             rendered,
         )
 
-    logger.debug("Render done: %r -> %r", template_str, rendered)
+    if not sensitive:
+        logger.debug("Render done: %r -> %r", template_str, rendered)
     return rendered

@@ -34,6 +34,8 @@ class ArchiveConfig:
     exclude_patterns: List[str] = field(
         default_factory=lambda: [
             "__pycache__",
+            "agentkit.yaml",
+            ".env",
             "*.pyc",
             "*.pyo",
             ".git",
@@ -44,6 +46,7 @@ class ArchiveConfig:
             "dist/",
             "build/",
             "*.egg-info/",
+            ".agentkit/",
         ]
     )
 

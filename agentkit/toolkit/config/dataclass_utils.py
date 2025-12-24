@@ -21,6 +21,40 @@ logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
+SENSITIVE_FIELDS = {
+    "runtime_envs",
+    "runtime_apikey_name",
+    "runtime_apikey",
+    "runtime_jwt_discovery_url",
+    "runtime_jwt_allowed_clients",
+}
+
+
+def _get_safe_value(field_name: str, value: Any) -> Any:
+    if field_name in SENSITIVE_FIELDS:
+        return "******"
+    return value
+
+
+def _sanitize_dict(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Sanitize sensitive fields in a dictionary."""
+    if not isinstance(data, dict):
+        return data
+    return {k: _get_safe_value(k, v) for k, v in data.items()}
+
+
+def _sanitize_diff(diff: Dict[str, Any]) -> Dict[str, Any]:
+    """Sanitize sensitive fields in a diff dictionary."""
+    if not isinstance(diff, dict):
+        return diff
+    sanitized = {}
+    for k, v in diff.items():
+        if k in SENSITIVE_FIELDS:
+            sanitized[k] = ("******", "******")
+        else:
+            sanitized[k] = v
+    return sanitized
+
 
 class DataclassSerializer:
     @staticmethod
@@ -50,7 +84,7 @@ class DataclassSerializer:
                 logger.debug(
                     "[DataclassSerializer] source=local field=%s value=%r",
                     field_name,
-                    kwargs[field_name],
+                    _get_safe_value(field_name, kwargs[field_name]),
                 )
             else:
                 # Try aliases (backward compatibility)
@@ -65,7 +99,7 @@ class DataclassSerializer:
                             "[DataclassSerializer] source=alias(%s) -> local field=%s value=%r",
                             alias,
                             field_name,
-                            kwargs[field_name],
+                            _get_safe_value(field_name, kwargs[field_name]),
                         )
                         break
 
@@ -77,7 +111,7 @@ class DataclassSerializer:
                         logger.debug(
                             "[DataclassSerializer] source=default_factory field=%s value=%r",
                             field_name,
-                            kwargs[field_name],
+                            _get_safe_value(field_name, kwargs[field_name]),
                         )
                     elif field.default is not MISSING:
                         kwargs[field_name] = field.default
@@ -85,7 +119,7 @@ class DataclassSerializer:
                         logger.debug(
                             "[DataclassSerializer] source=default field=%s value=%r",
                             field_name,
-                            kwargs[field_name],
+                            _get_safe_value(field_name, kwargs[field_name]),
                         )
                     else:
                         kwargs[field_name] = None
@@ -157,7 +191,11 @@ class AutoSerializableMixin:
             from .global_config import apply_global_config_defaults
 
             before = instance.to_dict()
-            logger.debug("from_dict: before globals for %s -> %r", cls.__name__, before)
+            logger.debug(
+                "from_dict: before globals for %s -> %r",
+                cls.__name__,
+                _sanitize_dict(before),
+            )
             instance = apply_global_config_defaults(instance, data)
             after = instance.to_dict()
             if before != after:
@@ -169,7 +207,7 @@ class AutoSerializableMixin:
                 logger.debug(
                     "from_dict: applied global defaults for %s; changes=%r",
                     cls.__name__,
-                    diff,
+                    _sanitize_diff(diff),
                 )
             else:
                 logger.debug(
@@ -254,7 +292,7 @@ class AutoSerializableMixin:
                         "[%s] [template] start field render check: name=%s, value=%r, has_placeholders=%s",
                         cfg_name,
                         field_info.name,
-                        field_value,
+                        _get_safe_value(field_info.name, field_value),
                         (
                             isinstance(field_value, str)
                             and ("{{" in field_value and "}}" in field_value)
@@ -269,7 +307,7 @@ class AutoSerializableMixin:
                                 "[%s] [template] field %s is Auto/empty -> using default_template=%r",
                                 cfg_name,
                                 field_info.name,
-                                default_template,
+                                _get_safe_value(field_info.name, default_template),
                             )
                             field_value = default_template
                             self._template_originals[field_info.name] = default_template
@@ -300,17 +338,20 @@ class AutoSerializableMixin:
                                     "[%s] [template] save original template for %s: %r",
                                     cfg_name,
                                     field_info.name,
-                                    field_value,
+                                    _get_safe_value(field_info.name, field_value),
                                 )
 
                         try:
-                            rendered = render_template(field_value)
+                            is_sensitive = field_info.name in SENSITIVE_FIELDS
+                            rendered = render_template(
+                                field_value, sensitive=is_sensitive
+                            )
                             logger.debug(
                                 "[%s] [template] rendered field %s: %r -> %r",
                                 cfg_name,
                                 field_info.name,
-                                field_value,
-                                rendered,
+                                _get_safe_value(field_info.name, field_value),
+                                _get_safe_value(field_info.name, rendered),
                             )
                             # Fail if unresolved placeholders remain
                             if "{{" in str(rendered) and "}}" in str(rendered):
@@ -356,7 +397,9 @@ class AutoSerializableMixin:
                         "[%s] [template] field %s is not marked for rendering, value: %r",
                         cfg_name,
                         field_info.name,
-                        getattr(self, field_info.name),
+                        _get_safe_value(
+                            field_info.name, getattr(self, field_info.name)
+                        ),
                     )
         except ImportError:
             # If template utils are not available, no-op
