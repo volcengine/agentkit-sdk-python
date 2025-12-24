@@ -25,6 +25,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from agentkit.toolkit.config import CommonConfig
 from agentkit.toolkit.config.dataclass_utils import AutoSerializableMixin
+from agentkit.toolkit.docker.utils import create_dockerignore_file
 from agentkit.toolkit.models import BuildResult, ImageInfo
 from agentkit.toolkit.reporter import Reporter
 from agentkit.toolkit.errors import ErrorCode
@@ -334,9 +335,7 @@ class LocalDockerBuilder(Builder):
                 force_regenerate=force_regenerate,
             )
 
-            dockerignore_path = self.workdir / ".dockerignore"
-            if not dockerignore_path.exists():
-                renderer.create_dockerignore(str(dockerignore_path))
+            create_dockerignore_file(str(self.workdir))
             image_name = f"{docker_config.image_name or 'agentkit-app'}"
             image_tag = f"{docker_config.image_tag or 'latest'}"
 
