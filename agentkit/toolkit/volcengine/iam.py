@@ -221,7 +221,13 @@ class VeIAM(BaseIAMClient):
                 data="{}",
             )
             response_data = json.loads(res)
-            return GetRoleResponse(**response_data.get("Result", {}))
+            result_data = response_data.get("Result", {})
+            role_data = result_data.get("Role")
+            if isinstance(role_data, dict):
+                tpd = role_data.get("TrustPolicyDocument")
+                if isinstance(tpd, dict):
+                    role_data["TrustPolicyDocument"] = json.dumps(tpd)
+            return GetRoleResponse(**result_data)
         except Exception as e:
             # If role not found, return None
             if "RoleNotExist" in str(e) or "NotFound" in str(e) or "404" in str(e):
