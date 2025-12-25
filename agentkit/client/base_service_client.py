@@ -137,7 +137,7 @@ class BaseServiceClient(Service):
                 sk=self.secret_key,
                 service=self.service,
                 region=self.region,
-                session_token=self.session_token,
+                session_token=self.session_token or "",
             ),
             connection_timeout=30,
             socket_timeout=30,
