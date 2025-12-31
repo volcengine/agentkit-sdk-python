@@ -14,7 +14,8 @@
 
 import inspect
 import logging
-from typing import Callable, override
+from typing import Callable
+from typing_extensions import override
 
 import uvicorn
 from starlette.applications import Starlette

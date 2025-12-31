@@ -15,7 +15,7 @@
 import json
 import logging
 from contextlib import asynccontextmanager
-from typing import override
+from typing_extensions import override
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
