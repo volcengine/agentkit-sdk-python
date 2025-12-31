@@ -110,14 +110,15 @@ class BaseServiceClient(Service):
 
         self.access_key = creds.access_key
         self.secret_key = creds.secret_key
-        self.region = ep.region
-        self.session_token = session_token
-        self.service_name = service_name
+        self.session_token = creds.session_token
 
         self.host = ep.host
-        self.api_version = ep.api_version
+        self.region = ep.region
         self.service = ep.service
         self.scheme = ep.scheme
+        self.api_version = ep.api_version
+
+        self.service_name = service_name
 
         if header is None:
             effective_header: Dict[str, Any] = {"Accept": "application/json"}
@@ -136,7 +137,7 @@ class BaseServiceClient(Service):
                 sk=self.secret_key,
                 service=self.service,
                 region=self.region,
-                session_token=self.session_token,
+                session_token=self.session_token or "",
             ),
             connection_timeout=30,
             socket_timeout=30,
