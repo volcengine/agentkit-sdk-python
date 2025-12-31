@@ -26,10 +26,12 @@ from volcengine.base.Service import Service
 from volcengine.Credentials import Credentials
 from volcengine.ServiceInfo import ServiceInfo
 
-from agentkit.utils.ve_sign import (
-    get_volc_ak_sk_region,
-    ensure_x_custom_source_header,
+from agentkit.platform import (
+    VolcConfiguration,
+    resolve_credentials,
+    resolve_endpoint,
 )
+from agentkit.utils.ve_sign import ensure_x_custom_source_header
 
 T = TypeVar("T")
 
@@ -62,7 +64,6 @@ class BaseServiceClient(Service):
 
     Subclasses should:
     1. Override API_ACTIONS with their API action configurations
-    2. Implement _get_service_config() to provide service-specific configuration
     """
 
     # Subclasses should override this with their API action configurations
@@ -70,43 +71,53 @@ class BaseServiceClient(Service):
 
     def __init__(
         self,
+        service: str,
         access_key: str = "",
         secret_key: str = "",
         region: str = "",
         session_token: str = "",
         service_name: str = "",
-        credential_env_prefix: str = "",
+        platform_config: Optional[VolcConfiguration] = None,
         header: Optional[Dict[str, Any]] = None,
     ) -> None:
         """
         Initialize the service client.
 
         Args:
+            service: Logical service name for signing and endpoint resolution
             access_key: Volcengine access key
             secret_key: Volcengine secret key
-            region: Volcengine region
+            region: Volcengine region override for endpoint
             session_token: Optional session token
             service_name: Service name for logging
-            credential_env_prefix: Environment variable prefix for credentials (e.g., 'AGENTKIT', 'IAM')
+            platform_config: Optional platform-level configuration overrides
         """
-        # Validate and get credentials
-        if not any([access_key, secret_key, region]):
-            access_key, secret_key, region = get_volc_ak_sk_region(
-                credential_env_prefix
-            )
-        else:
-            if not all([access_key, secret_key, region]):
-                raise ValueError(
-                    f"Error creating {service_name} instance: "
-                    "missing access key, secret key or region"
-                )
+        if platform_config is None:
+            platform_config = VolcConfiguration()
 
-        # Store credentials and service info
-        self.access_key = access_key
-        self.secret_key = secret_key
-        self.region = region
+        creds = resolve_credentials(
+            service=service,
+            explicit_access_key=access_key or None,
+            explicit_secret_key=secret_key or None,
+            platform_config=platform_config,
+        )
+
+        ep = resolve_endpoint(
+            service=service,
+            region=region or None,
+            platform_config=platform_config,
+        )
+
+        self.access_key = creds.access_key
+        self.secret_key = creds.secret_key
+        self.region = ep.region
         self.session_token = session_token
         self.service_name = service_name
+
+        self.host = ep.host
+        self.api_version = ep.api_version
+        self.service = ep.service
+        self.scheme = ep.scheme
 
         if header is None:
             effective_header: Dict[str, Any] = {"Accept": "application/json"}
@@ -116,14 +127,6 @@ class BaseServiceClient(Service):
                 effective_header = {"Accept": "application/json", **effective_header}
 
         effective_header = ensure_x_custom_source_header(effective_header)
-
-        # Get service-specific configuration from subclass
-        config = self._get_service_config()
-        self.host = config["host"]
-        self.api_version = config["api_version"]
-        self.service = config["service"]
-        self.scheme = config.get("scheme", "https")
-
         # Create ServiceInfo
         self.service_info = ServiceInfo(
             host=self.host,
@@ -145,20 +148,9 @@ class BaseServiceClient(Service):
 
         # Initialize parent Service class
         Service.__init__(self, service_info=self.service_info, api_info=self.api_info)
-
-    def _get_service_config(self) -> Dict[str, str]:
-        """
-        Get service-specific configuration.
-
-        Subclasses must override this method to provide:
-        - host: API endpoint host
-        - api_version: API version string
-        - service: Service name for signing
-
-        Returns:
-            Dictionary with 'host', 'api_version', and 'service' keys
-        """
-        raise NotImplementedError("Subclasses must implement _get_service_config()")
+        # need setting ak/sk after initializing Service to avoid volcengine SDK bugs
+        self.set_ak(self.access_key)
+        self.set_sk(self.secret_key)
 
     def _build_api_info(self) -> Dict[str, ApiInfo]:
         """

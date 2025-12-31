@@ -135,6 +135,18 @@ class HybridStrategyConfig(AutoSerializableMixin):
             "description": "Volcano Engine service region",
             "icon": "🌏",
             "aliases": ["ve_region"],
+            "choices": [
+                {"value": "cn-beijing", "description": "Beijing"},
+                {"value": "cn-shanghai", "description": "Shanghai"},
+            ],
+        },
+    )
+
+    region_overrides: Dict[str, str] = field(
+        default_factory=dict,
+        metadata={
+            "description": "Service region overrides (advanced)",
+            "hidden": True,
         },
     )
 
@@ -314,8 +326,17 @@ class CloudStrategyConfig(AutoSerializableMixin):
             "description": "Volcano Engine service region",
             "icon": "🌏",
             "choices": [
-                {"value": "cn-beijing", "description": "Beijing (North China 2)"}
+                {"value": "cn-beijing", "description": "Beijing"},
+                {"value": "cn-shanghai", "description": "Shanghai"},
             ],
+        },
+    )
+
+    region_overrides: Dict[str, str] = field(
+        default_factory=dict,
+        metadata={
+            "description": "Service region overrides (advanced)",
+            "hidden": True,
         },
     )
 
@@ -336,10 +357,6 @@ class CloudStrategyConfig(AutoSerializableMixin):
             "system": True,
             "description": "TOS object prefix for build artifacts",
         },
-    )
-    tos_region: str = field(
-        default="cn-beijing",
-        metadata={"system": True, "description": "TOS service region"},
     )
     tos_object_key: str = field(
         default="",
@@ -401,14 +418,6 @@ class CloudStrategyConfig(AutoSerializableMixin):
                 {"value": "Enterprise", "description": "Enterprise"},
             ],
             "hidden": True,
-        },
-    )
-    cr_region: str = field(
-        default="cn-beijing",
-        metadata={
-            "system": True,
-            "description": "Container Registry service region",
-            "aliases": ["ve_cr_region"],
         },
     )
     cr_image_full_url: str = field(

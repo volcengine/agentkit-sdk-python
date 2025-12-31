@@ -33,6 +33,7 @@ from agentkit.toolkit.config import (
     CloudStrategyConfig,
     merge_runtime_envs,
 )
+from agentkit.toolkit.config.region_resolver import RegionConfigResolver
 from agentkit.toolkit.builders.ve_pipeline import VeCPCRBuilder, VeCPCRBuilderConfig
 from agentkit.toolkit.runners.ve_agentkit import (
     VeAgentkitRuntimeRunner,
@@ -286,16 +287,19 @@ class CloudStrategy(Strategy):
         if self.config_manager:
             docker_build_config = self.config_manager.get_docker_build_config()
 
+        resolver = RegionConfigResolver.from_strategy_config(strategy_config)
+
         return VeCPCRBuilderConfig(
             common_config=common_config,
+            cp_region=resolver.resolve("cp"),
             tos_bucket=strategy_config.tos_bucket,
-            tos_region=strategy_config.tos_region,
+            tos_region=resolver.resolve("tos"),
             tos_prefix=strategy_config.tos_prefix,
             cr_instance_name=strategy_config.cr_instance_name,
             cr_namespace_name=strategy_config.cr_namespace_name,
             cr_repo_name=strategy_config.cr_repo_name,
             cr_auto_create_instance_type=strategy_config.cr_auto_create_instance_type,
-            cr_region=strategy_config.cr_region,
+            cr_region=resolver.resolve("cr"),
             cp_workspace_name=strategy_config.cp_workspace_name,
             cp_pipeline_name=cp_pipeline_name_override
             or strategy_config.cp_pipeline_name,
@@ -323,6 +327,8 @@ class CloudStrategy(Strategy):
             common_config, strategy_config.to_dict(), project_dir
         )
 
+        resolver = RegionConfigResolver.from_strategy_config(strategy_config)
+
         return VeAgentkitRunnerConfig(
             common_config=common_config,
             runtime_id=strategy_config.runtime_id,
@@ -336,4 +342,5 @@ class CloudStrategy(Strategy):
             runtime_jwt_discovery_url=strategy_config.runtime_jwt_discovery_url,
             runtime_jwt_allowed_clients=strategy_config.runtime_jwt_allowed_clients,
             image_url=strategy_config.cr_image_full_url,
+            region=resolver.resolve("agentkit"),
         )

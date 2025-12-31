@@ -55,7 +55,10 @@ class LifecycleExecutor(BaseExecutor):
         self.status_executor = StatusExecutor(reporter=self.reporter)
 
     def _combined_preflight_check(
-        self, launch_type: str, operations: List[str]
+        self,
+        launch_type: str,
+        operations: List[str],
+        region: Optional[str] = None,
     ) -> PreflightResult:
         """
         Perform combined preflight check for multiple operations.
@@ -66,6 +69,7 @@ class LifecycleExecutor(BaseExecutor):
         Args:
             launch_type: Launch type (local/cloud/hybrid)
             operations: List of operation names to check (e.g., ['build', 'deploy'])
+            region: Optional region override for the check
 
         Returns:
             PreflightResult with all missing services combined
@@ -91,7 +95,7 @@ class LifecycleExecutor(BaseExecutor):
         try:
             from agentkit.sdk.account.client import AgentkitAccountClient
 
-            client = AgentkitAccountClient()
+            client = AgentkitAccountClient(region=region)
             statuses = client.get_services_status(required_list)
 
             missing = [name for name, status in statuses.items() if status != "Enabled"]
@@ -149,8 +153,10 @@ class LifecycleExecutor(BaseExecutor):
                 config = self._load_config(config_dict, config_file)
                 launch_type = config.get_common_config().launch_type
 
+                # Resolve region for preflight check
+                region = self._resolve_account_region(config, launch_type)
                 preflight_result = self._combined_preflight_check(
-                    launch_type, ["build", "deploy"]
+                    launch_type, ["build", "deploy"], region=region
                 )
                 if not self._handle_preflight_result(preflight_result, preflight_mode):
                     return LifecycleResult(

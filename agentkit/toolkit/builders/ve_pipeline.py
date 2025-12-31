@@ -101,6 +101,11 @@ class VeCPCRBuilderConfig(AutoSerializableMixin):
         default="", metadata={"description": "Code Pipeline ID"}
     )
 
+    cp_region: str = field(
+        default="cn-beijing",
+        metadata={"description": "Code Pipeline region"},
+    )
+
     image_tag: str = field(
         default=DEFAULT_IMAGE_TAG, metadata={"description": "Image tag"}
     )
@@ -202,7 +207,7 @@ class VeCPCRBuilder(Builder):
             resources["archive_path"] = self._create_project_archive(builder_config)
 
             self.reporter.info("3/6 Uploading to TOS...")
-            resources["tos_url"] = self._upload_to_tos(
+            resources["tos_url"], resources["tos_actual_region"] = self._upload_to_tos(
                 resources["archive_path"], builder_config
             )
             resources["tos_object_key"] = builder_config.tos_object_key
@@ -212,7 +217,9 @@ class VeCPCRBuilder(Builder):
             )
 
             self.reporter.info("4/6 Preparing CR resources...")
-            resources["cr_config"] = self._prepare_cr_resources(builder_config)
+            resources["cr_config"], resources["cr_actual_region"] = (
+                self._prepare_cr_resources(builder_config)
+            )
 
             self.reporter.info("5/6 Preparing Code Pipeline resources...")
             resources["pipeline_id"] = self._prepare_pipeline_resources(
@@ -226,8 +233,17 @@ class VeCPCRBuilder(Builder):
                     resources["pipeline_id"] = self._build_resources["pipeline_id"]
 
             self.reporter.info("6/6 Executing build...")
+
+            # Aggregate all runtime overrides
+            runtime_overrides = {
+                "tos_region": resources.get("tos_actual_region"),
+                "cr_region": resources.get("cr_actual_region"),
+            }
+
             resources["image_url"] = self._execute_build(
-                resources["pipeline_id"], builder_config
+                resources["pipeline_id"],
+                builder_config,
+                runtime_overrides=runtime_overrides,
             )
             self.reporter.success(f"Build completed: {resources['image_url']}")
 
@@ -316,27 +332,11 @@ class VeCPCRBuilder(Builder):
 
             # Use CR service to verify image existence
             try:
-                from agentkit.toolkit.volcengine.services import (
-                    CRService,
-                    CRServiceConfig,
-                )
-
-                CRServiceConfig(
-                    instance_name=builder_config.cr_instance_name,
-                    namespace_name=builder_config.cr_namespace_name,
-                    repo_name=builder_config.cr_repo_name,
-                    region=builder_config.cr_region,
-                    image_full_url=builder_config.image_url,
-                )
-
-                CRService(reporter=self.reporter)
-
+                # TODO: Implement actual CR API image verification
+                # Currently simplified - assumes image exists if URL is configured
                 self.reporter.info(
                     f"Checking image existence: {builder_config.image_url}"
                 )
-
-                # TODO: Implement actual CR API image verification
-                # Currently simplified - assumes image exists if URL is configured
                 return True
 
             except Exception as e:
@@ -692,7 +692,9 @@ class VeCPCRBuilder(Builder):
         except Exception as e:
             raise Exception(f"Failed to create project archive: {str(e)}")
 
-    def _upload_to_tos(self, archive_path: str, config: VeCPCRBuilderConfig) -> str:
+    def _upload_to_tos(
+        self, archive_path: str, config: VeCPCRBuilderConfig
+    ) -> tuple[str, str]:
         """Upload project archive to TOS (Object Storage).
 
         Handles bucket auto-creation, template variable validation, and upload verification.
@@ -703,7 +705,7 @@ class VeCPCRBuilder(Builder):
             config: Build configuration with TOS settings.
 
         Returns:
-            TOS URL of the uploaded archive.
+            Tuple[str, str]: (TOS URL of the uploaded archive, Actual TOS Region used)
 
         Raises:
             ValueError: For unrendered template variables in bucket name.
@@ -801,11 +803,14 @@ class VeCPCRBuilder(Builder):
             # Upload file to TOS
             tos_url = tos_service.upload_file(archive_path, object_key)
 
+            # Get the actual region resolved by the service, or fallback to config
+            actual_region = getattr(tos_service, "actual_region", config.tos_region)
+
             # Save object key to config for later reference
             config.tos_object_key = object_key
 
-            logger.info(f"File uploaded to TOS: {tos_url}")
-            return tos_url
+            logger.info(f"File uploaded to TOS: {tos_url} (Region: {actual_region})")
+            return tos_url, actual_region
 
         except Exception as e:
             if "AccountDisable" in str(e):
@@ -818,14 +823,16 @@ class VeCPCRBuilder(Builder):
                 )
             raise Exception(f"Failed to upload to TOS: {str(e)}")
 
-    def _prepare_cr_resources(self, config: VeCPCRBuilderConfig) -> CRServiceConfig:
+    def _prepare_cr_resources(
+        self, config: VeCPCRBuilderConfig
+    ) -> tuple[CRServiceConfig, str]:
         """Prepare Container Registry resources.
 
         Ensures CR instance, namespace, and repository exist with public access.
         Auto-creates missing resources when configured with AUTO_CREATE_VE.
 
         Returns:
-            CRServiceConfig with validated resource information.
+            Tuple[CRServiceConfig, str]: (Validated resource info, Actual CR Region used)
 
         Raises:
             Exception: For CR resource creation or configuration failures.
@@ -899,7 +906,9 @@ class VeCPCRBuilder(Builder):
             self.reporter.info(f"   Namespace: {cr_result.namespace_name}")
             self.reporter.info(f"   Repository: {cr_result.repo_name}")
 
-            return cr_config
+            actual_region = getattr(cr_service, "actual_region", config.cr_region)
+
+            return cr_config, actual_region
 
         except Exception as e:
             raise Exception(f"Failed to prepare CR resources: {str(e)}")
@@ -926,17 +935,7 @@ class VeCPCRBuilder(Builder):
         try:
             from agentkit.toolkit.volcengine.code_pipeline import VeCodePipeline
 
-            # Get authentication credentials for Code Pipeline
-            from agentkit.utils.ve_sign import get_volc_ak_sk_region
-
-            ak, sk, region = get_volc_ak_sk_region("CP")
-            if region != "cn-beijing":
-                self.reporter.error(
-                    "Error: Code Pipeline only supported in cn-beijing region"
-                )
-                return False
-
-            cp_client = VeCodePipeline(access_key=ak, secret_key=sk, region=region)
+            cp_client = VeCodePipeline(region=config.cp_region)
 
             # Get or create agentkit-cli-workspace
             workspace_name = "agentkit-cli-workspace"
@@ -1196,7 +1195,12 @@ class VeCPCRBuilder(Builder):
         except Exception as e:
             raise Exception(f"Failed to prepare pipeline resources: {str(e)}")
 
-    def _execute_build(self, pipeline_id: str, config: VeCPCRBuilderConfig) -> str:
+    def _execute_build(
+        self,
+        pipeline_id: str,
+        config: VeCPCRBuilderConfig,
+        runtime_overrides: Dict[str, Any] = None,
+    ) -> str:
         """Execute build using Code Pipeline.
 
         Triggers pipeline execution with build parameters and monitors progress
@@ -1205,6 +1209,8 @@ class VeCPCRBuilder(Builder):
         Args:
             pipeline_id: Code Pipeline ID for build execution.
             config: Build configuration with CR and TOS settings.
+            runtime_overrides: Optional dictionary of runtime overrides (e.g. resolved physical regions).
+                             Keys: "tos_region", "cr_region", etc.
 
         Returns:
             Full image URL in Container Registry.
@@ -1247,16 +1253,19 @@ class VeCPCRBuilder(Builder):
                         lines=lines,
                         max_lines=100,
                     )
-
                     self.reporter.info(f"Complete logs saved to: {log_file}")
 
                 except Exception as log_err:
                     self.reporter.warning(f"Log download failed: {log_err}")
 
             # Prepare build parameters for pipeline execution
+            overrides = runtime_overrides or {}
+            tos_region = overrides.get("tos_region") or config.tos_region
+            cr_region = overrides.get("cr_region") or config.cr_region
+
             build_parameters = [
                 {"Key": "TOS_BUCKET_NAME", "Value": config.tos_bucket},
-                {"Key": "TOS_REGION", "Value": config.tos_region},
+                {"Key": "TOS_REGION", "Value": tos_region},
                 {
                     "Key": "TOS_PROJECT_FILE_NAME",
                     "Value": os.path.basename(config.tos_object_key),
@@ -1271,12 +1280,12 @@ class VeCPCRBuilder(Builder):
                 {"Key": "CR_INSTANCE", "Value": config.cr_instance_name},
                 {
                     "Key": "CR_DOMAIN",
-                    "Value": f"{config.cr_instance_name}-{config.cr_region}.cr.volces.com",
+                    "Value": f"{config.cr_instance_name}-{cr_region}.cr.volces.com",
                 },
                 {"Key": "CR_NAMESPACE", "Value": config.cr_namespace_name},
                 {"Key": "CR_OCI", "Value": config.cr_repo_name},
                 {"Key": "CR_TAG", "Value": config.image_tag},
-                {"Key": "CR_REGION", "Value": config.cr_region},
+                {"Key": "CR_REGION", "Value": cr_region},
             ]
 
             # Execute pipeline
@@ -1376,7 +1385,7 @@ class VeCPCRBuilder(Builder):
             self.reporter.success("Pipeline execution completed!")
 
             # Construct image URL: [instance-name]-[region].cr.volces.com
-            image_url = f"{config.cr_instance_name}-{config.cr_region}.cr.volces.com/{config.cr_namespace_name}/{config.cr_repo_name}:{config.image_tag}"
+            image_url = f"{config.cr_instance_name}-{cr_region}.cr.volces.com/{config.cr_namespace_name}/{config.cr_repo_name}:{config.image_tag}"
             config.image_url = image_url
 
             return image_url

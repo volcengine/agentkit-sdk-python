@@ -133,7 +133,10 @@ class BuildExecutor(BaseExecutor):
 
             # Preflight check: verify required cloud services are enabled
             if preflight_mode != PreflightMode.SKIP:
-                preflight_result = self._preflight_check("build", launch_type)
+                region = self._resolve_account_region(config, launch_type)
+                preflight_result = self._preflight_check(
+                    "build", launch_type, region=region
+                )
                 if not self._handle_preflight_result(preflight_result, preflight_mode):
                     return BuildResult(
                         success=False,

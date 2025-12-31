@@ -143,10 +143,18 @@ def create_tool_command(
     print_json: bool = typer.Option(
         False, "--print-json", help="Print final JSON payload"
     ),
+    region: Optional[str] = typer.Option(
+        None,
+        "--region",
+        help=(
+            "Region override for this command (e.g. cn-beijing, cn-shanghai). "
+            "Defaults to VOLCENGINE_AGENTKIT_REGION/VOLCENGINE_REGION/global config."
+        ),
+    ),
 ):
     """Create a tool."""
     try:
-        client = AgentkitToolsClient()
+        client = AgentkitToolsClient(region=(region or "").strip())
 
         if json_body:
             payload = json.loads(json_body)
@@ -259,10 +267,18 @@ def show_tool_command(
     quiet: bool = typer.Option(
         False, "--quiet", help="Print only ToolId when possible"
     ),
+    region: Optional[str] = typer.Option(
+        None,
+        "--region",
+        help=(
+            "Region override for this command (e.g. cn-beijing, cn-shanghai). "
+            "Defaults to VOLCENGINE_AGENTKIT_REGION/VOLCENGINE_REGION/global config."
+        ),
+    ),
 ):
     """Show tool details."""
     try:
-        client = AgentkitToolsClient()
+        client = AgentkitToolsClient(region=(region or "").strip())
         req = tools_types.GetToolRequest(tool_id=tool_id)
         resp = client.get_tool(req)
         data = resp.model_dump(by_alias=True, exclude_none=True)
@@ -299,10 +315,18 @@ def update_tool_command(
     print_json: bool = typer.Option(
         False, "--print-json", help="Print final JSON payload"
     ),
+    region: Optional[str] = typer.Option(
+        None,
+        "--region",
+        help=(
+            "Region override for this command (e.g. cn-beijing, cn-shanghai). "
+            "Defaults to VOLCENGINE_AGENTKIT_REGION/VOLCENGINE_REGION/global config."
+        ),
+    ),
 ):
     """Update tool description."""
     try:
-        client = AgentkitToolsClient()
+        client = AgentkitToolsClient(region=(region or "").strip())
         if json_body:
             payload = json.loads(json_body)
         else:
@@ -333,12 +357,20 @@ def update_tool_command(
 def delete_tool_command(
     tool_id: str = typer.Option(..., "--tool-id", "-t", help="Tool ID"),
     force: bool = typer.Option(False, "--force", help="Skip confirmation"),
+    region: Optional[str] = typer.Option(
+        None,
+        "--region",
+        help=(
+            "Region override for this command (e.g. cn-beijing, cn-shanghai). "
+            "Defaults to VOLCENGINE_AGENTKIT_REGION/VOLCENGINE_REGION/global config."
+        ),
+    ),
 ):
     """Delete tool."""
     try:
         if not force:
             typer.confirm("Are you sure you want to delete this tool?", abort=True)
-        client = AgentkitToolsClient()
+        client = AgentkitToolsClient(region=(region or "").strip())
         req = tools_types.DeleteToolRequest(tool_id=tool_id)
         resp = client.delete_tool(req)
         console.print(
@@ -427,10 +459,18 @@ def list_tools_command(
     no_color: bool = typer.Option(
         False, "--no-color", "-nc", help="Disable colored output for tables/panels"
     ),
+    region: Optional[str] = typer.Option(
+        None,
+        "--region",
+        help=(
+            "Region override for this command (e.g. cn-beijing, cn-shanghai). "
+            "Defaults to VOLCENGINE_AGENTKIT_REGION/VOLCENGINE_REGION/global config."
+        ),
+    ),
 ):
     """List tools with exact and substring filters for Id|Name|Description|Status."""
     try:
-        client = AgentkitToolsClient()
+        client = AgentkitToolsClient(region=(region or "").strip())
         allowed_status = {"Creating", "Error", "Ready", "Deleting"}
 
         # Use unified parameter helper
@@ -609,10 +649,18 @@ def create_session_command(
     print_json: bool = typer.Option(
         False, "--print-json", help="Print final JSON payload"
     ),
+    region: Optional[str] = typer.Option(
+        None,
+        "--region",
+        help=(
+            "Region override for this command (e.g. cn-beijing, cn-shanghai). "
+            "Defaults to VOLCENGINE_AGENTKIT_REGION/VOLCENGINE_REGION/global config."
+        ),
+    ),
 ):
     """Create a session for a tool."""
     try:
-        client = AgentkitToolsClient()
+        client = AgentkitToolsClient(region=(region or "").strip())
         if json_body:
             payload = json.loads(json_body)
         else:
@@ -647,10 +695,18 @@ def get_session_command(
     output: str = typer.Option(
         "yaml", "--output", "-o", help="Output format: json|yaml"
     ),
+    region: Optional[str] = typer.Option(
+        None,
+        "--region",
+        help=(
+            "Region override for this command (e.g. cn-beijing, cn-shanghai). "
+            "Defaults to VOLCENGINE_AGENTKIT_REGION/VOLCENGINE_REGION/global config."
+        ),
+    ),
 ):
     """Show session details."""
     try:
-        client = AgentkitToolsClient()
+        client = AgentkitToolsClient(region=(region or "").strip())
         req = tools_types.GetSessionRequest(tool_id=tool_id, session_id=session_id)
         resp = client.get_session(req)
         data = resp.model_dump(by_alias=True, exclude_none=True)
@@ -676,12 +732,20 @@ def delete_session_command(
         ..., "--tool-id", "-t", help="Tool ID (optional)"
     ),
     force: bool = typer.Option(False, "--force", help="Skip confirmation"),
+    region: Optional[str] = typer.Option(
+        None,
+        "--region",
+        help=(
+            "Region override for this command (e.g. cn-beijing, cn-shanghai). "
+            "Defaults to VOLCENGINE_AGENTKIT_REGION/VOLCENGINE_REGION/global config."
+        ),
+    ),
 ):
     """Delete session."""
     try:
         if not force:
             typer.confirm("Are you sure you want to delete this session?", abort=True)
-        client = AgentkitToolsClient()
+        client = AgentkitToolsClient(region=(region or "").strip())
         req = tools_types.DeleteSessionRequest(session_id=session_id, tool_id=tool_id)
         resp = client.delete_session(req)
         console.print(
@@ -765,10 +829,18 @@ def list_sessions_command(
     no_color: bool = typer.Option(
         False, "--no-color", "-nc", help="Disable colored output for tables/panels"
     ),
+    region: Optional[str] = typer.Option(
+        None,
+        "--region",
+        help=(
+            "Region override for this command (e.g. cn-beijing, cn-shanghai). "
+            "Defaults to VOLCENGINE_AGENTKIT_REGION/VOLCENGINE_REGION/global config."
+        ),
+    ),
 ):
     """List sessions with exact/substring filters and cursor pagination (limit/next-token)."""
     try:
-        client = AgentkitToolsClient()
+        client = AgentkitToolsClient(region=(region or "").strip())
         allowed_status = {"Creating", "Error", "Ready", "Deleting"}
 
         def _parse_csv(v: Optional[str]) -> Optional[List[str]]:
@@ -977,10 +1049,18 @@ def session_logs_command(
     tool_id: str = typer.Option(..., "--tool-id", "-t", help="Tool ID"),
     session_id: str = typer.Option(..., "--session-id", "-s", help="Session ID"),
     limit: Optional[int] = typer.Option(None, "--limit", help="Max log lines"),
+    region: Optional[str] = typer.Option(
+        None,
+        "--region",
+        help=(
+            "Region override for this command (e.g. cn-beijing, cn-shanghai). "
+            "Defaults to VOLCENGINE_AGENTKIT_REGION/VOLCENGINE_REGION/global config."
+        ),
+    ),
 ):
     """Get session logs."""
     try:
-        client = AgentkitToolsClient()
+        client = AgentkitToolsClient(region=(region or "").strip())
         req = tools_types.GetSessionLogsRequest(
             tool_id=tool_id, session_id=session_id, limit=limit
         )
@@ -1000,10 +1080,18 @@ def set_session_ttl_command(
     ttl_unit: Optional[str] = typer.Option(
         None, "--ttl-unit", "-u", help="TTL unit: second|minute (default: minute)"
     ),
+    region: Optional[str] = typer.Option(
+        None,
+        "--region",
+        help=(
+            "Region override for this command (e.g. cn-beijing, cn-shanghai). "
+            "Defaults to VOLCENGINE_AGENTKIT_REGION/VOLCENGINE_REGION/global config."
+        ),
+    ),
 ):
     """Set session TTL."""
     try:
-        client = AgentkitToolsClient()
+        client = AgentkitToolsClient(region=(region or "").strip())
         normalized_unit = _normalize_ttl_unit(ttl_unit)
         req = tools_types.SetSessionTtlRequest(
             tool_id=tool_id, session_id=session_id, ttl=ttl, ttl_unit=normalized_unit

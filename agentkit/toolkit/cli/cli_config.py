@@ -362,10 +362,13 @@ def _handle_global_config(show: bool, set_field: Optional[str], init_global: boo
             )
 
             console.print("\n[bold]Supported fields:[/bold]")
+            console.print("  [dim]Global:[/dim]")
+            console.print(
+                "    • [green]region[/green]                  - Default region (e.g. cn-beijing, cn-shanghai)"
+            )
             console.print("  [dim]Volcengine:[/dim]")
             console.print("    • [green]volcengine.access_key[/green]   - Access Key")
             console.print("    • [green]volcengine.secret_key[/green]   - Secret Key")
-            console.print("    • [green]volcengine.region[/green]       - Region")
             console.print("  [dim]CR:[/dim]")
             console.print(
                 "    • [green]cr.instance_name[/green]        - CR instance name"
@@ -379,7 +382,6 @@ def _handle_global_config(show: bool, set_field: Optional[str], init_global: boo
             console.print(
                 "    • [green]tos.prefix[/green]              - Object prefix"
             )
-            console.print("    • [green]tos.region[/green]              - Region")
 
 
 def _init_global_config():
@@ -407,9 +409,8 @@ def _init_global_config():
     # Create default config
     config = GlobalConfig()
     # Set default values
-    config.volcengine.region = "cn-beijing"
+    config.region = "cn-beijing"
     config.tos.prefix = "agentkit-builds"
-    config.tos.region = "cn-beijing"
 
     # Save config file
     try:
@@ -419,10 +420,14 @@ def _init_global_config():
             "\n[bold cyan]📝 Config template generated with the following items:[/bold cyan]\n"
         )
 
+        console.print("[bold]🌍 Global Settings[/bold]")
+        console.print(
+            "  region: cn-beijing # Default project region (e.g. cn-beijing, cn-shanghai)"
+        )
+
         console.print("[bold]🔐 Volcengine Credentials[/bold]")
         console.print("  access_key: ''     # Volcengine Access Key")
         console.print("  secret_key: ''     # Volcengine Secret Key")
-        console.print("  region: cn-beijing # Default region")
 
         console.print("\n[bold]📦 CR Configuration[/bold]")
         console.print("  instance_name: ''  # CR instance name")
@@ -434,7 +439,6 @@ def _init_global_config():
         console.print("\n[bold]🗂️  TOS Configuration[/bold]")
         console.print("  bucket: ''         # TOS bucket name")
         console.print("  prefix: agentkit-builds")
-        console.print("  region: cn-beijing")
 
         console.print("\n[dim]💡 Tips:[/dim]")
         console.print(f"  • Edit config:   vim {config_path}")
@@ -463,6 +467,13 @@ def _show_global_config():
         "\n[bold cyan]📋 Global Configuration[/bold cyan] [dim](~/.agentkit/config.yaml)[/dim]\n"
     )
 
+    # Display Global Settings
+    console.print("[bold]🌍 Global Settings[/bold]")
+    console.print(
+        f"  Region:     [yellow]{config.region or '[dim](not set)[/dim]'}[/yellow]"
+    )
+    console.print()
+
     # Display Volcengine credentials
     console.print("[bold]🔐 Volcengine Credentials[/bold]")
     if config.volcengine.access_key:
@@ -479,8 +490,6 @@ def _show_global_config():
         console.print("  Secret Key: [yellow]***[/yellow] (set)")
     else:
         console.print("  Secret Key: [dim](not set)[/dim]")
-
-    console.print(f"  Region:     [yellow]{config.volcengine.region}[/yellow]")
 
     # Display CR configuration
     console.print("\n[bold]📦 CR Configuration[/bold]")
@@ -500,14 +509,16 @@ def _show_global_config():
         f"  Bucket:     [yellow]{config.tos.bucket or '[dim](not set)[/dim]'}[/yellow]"
     )
     console.print(f"  Prefix:     [yellow]{config.tos.prefix}[/yellow]")
-    console.print(f"  Region:     [yellow]{config.tos.region}[/yellow]")
 
     console.print()
 
 
 def _set_global_field(field_value: str):
     """Set global config field value."""
-    from agentkit.toolkit.config import get_global_config, save_global_config
+    from agentkit.utils.global_config_io import (
+        read_global_config_dict,
+        write_global_config_dict,
+    )
 
     # Parse key=value format
     if "=" not in field_value:
@@ -520,112 +531,103 @@ def _set_global_field(field_value: str):
     key, value = field_value.split("=", 1)
     parts = key.split(".")
 
-    if len(parts) != 2:
+    # Special case for top-level region
+    if key == "region":
+        pass
+    elif len(parts) < 2:
         console.print(f"[red]❌ Invalid field format: {key}[/red]")
         console.print("\nSupported fields:")
+        console.print("  • region")
         console.print("  • volcengine.access_key")
         console.print("  • volcengine.secret_key")
-        console.print("  • volcengine.region")
         console.print("  • cr.instance_name")
-        console.print("  • cr.auto_create_instance_type")
-        console.print("  • cr.namespace_name")
         console.print("  • tos.bucket")
-        console.print("  • tos.prefix")
-        console.print("  • tos.region")
         raise typer.Exit(code=1)
 
-    section, field = parts
+    # Read config as raw dict to preserve unknown fields (e.g. 'services')
+    config_dict = read_global_config_dict()
 
-    # Load config
-    config = get_global_config()
+    # Special handling for region compatibility
+    if key == "volcengine.region":
+        console.print(
+            "[yellow]⚠️  'volcengine.region' is deprecated, setting 'region' instead.[/yellow]"
+        )
+        config_dict["region"] = value
+    elif key == "region":
+        config_dict["region"] = value
+    # Special handling for known 'defaults' section which requires type conversion
+    elif parts[0] == "defaults" and len(parts) == 2:
+        section = "defaults"
+        field = parts[1]
 
-    # Set field value
-    try:
-        if section == "volcengine":
-            if not hasattr(config.volcengine, field):
-                raise AttributeError(f"volcengine has no field: {field}")
-            setattr(config.volcengine, field, value)
-        elif section == "cr":
-            if not hasattr(config.cr, field):
-                raise AttributeError(f"cr has no field: {field}")
-            setattr(config.cr, field, value)
-        elif section == "tos":
-            if not hasattr(config.tos, field):
-                raise AttributeError(f"tos has no field: {field}")
-            setattr(config.tos, field, value)
-        elif section == "agentkit":
-            if field not in ["host", "schema"]:
-                raise AttributeError(f"agentkit has no field: {field}")
-            if field == "host":
-                config.agentkit_host = value
-            elif field == "schema":
-                config.agentkit_schema = value
-        elif section == "iam":
-            if field not in ["host", "schema"]:
-                raise AttributeError(f"iam has no field: {field}")
-            if field == "host":
-                config.iam_host = value
-            elif field == "schema":
-                config.iam_schema = value
-        elif section == "defaults":
-            if field == "launch_type":
-                clean_value = value.strip() if value is not None else None
-                if clean_value == "":
-                    clean_value = None
-                config.defaults.launch_type = clean_value
-            elif field == "preflight_mode":
-                clean_value = value.strip().lower() if value is not None else None
-                if clean_value == "":
-                    clean_value = None
-                # Accept only known modes
-                allowed = {"prompt", "fail", "warn", "skip"}
-                if clean_value and clean_value not in allowed:
-                    raise AttributeError(
-                        f"Invalid preflight_mode: {value}. Allowed: prompt|fail|warn|skip"
-                    )
-                config.defaults.preflight_mode = clean_value
-            elif field == "cr_public_endpoint_check":
-                clean_value = value.strip().lower() if value is not None else None
-                if clean_value == "":
-                    clean_value = None
-                if clean_value is None:
-                    config.defaults.cr_public_endpoint_check = None
-                else:
-                    truthy = {"true", "1", "yes", "y"}
-                    falsy = {"false", "0", "no", "n"}
-                    if clean_value in truthy:
-                        config.defaults.cr_public_endpoint_check = True
-                    elif clean_value in falsy:
-                        config.defaults.cr_public_endpoint_check = False
-                    else:
-                        raise AttributeError(
-                            f"Invalid cr_public_endpoint_check: {value}. Allowed: true|false|1|0|yes|no"
-                        )
-            elif field == "iam_role_policies":
-                clean_value = value.strip() if value is not None else None
-                if clean_value == "" or clean_value is None:
-                    config.defaults.iam_role_policies = None
-                else:
-                    policies = [p.strip() for p in clean_value.split(",") if p.strip()]
-                    config.defaults.iam_role_policies = policies
+        # Ensure section exists
+        if section not in config_dict:
+            config_dict[section] = {}
+
+        if field == "launch_type":
+            clean_value = value.strip() if value is not None else None
+            if clean_value == "":
+                clean_value = None
+            config_dict[section][field] = clean_value
+        elif field == "preflight_mode":
+            clean_value = value.strip().lower() if value is not None else None
+            if clean_value == "":
+                clean_value = None
+            # Accept only known modes
+            allowed = {"prompt", "fail", "warn", "skip"}
+            if clean_value and clean_value not in allowed:
+                raise AttributeError(
+                    f"Invalid preflight_mode: {value}. Allowed: prompt|fail|warn|skip"
+                )
+            config_dict[section][field] = clean_value
+        elif field == "cr_public_endpoint_check":
+            clean_value = value.strip().lower() if value is not None else None
+            if clean_value == "":
+                clean_value = None
+            if clean_value is None:
+                config_dict[section][field] = None
             else:
-                raise AttributeError(f"defaults has no field: {field}")
+                truthy = {"true", "1", "yes", "y"}
+                falsy = {"false", "0", "no", "n"}
+                if clean_value in truthy:
+                    config_dict[section][field] = True
+                elif clean_value in falsy:
+                    config_dict[section][field] = False
+                else:
+                    raise AttributeError(
+                        f"Invalid boolean value for cr_public_endpoint_check: {value}"
+                    )
+        elif field == "iam_role_policies":
+            # Simple list parsing for CLI convenience
+            if not value:
+                config_dict[section][field] = []
+            else:
+                config_dict[section][field] = [
+                    p.strip() for p in value.split(",") if p.strip()
+                ]
         else:
-            console.print(f"[red]❌ Unknown config section: {section}[/red]")
-            console.print("\nSupported sections: volcengine, cr, tos")
-            raise typer.Exit(code=1)
+            config_dict[section][field] = value
+    else:
+        # Generic recursive update for all other keys (including deep nested ones like services.tos.host)
+        current = config_dict
+        for i, part in enumerate(parts[:-1]):
+            if part not in current:
+                current[part] = {}
 
-        # Save config
-        save_global_config(config)
+            if not isinstance(current[part], dict):
+                # If path exists but is not a dict (collision), overwrite it with dict
+                # unless it's the last step (which is handled after loop)
+                current[part] = {}
 
-        # Display success message
-        if value:
-            console.print(f"[green]✅ Set:[/green] {key} = [yellow]{value}[/yellow]")
-        else:
-            console.print(f"[green]✅ Cleared:[/green] {key}")
+            current = current[part]
 
-        console.print("\n[dim]Config saved to: ~/.agentkit/config.yaml[/dim]")
+        # Set the final value
+        current[parts[-1]] = value
 
-    except AttributeError as e:
-        console.print(f"[red]❌ {e}[/red]")
+    # Save raw dict back
+    try:
+        write_global_config_dict(config_dict)
+        console.print(f"[green]✅ Global config updated: {key}={value}[/green]")
+    except Exception as e:
+        console.print(f"[red]❌ Failed to set config: {e}[/red]")
         raise typer.Exit(code=1)

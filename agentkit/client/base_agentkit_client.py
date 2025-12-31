@@ -20,7 +20,6 @@ Provides common initialization and API invocation logic.
 from typing import Any, Dict, Union, Optional
 
 from agentkit.client.base_service_client import BaseServiceClient, ApiConfig
-from agentkit.utils.ve_sign import get_volc_agentkit_host_info, get_volc_agentkit_scheme
 
 
 class BaseAgentkitClient(BaseServiceClient):
@@ -60,29 +59,14 @@ class BaseAgentkitClient(BaseServiceClient):
             service_name: Service name for logging (e.g., 'knowledge', 'memory')
         """
         super().__init__(
+            service="agentkit",
             access_key=access_key,
             secret_key=secret_key,
             region=region,
             session_token=session_token,
             service_name=service_name,
-            credential_env_prefix="AGENTKIT",
             header=header,
         )
-
-    def _get_service_config(self) -> Dict[str, str]:
-        """
-        Get AgentKit service configuration.
-
-        Returns:
-            Dictionary with host, api_version, and service
-        """
-        host, api_version, service = get_volc_agentkit_host_info()
-        return {
-            "host": host,
-            "api_version": api_version,
-            "service": service,
-            "scheme": get_volc_agentkit_scheme(),
-        }
 
     def _get(self, api_action: str, params: Dict[str, Any] = None) -> str:
         """Legacy method for GET requests."""

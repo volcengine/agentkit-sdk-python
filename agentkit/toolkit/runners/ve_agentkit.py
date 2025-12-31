@@ -108,6 +108,14 @@ class VeAgentkitRunnerConfig(AutoSerializableMixin):
     # Container image configuration
     image_url: str = field(default="", metadata={"description": "Container image URL"})
 
+    region: str = field(
+        default="",
+        metadata={
+            "system": True,
+            "description": "AgentKit service region",
+        },
+    )
+
     # Minimum instance count
     min_instance: int = field(
         default=1, metadata={"description": "Minimum number of Runtime instances"}
@@ -140,7 +148,10 @@ class VeAgentkitRuntimeRunner(Runner):
             it does not require a local project directory.
         """
         super().__init__(reporter)
-        self.agentkit_runtime_client = AgentkitRuntimeClient()
+        self.agentkit_runtime_client = None
+
+    def _get_runtime_client(self, region: str = "") -> AgentkitRuntimeClient:
+        return AgentkitRuntimeClient(region=region or "")
 
     def deploy(self, config: VeAgentkitRunnerConfig) -> DeployResult:
         """Deploy Runtime.
@@ -170,7 +181,7 @@ class VeAgentkitRuntimeRunner(Runner):
                 )
 
             # Ensure IAM role exists for Runtime
-            ve_iam = VeIAM()
+            ve_iam = VeIAM(region=config.region)
             if not ve_iam.ensure_role_for_agentkit(runner_config.runtime_role_name):
                 error_msg = "Failed to create or ensure Runtime IAM role."
                 logger.error(error_msg)
@@ -212,7 +223,8 @@ class VeAgentkitRuntimeRunner(Runner):
                 self.reporter.info("Runtime ID not configured, skipping destroy.")
                 return True
 
-            self.agentkit_runtime_client.delete_runtime(
+            client = self._get_runtime_client(config.region)
+            client.delete_runtime(
                 runtime_types.DeleteRuntimeRequest(runtime_id=runner_config.runtime_id)
             )
             self.reporter.success(
@@ -251,7 +263,8 @@ class VeAgentkitRuntimeRunner(Runner):
                     metadata={"message": "Runtime not deployed"},
                 )
 
-            runtime = self.agentkit_runtime_client.get_runtime(
+            client = self._get_runtime_client(config.region)
+            runtime = client.get_runtime(
                 runtime_types.GetRuntimeRequest(runtime_id=runner_config.runtime_id)
             )
 
@@ -410,7 +423,8 @@ class VeAgentkitRuntimeRunner(Runner):
 
                 # Auto-fetch Runtime information if not cached
                 try:
-                    runtime = self.agentkit_runtime_client.get_runtime(
+                    client = self._get_runtime_client(config.region)
+                    runtime = client.get_runtime(
                         runtime_types.GetRuntimeRequest(
                             runtime_id=runner_config.runtime_id
                         )
@@ -602,6 +616,8 @@ class VeAgentkitRuntimeRunner(Runner):
         try:
             self.reporter.info(f"Creating Runtime: {config.runtime_name}")
 
+            client = self._get_runtime_client(config.region)
+
             # Build Runtime creation request
             envs = [
                 runtime_types.EnvsItemForCreateRuntime(key=k, value=v)
@@ -628,7 +644,7 @@ class VeAgentkitRuntimeRunner(Runner):
             )
 
             # Create Runtime
-            runtime_resp = self.agentkit_runtime_client.create_runtime(create_request)
+            runtime_resp = client.create_runtime(create_request)
             config.runtime_id = runtime_resp.runtime_id
 
             self.reporter.success(f"Runtime created successfully: {config.runtime_id}")
@@ -642,6 +658,7 @@ class VeAgentkitRuntimeRunner(Runner):
                 runtime_id=config.runtime_id,
                 target_status=RUNTIME_STATUS_READY,
                 task_description="Waiting for Runtime to be ready...",
+                region=config.region,
                 timeout=600,
                 error_message="Initialization failed",
             )
@@ -664,7 +681,7 @@ class VeAgentkitRuntimeRunner(Runner):
                         f"Cleaning up failed Runtime: {config.runtime_id}"
                     )
                     try:
-                        self.agentkit_runtime_client.delete_runtime(
+                        client.delete_runtime(
                             runtime_types.DeleteRuntimeRequest(
                                 runtime_id=config.runtime_id
                             )
@@ -781,6 +798,7 @@ class VeAgentkitRuntimeRunner(Runner):
         runtime_id: str,
         target_status: str,
         task_description: str,
+        region: str = "",
         timeout: Optional[int] = None,
         error_message: str = "Failed to wait for Runtime status change",
     ) -> Tuple[bool, Optional[runtime_types.GetRuntimeResponse], Optional[str]]:
@@ -800,6 +818,7 @@ class VeAgentkitRuntimeRunner(Runner):
             runtime_id=runtime_id,
             target_statuses=[target_status],
             task_description=task_description,
+            region=region,
             timeout=timeout,
             error_message=error_message,
         )
@@ -809,6 +828,7 @@ class VeAgentkitRuntimeRunner(Runner):
         runtime_id: str,
         target_statuses: List[str],
         task_description: str,
+        region: str = "",
         timeout: Optional[int] = None,
         error_message: str = "Failed to wait for Runtime status change",
     ) -> Tuple[bool, Optional[runtime_types.GetRuntimeResponse], Optional[str]]:
@@ -833,10 +853,12 @@ class VeAgentkitRuntimeRunner(Runner):
         runtime = None  # Initialize runtime variable
 
         # Use reporter.long_task() for progress tracking
+        client = self._get_runtime_client(region)
+
         with self.reporter.long_task(task_description, total=total_time) as task:
             while True:
                 runtime = retry(
-                    lambda: self.agentkit_runtime_client.get_runtime(
+                    lambda: client.get_runtime(
                         runtime_types.GetRuntimeRequest(runtime_id=runtime_id)
                     )
                 )
@@ -963,9 +985,11 @@ class VeAgentkitRuntimeRunner(Runner):
         try:
             self.reporter.info(f"Updating Runtime: {config.runtime_id}")
 
+            client = self._get_runtime_client(config.region)
+
             # Get existing Runtime information
             try:
-                runtime = self.agentkit_runtime_client.get_runtime(
+                runtime = client.get_runtime(
                     runtime_types.GetRuntimeRequest(runtime_id=config.runtime_id)
                 )
             except Exception as e:
@@ -1027,7 +1051,7 @@ class VeAgentkitRuntimeRunner(Runner):
             envs = [
                 {"Key": str(k), "Value": str(v)} for k, v in config.runtime_envs.items()
             ]
-            self.agentkit_runtime_client.update_runtime(
+            client.update_runtime(
                 runtime_types.UpdateRuntimeRequest(
                     runtime_id=config.runtime_id,
                     artifact_url=config.image_url,
@@ -1045,6 +1069,7 @@ class VeAgentkitRuntimeRunner(Runner):
                 runtime_id=config.runtime_id,
                 target_statuses=[RUNTIME_STATUS_UNRELEASED, RUNTIME_STATUS_READY],
                 task_description="Waiting for Runtime update to complete...",
+                region=config.region,
                 timeout=600,
                 error_message="Update failed",
             )
@@ -1071,7 +1096,7 @@ class VeAgentkitRuntimeRunner(Runner):
             else:
                 # Phase 2: Status is UnReleased, need to release the update
                 self.reporter.info("Starting Runtime release...")
-                self.agentkit_runtime_client.release_runtime(
+                client.release_runtime(
                     runtime_types.ReleaseRuntimeRequest(
                         runtime_id=config.runtime_id,
                     )
@@ -1089,6 +1114,7 @@ class VeAgentkitRuntimeRunner(Runner):
                     runtime_id=config.runtime_id,
                     target_status=RUNTIME_STATUS_READY,
                     task_description="Waiting for Runtime release to complete...",
+                    region=config.region,
                     timeout=300,
                     error_message="Release failed",
                 )

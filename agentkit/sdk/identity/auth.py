@@ -13,12 +13,14 @@
 # limitations under the License.
 
 import asyncio
-import os
 from functools import wraps
 from typing import Any, Callable
 
-from agentkit.utils.credential import get_credential_from_vefaas_iam
-from agentkit.utils.ve_sign import ve_request, get_identity_host_info
+from agentkit.utils.ve_sign import ve_request
+from agentkit.platform import (
+    resolve_credentials,
+    resolve_endpoint,
+)
 
 
 def requires_api_key(*, provider_name: str, into: str = "api_key"):
@@ -34,16 +36,11 @@ def requires_api_key(*, provider_name: str, into: str = "api_key"):
 
     def decorator(func: Callable) -> Callable:
         def _get_api_key() -> str:
-            access_key = os.getenv("VOLCENGINE_ACCESS_KEY")
-            secret_key = os.getenv("VOLCENGINE_SECRET_KEY")
+            creds = resolve_credentials("identity")
+            endpoint = resolve_endpoint("identity")
+            access_key = creds.access_key
+            secret_key = creds.secret_key
             session_token = ""
-            host, version, service, region = get_identity_host_info()
-
-            if not (access_key and secret_key):
-                cred = get_credential_from_vefaas_iam()
-                access_key = cred.access_key_id
-                secret_key = cred.secret_access_key
-                session_token = cred.session_token
 
             response = ve_request(
                 request_body={
@@ -54,10 +51,10 @@ def requires_api_key(*, provider_name: str, into: str = "api_key"):
                 header={"X-Security-Token": session_token} if session_token else {},
                 ak=access_key,
                 sk=secret_key,
-                version=version,
-                service=service,
-                host=host,
-                region=region,
+                version=endpoint.api_version,
+                service=endpoint.service,
+                host=endpoint.host,
+                region=endpoint.region,
             )
 
             try:
