@@ -21,6 +21,7 @@ volcengine
 volcengine-python-sdk
 pyfiglet>=1.0.2
 inquirerpy>=0.3.4
+typing_extensions>=4.12
 
 # Windows-only enhancement for interactive CLI input
 pyreadline3; sys_platform == 'win32'

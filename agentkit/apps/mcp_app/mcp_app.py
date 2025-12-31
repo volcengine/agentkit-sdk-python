@@ -17,7 +17,8 @@ import inspect
 import logging
 import os
 from functools import wraps
-from typing import Any, Callable, override
+from typing import Any, Callable
+from typing_extensions import override
 
 from fastmcp import FastMCP
 from fastmcp.server.server import Transport

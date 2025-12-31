@@ -19,7 +19,8 @@ import threading
 import time
 import uuid
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Optional, override
+from typing import Any, Callable, Optional
+from typing_extensions import override
 
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response, StreamingResponse
