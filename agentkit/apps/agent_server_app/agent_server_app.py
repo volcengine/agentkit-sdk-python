@@ -202,7 +202,7 @@ class AgentkitAgentServerApp(BaseAgentkitApp):
                 except Exception as e:
                     yield f'data: {{"error": "{str(e)}"}}\n\n'
                     telemetry.trace_agent_server_finish(
-                        func_result="", exception=e
+                        path="/invoke", func_result="", exception=e
                     )
 
             return StreamingResponse(
