@@ -378,8 +378,6 @@ class LocalDockerBuilder(Builder):
                 )
             else:
                 error_msg = "Docker build failed"
-                if build_logs:
-                    error_msg = "\n".join(build_logs[-10:])
                 return BuildResult(
                     success=False,
                     error=error_msg,

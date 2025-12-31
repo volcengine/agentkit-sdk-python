@@ -279,7 +279,7 @@ class DockerManager:
                     )
                     build_logs.append(f"ERROR: {error_msg}")
                     logger.error(error_msg)
-                    return False, "\n".join(build_logs), None
+                    return False, build_logs, None
 
             try:
                 image = self.client.images.get(full_image_name)
@@ -287,10 +287,10 @@ class DockerManager:
                 logger.info(
                     f"Image build successful: {full_image_name} (ID: {image_id})"
                 )
-                return True, "\n".join(build_logs), image_id
+                return True, build_logs, image_id
             except Exception as e:
                 logger.warning(f"Build successful but couldn't get image ID: {str(e)}")
-                return True, "\n".join(build_logs), None
+                return True, build_logs, None
 
         except Exception as e:
             error_msg = f"Image build failed: {str(e)}"
