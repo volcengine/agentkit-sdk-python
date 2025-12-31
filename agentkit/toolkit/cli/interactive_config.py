@@ -107,6 +107,7 @@ class AutoPromptGenerator:
             dict: self._handle_dict,
             Dict: self._handle_dict,
         }
+        self.current_dataclass_type = None
 
     def _safe_input(self, prompt_text, default: str = "") -> str:
         """Safe input method that protects prompt text from being deleted by Backspace.
@@ -175,6 +176,7 @@ class AutoPromptGenerator:
     def generate_config(
         self, dataclass_type: type, existing_config: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
+        self.current_dataclass_type = dataclass_type
         if not is_dataclass(dataclass_type):
             raise ValueError(f"{dataclass_type} must be a dataclass")
 
@@ -270,6 +272,7 @@ class AutoPromptGenerator:
             if not isinstance(value, type(MISSING)):
                 filtered_config[key] = value
 
+        self.current_dataclass_type = None
         return filtered_config
 
     def _prompt_for_field(
@@ -326,7 +329,35 @@ class AutoPromptGenerator:
             default = None
 
         choices = metadata.get("choices")
-        if choices:
+        # Allow free region input when global defaults disable strict restrictions
+        allow_free_region = False
+        try:
+            from agentkit.toolkit.config.global_config import get_global_config
+
+            global_conf = get_global_config()
+            disabled = bool(
+                getattr(
+                    global_conf.defaults, "disable_region_strict_restrictions", False
+                )
+            )
+            if disabled and name == "region":
+                # Limit to Cloud/Hybrid strategy types only
+                try:
+                    from agentkit.toolkit.config.strategy_configs import (
+                        CloudStrategyConfig,
+                        HybridStrategyConfig,
+                    )
+
+                    allow_free_region = self.current_dataclass_type in (
+                        CloudStrategyConfig,
+                        HybridStrategyConfig,
+                    )
+                except Exception:
+                    allow_free_region = False
+        except Exception:
+            allow_free_region = False
+
+        if choices and not allow_free_region:
             return self._handle_choice_selection(
                 description, default, choices, metadata, current, total
             )

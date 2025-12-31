@@ -134,6 +134,7 @@ class GlobalConfig:
         preflight_mode: Optional[str] = None
         cr_public_endpoint_check: Optional[bool] = None
         iam_role_policies: Optional[list] = None
+        disable_region_strict_restrictions: Optional[bool] = None
 
         def to_dict(self):
             data = {}
@@ -145,6 +146,10 @@ class GlobalConfig:
                 data["cr_public_endpoint_check"] = self.cr_public_endpoint_check
             if self.iam_role_policies is not None:
                 data["iam_role_policies"] = self.iam_role_policies
+            if self.disable_region_strict_restrictions is not None:
+                data["disable_region_strict_restrictions"] = (
+                    self.disable_region_strict_restrictions
+                )
             return data
 
         @classmethod
@@ -154,6 +159,9 @@ class GlobalConfig:
                 preflight_mode=data.get("preflight_mode"),
                 cr_public_endpoint_check=data.get("cr_public_endpoint_check"),
                 iam_role_policies=data.get("iam_role_policies"),
+                disable_region_strict_restrictions=data.get(
+                    "disable_region_strict_restrictions"
+                ),
             )
 
     defaults: "GlobalConfig.Defaults" = field(

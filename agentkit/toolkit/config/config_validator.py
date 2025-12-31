@@ -88,6 +88,18 @@ class ConfigValidator:
 
         errors: List[str] = []
 
+        # Global flag: disable strict region choices
+        disable_region_restrictions = False
+        try:
+            from agentkit.toolkit.config.global_config import get_global_config
+
+            gc = get_global_config()
+            disable_region_restrictions = bool(
+                getattr(gc.defaults, "disable_region_strict_restrictions", False)
+            )
+        except Exception:
+            disable_region_restrictions = False
+
         for field in fields(config):
             if field.name.startswith("_"):
                 continue
@@ -114,7 +126,11 @@ class ConfigValidator:
                     errors.append(f"{desc}: {msg}")
 
             choices = field.metadata.get("choices")
-            if choices and value:
+            if (
+                choices
+                and value
+                and not (disable_region_restrictions and field.name == "region")
+            ):
                 valid_values = []
                 if isinstance(choices, list):
                     if choices and isinstance(choices[0], dict):
