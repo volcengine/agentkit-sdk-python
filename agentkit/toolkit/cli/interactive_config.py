@@ -825,8 +825,8 @@ class AutoPromptGenerator:
         # Add environment variable hints (if description contains 'env')
         if "env" in description.lower():
             console.print("Common environment variables:")
+            console.print("  - MODEL_AGENT_NAME=your_model_name")
             console.print("  - MODEL_AGENT_API_KEY=your_api_key")
-            console.print("  - DEBUG=true")
             console.print("  - LOG_LEVEL=info")
 
         console.print("Input format: KEY=VALUE")

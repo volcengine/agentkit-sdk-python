@@ -88,6 +88,23 @@ TEMPLATES = {
         "description": "A2A Application Based on the Eino Framework",
         "type": "A2A App",
     },
+    "agent_server": {
+        "file": "agent_server.py",
+        "name": "Agent Server App",
+        "language": "Python",
+        "language_version": "3.12",
+        "description": "Agent app with adk web server",
+        "type": "WebServer App",
+    },
+    "langchain_basic_stream": {
+        "file": "langchain_basic_stream.py",
+        "name": "Langchain Basic Stream Agent App",
+        "language": "Python",
+        "language_version": "3.12",
+        "description": "Agent app with streaming output support",
+        "type": "Stream App",
+        "extra_requirements": ["langchain", "langchain-litellm"],
+    },
 }
 
 

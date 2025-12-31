@@ -446,16 +446,8 @@ class Runner(ABC):
                     timeout_s=policy.list_apps_timeout,
                 )
                 app_name = app_name or "agentkit-app"
-                user_id = (
-                    ctx.headers.get("user_id")
-                    or ctx.headers.get("x-user-id")
-                    or "agentkit_user"
-                )
-                session_id = (
-                    ctx.headers.get("session_id")
-                    or ctx.headers.get("x-session-id")
-                    or "agentkit_sample_session"
-                )
+                user_id = ctx.headers.get("user_id") or "agentkit_user"
+                session_id = ctx.headers.get("session_id") or "agentkit_sample_session"
                 self._ensure_adk_session(
                     ctx.base_endpoint,
                     ctx.headers,
@@ -489,15 +481,9 @@ class Runner(ABC):
                         timeout_s=policy.list_apps_timeout,
                     )
                     app_name = app_name or "agentkit-app"
-                    user_id = (
-                        ctx.headers.get("user_id")
-                        or ctx.headers.get("x-user-id")
-                        or "agentkit_user"
-                    )
+                    user_id = ctx.headers.get("user_id") or "agentkit_user"
                     session_id = (
-                        ctx.headers.get("session_id")
-                        or ctx.headers.get("x-session-id")
-                        or "agentkit_sample_session"
+                        ctx.headers.get("session_id") or "agentkit_sample_session"
                     )
                     self._ensure_adk_session(
                         ctx.base_endpoint,
