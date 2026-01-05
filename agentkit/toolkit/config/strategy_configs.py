@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Dict, List
+from typing import Any, Dict, List, Optional
 from .dataclass_utils import AutoSerializableMixin
 from .constants import (
     AUTH_TYPE_CUSTOM_JWT,
@@ -307,6 +307,25 @@ class HybridStrategyConfig(AutoSerializableMixin):
             "icon": "🔧",
         },
     )
+
+    runtime_bindings: Dict[str, Optional[str]] = field(
+        default_factory=dict,
+        metadata={
+            "hidden": True,
+            "description": "Runtime associated resource IDs (memory_id/knowledge_id/tool_id/mcp_toolset_id)",
+            "examples": "{memory_id: mem-xxx, knowledge_id: kb-xxx, tool_id: tool-xxx, mcp_toolset_id: mcp-ts-xxx}",
+            "icon": "🔗",
+        },
+    )
+
+    runtime_network: Dict[str, Any] = field(
+        default_factory=dict,
+        metadata={
+            "hidden": True,
+            "description": "Runtime network configuration (advanced, CreateRuntime only)",
+            "examples": "{mode: private, vpc_id: vpc-xxx, subnet_ids: [subnet-aaa, subnet-bbb]}",
+        },
+    )
     _config_metadata = {
         "name": "Hybrid Strategy Configuration",
         "welcome_message": "Welcome to AgentKit Hybrid Deployment Mode Configuration Wizard",
@@ -551,6 +570,25 @@ class CloudStrategyConfig(AutoSerializableMixin):
             "description": "Runtime environment variables (format: KEY=VALUE, one per line, use 'del KEY' to remove, 'list' to view)",
             "examples": "MODEL_AGENT_API_KEY=your_key_here, DEBUG=true",
             "icon": "🔧",
+        },
+    )
+
+    runtime_bindings: Dict[str, Optional[str]] = field(
+        default_factory=dict,
+        metadata={
+            "hidden": True,
+            "description": "Runtime associated resource IDs (memory_id/knowledge_id/tool_id/mcp_toolset_id)",
+            "examples": "{memory_id: mem-xxx, knowledge_id: kb-xxx, tool_id: tool-xxx, mcp_toolset_id: mcp-ts-xxx}",
+            "icon": "🔗",
+        },
+    )
+
+    runtime_network: Dict[str, Any] = field(
+        default_factory=dict,
+        metadata={
+            "hidden": True,
+            "description": "Runtime network configuration (advanced, CreateRuntime only)",
+            "examples": "{mode: private, vpc_id: vpc-xxx, subnet_ids: [subnet-aaa, subnet-bbb]}",
         },
     )
 

@@ -505,6 +505,8 @@ class HybridStrategy(Strategy):
             runtime_apikey_name=strategy_config.runtime_apikey_name,
             runtime_endpoint=strategy_config.runtime_endpoint,
             runtime_envs=merged_envs,
+            runtime_bindings=getattr(strategy_config, "runtime_bindings", None) or {},
+            runtime_network=getattr(strategy_config, "runtime_network", None) or {},
             runtime_auth_type=strategy_config.runtime_auth_type,
             runtime_jwt_discovery_url=strategy_config.runtime_jwt_discovery_url,
             runtime_jwt_allowed_clients=strategy_config.runtime_jwt_allowed_clients,

@@ -91,6 +91,22 @@ class VeAgentkitRunnerConfig(AutoSerializableMixin):
         default_factory=dict, metadata={"description": "Runtime environment variables"}
     )
 
+    # Runtime bindings (resource associations)
+    runtime_bindings: Dict[str, Optional[str]] = field(
+        default_factory=dict,
+        metadata={
+            "description": "Runtime associated resources: memory_id/knowledge_id/tool_id/mcp_toolset_id",
+        },
+    )
+
+    # Runtime network configuration (advanced, CreateRuntime only)
+    runtime_network: Dict[str, Any] = field(
+        default_factory=dict,
+        metadata={
+            "description": "Runtime network configuration (advanced, CreateRuntime only)",
+        },
+    )
+
     # Authentication configuration
     runtime_auth_type: str = field(
         default=AUTH_TYPE_KEY_AUTH,
@@ -451,7 +467,7 @@ class VeAgentkitRuntimeRunner(Runner):
 
                 # Validate based on auth type
                 if not endpoint:
-                    error_msg = "Failed to obtain Runtime endpoint."
+                    error_msg = "Failed to obtain Runtime endpoint. The 'agentkit invoke' command only supports public network endpoints."
                     logger.error(f"{error_msg}, runtime: {runtime}")
                     return InvokeResult(
                         success=False,
@@ -604,6 +620,65 @@ class VeAgentkitRuntimeRunner(Runner):
                 )
             )
 
+    def _build_network_config_for_create(
+        self, config: VeAgentkitRunnerConfig
+    ) -> Optional[runtime_types.NetworkForCreateRuntime]:
+        runtime_network = (
+            config.runtime_network if isinstance(config.runtime_network, dict) else {}
+        )
+        if not runtime_network:
+            return None
+
+        mode = runtime_network.get("mode")
+        vpc_id = runtime_network.get("vpc_id")
+        subnet_ids = runtime_network.get("subnet_ids")
+
+        # Convenience: if vpc_id is provided without an explicit mode, assume private.
+        if mode is None and vpc_id:
+            mode = "private"
+
+        if mode is None:
+            raise ValueError(
+                "runtime_network is configured but 'mode' is missing. "
+                "Valid values: public/private/both."
+            )
+
+        mode = str(mode).strip().lower()
+        if mode not in {"public", "private", "both"}:
+            raise ValueError(
+                f"Invalid runtime_network.mode '{mode}'. Valid values: public/private/both."
+            )
+
+        enable_public = mode in {"public", "both"}
+        enable_private = mode in {"private", "both"}
+
+        vpc_configuration = None
+        if enable_private:
+            vpc_id_str = str(vpc_id or "").strip()
+            if not vpc_id_str:
+                raise ValueError(
+                    "runtime_network.mode requires 'vpc_id' when mode is private/both."
+                )
+
+            parsed_subnet_ids: Optional[List[str]] = None
+            if isinstance(subnet_ids, str):
+                ids = [s.strip() for s in subnet_ids.split(",") if s.strip()]
+                parsed_subnet_ids = ids or None
+            elif isinstance(subnet_ids, list):
+                ids = [str(s).strip() for s in subnet_ids if str(s).strip()]
+                parsed_subnet_ids = ids or None
+
+            vpc_configuration = runtime_types.NetworkVpcForCreateRuntime(
+                vpc_id=vpc_id_str,
+                subnet_ids=parsed_subnet_ids,
+            )
+
+        return runtime_types.NetworkForCreateRuntime(
+            vpc_configuration=vpc_configuration,
+            enable_private_network=enable_private,
+            enable_public_network=enable_public,
+        )
+
     def _create_new_runtime(self, config: VeAgentkitRunnerConfig) -> DeployResult:
         """Create a new Runtime instance.
 
@@ -624,8 +699,21 @@ class VeAgentkitRuntimeRunner(Runner):
                 for k, v in config.runtime_envs.items()
             ]
 
+            bindings = (
+                config.runtime_bindings
+                if isinstance(config.runtime_bindings, dict)
+                else {}
+            )
+            memory_id = bindings.get("memory_id")
+            knowledge_id = bindings.get("knowledge_id")
+            tool_id = bindings.get("tool_id")
+            mcp_toolset_id = bindings.get("mcp_toolset_id")
+
             # Build authorizer configuration based on auth type
             authorizer_config = self._build_authorizer_config_for_create(config)
+
+            # Network configuration is only supported during CreateRuntime.
+            network_configuration = self._build_network_config_for_create(config)
 
             create_request = runtime_types.CreateRuntimeRequest(
                 name=config.runtime_name,
@@ -635,6 +723,13 @@ class VeAgentkitRuntimeRunner(Runner):
                 artifact_type=ARTIFACT_TYPE_DOCKER_IMAGE,
                 artifact_url=config.image_url,
                 role_name=config.runtime_role_name,
+                memory_id=(memory_id if is_valid_config(memory_id) else None),
+                knowledge_id=(knowledge_id if is_valid_config(knowledge_id) else None),
+                tool_id=(tool_id if is_valid_config(tool_id) else None),
+                mcp_toolset_id=(
+                    mcp_toolset_id if is_valid_config(mcp_toolset_id) else None
+                ),
+                network_configuration=network_configuration,
                 envs=envs,
                 project_name=PROJECT_NAME_DEFAULT,
                 authorizer_configuration=authorizer_config,
@@ -985,6 +1080,12 @@ class VeAgentkitRuntimeRunner(Runner):
         try:
             self.reporter.info(f"Updating Runtime: {config.runtime_id}")
 
+            if isinstance(config.runtime_network, dict) and config.runtime_network:
+                self.reporter.warning(
+                    "runtime_network is configured, but network settings only apply when creating a Runtime. "
+                    "UpdateRuntime does not support network_configuration; ignoring runtime_network."
+                )
+
             client = self._get_runtime_client(config.region)
 
             # Get existing Runtime information
@@ -1048,6 +1149,32 @@ class VeAgentkitRuntimeRunner(Runner):
 
             self.reporter.info("Starting Runtime update...")
 
+            def _binding_update_value(key: str) -> Optional[str]:
+                """Translate runtime_bindings into UpdateRuntimeRequest fields.
+
+                Semantics:
+                - key not present: return None (do not send)
+                - value is None: return "" (explicit clear/unbind)
+                - value is "" or whitespace: return "" (explicit clear/unbind)
+                - value is non-empty: return value
+                """
+                if (
+                    not isinstance(config.runtime_bindings, dict)
+                    or key not in config.runtime_bindings
+                ):
+                    return None
+                raw = config.runtime_bindings.get(key)
+                if raw is None:
+                    return ""
+                if isinstance(raw, str) and not raw.strip():
+                    return ""
+                return str(raw)
+
+            memory_id = _binding_update_value("memory_id")
+            knowledge_id = _binding_update_value("knowledge_id")
+            tool_id = _binding_update_value("tool_id")
+            mcp_toolset_id = _binding_update_value("mcp_toolset_id")
+
             envs = [
                 {"Key": str(k), "Value": str(v)} for k, v in config.runtime_envs.items()
             ]
@@ -1056,6 +1183,10 @@ class VeAgentkitRuntimeRunner(Runner):
                     runtime_id=config.runtime_id,
                     artifact_url=config.image_url,
                     description=config.common_config.description,
+                    memory_id=memory_id,
+                    knowledge_id=knowledge_id,
+                    tool_id=tool_id,
+                    mcp_toolset_id=mcp_toolset_id,
                     envs=envs,
                     client_token=generate_client_token(),
                 )

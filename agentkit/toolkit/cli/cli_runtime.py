@@ -57,6 +57,9 @@ def create_runtime_command(
         None, "--knowledge-id", help="Knowledge ID"
     ),
     tool_id: Optional[str] = typer.Option(None, "--tool-id", help="Tool ID"),
+    mcp_toolset_id: Optional[str] = typer.Option(
+        None, "--mcp-toolset-id", help="MCP Toolset ID"
+    ),
     model_agent_name: Optional[str] = typer.Option(
         None, "--model-agent-name", help="Model agent name"
     ),
@@ -169,6 +172,7 @@ def create_runtime_command(
                 memory_id=memory_id,
                 knowledge_id=knowledge_id,
                 tool_id=tool_id,
+                mcp_toolset_id=mcp_toolset_id,
                 model_agent_name=model_agent_name,
                 authorizer_configuration=authorizer,
                 network_configuration=network,
@@ -233,6 +237,9 @@ def update_runtime_command(
         None, "--knowledge-id", help="Knowledge ID"
     ),
     tool_id: Optional[str] = typer.Option(None, "--tool-id", help="Tool ID"),
+    mcp_toolset_id: Optional[str] = typer.Option(
+        None, "--mcp-toolset-id", help="MCP Toolset ID"
+    ),
     envs_json: Optional[str] = typer.Option(
         None, "--envs-json", help="JSON array of envs [{Key,Value}]"
     ),
@@ -278,6 +285,7 @@ def update_runtime_command(
                 memory_id=memory_id,
                 knowledge_id=knowledge_id,
                 tool_id=tool_id,
+                mcp_toolset_id=mcp_toolset_id,
                 envs=envs,
                 tags=tags,
             )

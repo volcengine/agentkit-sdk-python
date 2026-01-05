@@ -155,6 +155,52 @@ def config_command(
         "--runtime_jwt_allowed_clients",
         help="Allowed OAuth2 client IDs when runtime_auth_type is custom_jwt (can be used multiple times)",
     ),
+    # Runtime bindings (resource associations)
+    memory_id: Optional[str] = typer.Option(
+        None,
+        "--memory_id",
+        "--runtime_binding_memory_id",
+        help="Bind Runtime to a Memory collection ID (cloud/hybrid only)",
+    ),
+    knowledge_id: Optional[str] = typer.Option(
+        None,
+        "--knowledge_id",
+        "--runtime_binding_knowledge_id",
+        help="Bind Runtime to a Knowledge ID (cloud/hybrid only)",
+    ),
+    tool_id: Optional[str] = typer.Option(
+        None,
+        "--tool_id",
+        "--runtime_binding_tool_id",
+        help="Bind Runtime to a Tool ID (cloud/hybrid only)",
+    ),
+    mcp_toolset_id: Optional[str] = typer.Option(
+        None,
+        "--mcp_toolset_id",
+        "--runtime_binding_mcp_toolset_id",
+        help="Bind Runtime to an MCP Toolset ID (cloud/hybrid only)",
+    ),
+    # Runtime network configuration (advanced, CreateRuntime only)
+    runtime_network_mode: Optional[str] = typer.Option(
+        None,
+        "--runtime_network_mode",
+        "--runtime-network-mode",
+        help="Runtime network mode (cloud/hybrid, CreateRuntime only): public/private/both",
+    ),
+    runtime_vpc_id: Optional[str] = typer.Option(
+        None,
+        "--runtime_vpc_id",
+        "--runtime-vpc-id",
+        help="Runtime VPC ID (cloud/hybrid, CreateRuntime only; required for private/both)",
+    ),
+    runtime_subnet_ids: Optional[List[str]] = typer.Option(
+        None,
+        "--runtime_subnet_ids",
+        "--runtime_subnet_id",
+        "--runtime-subnet-id",
+        "--runtime-subnet-ids",
+        help="Runtime subnet ID (repeatable; cloud/hybrid, CreateRuntime only)",
+    ),
 ):
     """Configure AgentKit (supports interactive and non-interactive modes).
     
@@ -254,6 +300,13 @@ def config_command(
             runtime_auth_type=runtime_auth_type,
             runtime_jwt_discovery_url=runtime_jwt_discovery_url,
             runtime_jwt_allowed_clients=runtime_jwt_allowed_clients,
+            memory_id=memory_id,
+            knowledge_id=knowledge_id,
+            tool_id=tool_id,
+            mcp_toolset_id=mcp_toolset_id,
+            runtime_network_mode=runtime_network_mode,
+            runtime_vpc_id=runtime_vpc_id,
+            runtime_subnet_ids=runtime_subnet_ids,
         )
 
         has_cli_params = ConfigParamHandler.has_cli_params(cli_params)

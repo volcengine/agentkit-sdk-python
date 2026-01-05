@@ -64,6 +64,21 @@ class ConfigParamHandler:
         return result
 
     @staticmethod
+    def parse_id_list(values: Optional[List[str]]) -> List[str]:
+        """Parse repeatable IDs, supporting comma-separated values."""
+        if not values:
+            return []
+        result: List[str] = []
+        for item in values:
+            if item is None:
+                continue
+            for part in str(item).split(","):
+                part = part.strip()
+                if part:
+                    result.append(part)
+        return result
+
+    @staticmethod
     def collect_cli_params(
         agent_name: Optional[str],
         entry_point: Optional[str],
@@ -88,6 +103,13 @@ class ConfigParamHandler:
         runtime_auth_type: Optional[str],
         runtime_jwt_discovery_url: Optional[str],
         runtime_jwt_allowed_clients: Optional[List[str]],
+        memory_id: Optional[str],
+        knowledge_id: Optional[str],
+        tool_id: Optional[str],
+        mcp_toolset_id: Optional[str],
+        runtime_network_mode: Optional[str],
+        runtime_vpc_id: Optional[str],
+        runtime_subnet_ids: Optional[List[str]],
     ) -> Dict[str, Any]:
         """Collect all CLI parameters.
 
@@ -158,6 +180,32 @@ class ConfigParamHandler:
             strategy_params["runtime_role_name"] = runtime_role_name
         if runtime_apikey_name is not None:
             strategy_params["runtime_apikey_name"] = runtime_apikey_name
+
+        # Runtime bindings (resource associations)
+        runtime_bindings: Dict[str, Any] = {}
+        if memory_id is not None:
+            runtime_bindings["memory_id"] = memory_id
+        if knowledge_id is not None:
+            runtime_bindings["knowledge_id"] = knowledge_id
+        if tool_id is not None:
+            runtime_bindings["tool_id"] = tool_id
+        if mcp_toolset_id is not None:
+            runtime_bindings["mcp_toolset_id"] = mcp_toolset_id
+        if runtime_bindings:
+            strategy_params["runtime_bindings"] = runtime_bindings
+
+        # Runtime network configuration (advanced, CreateRuntime only)
+        runtime_network: Dict[str, Any] = {}
+        if runtime_network_mode is not None:
+            runtime_network["mode"] = runtime_network_mode.strip().lower()
+        if runtime_vpc_id is not None:
+            runtime_network["vpc_id"] = runtime_vpc_id
+        if runtime_subnet_ids is not None:
+            runtime_network["subnet_ids"] = ConfigParamHandler.parse_id_list(
+                runtime_subnet_ids
+            )
+        if runtime_network:
+            strategy_params["runtime_network"] = runtime_network
         if runtime_auth_type is not None:
             strategy_params["runtime_auth_type"] = runtime_auth_type
         if runtime_jwt_discovery_url is not None:
@@ -241,6 +289,20 @@ class NonInteractiveConfigHandler:
                         new_strategy_config["runtime_envs"] = existing_envs
                     else:
                         new_strategy_config["runtime_envs"] = value
+                elif key == "runtime_bindings" and isinstance(value, dict):
+                    existing_bindings = new_strategy_config.get("runtime_bindings", {})
+                    if isinstance(existing_bindings, dict):
+                        existing_bindings.update(value)
+                        new_strategy_config["runtime_bindings"] = existing_bindings
+                    else:
+                        new_strategy_config["runtime_bindings"] = value
+                elif key == "runtime_network" and isinstance(value, dict):
+                    existing_network = new_strategy_config.get("runtime_network", {})
+                    if isinstance(existing_network, dict):
+                        existing_network.update(value)
+                        new_strategy_config["runtime_network"] = existing_network
+                    else:
+                        new_strategy_config["runtime_network"] = value
                 else:
                     new_strategy_config[key] = value
 
