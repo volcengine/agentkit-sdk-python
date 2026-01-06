@@ -15,6 +15,7 @@
 import os
 import logging
 from dataclasses import dataclass, field
+from typing import List, Optional
 from agentkit.utils.misc import generate_random_id
 from agentkit.toolkit.config.dataclass_utils import AutoSerializableMixin
 from agentkit.toolkit.config.constants import DEFAULT_TOS_BUCKET_TEMPLATE_NAME
@@ -83,6 +84,7 @@ class TOSService:
             )
             # Expose the actual region resolved by VolcConfiguration
             self.actual_region = ep.region
+            self.config.endpoint = ep.host
 
             logger.info(
                 f"TOS client initialized: bucket={self.config.bucket}, region={ep.region}"
@@ -227,6 +229,42 @@ class TOSService:
             logger.error(f"Failed to list files: {str(e)}")
             return []
 
+    def list_bucket_names(self) -> List[str]:
+        """List bucket names owned by the current credentials.
+
+        This is used for security-sensitive ownership checks (e.g., preventing
+        uploads into buckets not owned by the current account).
+
+        Returns:
+            List[str]: Bucket names under the current account.
+        """
+        try:
+            out = self.client.list_buckets()
+            buckets = getattr(out, "buckets", None) or []
+            names: List[str] = []
+            for b in buckets:
+                name = getattr(b, "name", None)
+                if name:
+                    names.append(name)
+            return names
+        except Exception as e:
+            logger.error(f"Failed to list buckets: {str(e)}")
+            raise
+
+    def bucket_is_owned(self, bucket_name: Optional[str] = None) -> bool:
+        """Check whether a bucket is owned by the current credentials.
+
+        Args:
+            bucket_name: Bucket name to check. Defaults to configured bucket.
+
+        Returns:
+            True if the bucket is in the current account's bucket list.
+        """
+        name = bucket_name or self.config.bucket
+        if not name:
+            return False
+        return name in set(self.list_bucket_names())
+
     def bucket_exists(self) -> bool:
         """Check if the configured bucket exists.
 
@@ -267,9 +305,11 @@ class TOSService:
 
         except tos.exceptions.TosServerError as e:
             if e.status_code == 409:
-                # Bucket already exists - treat as success
-                logger.warning(f"Bucket already exists: {self.config.bucket}")
-                return True
+                # IMPORTANT: 409 means the bucket name is already taken.
+                # It may be owned by another account. Do not treat this as success.
+                logger.warning(
+                    f"Bucket name conflict (already exists): {self.config.bucket}"
+                )
             logger.error(f"Failed to create bucket: {e.code} - {e.message}")
             raise e
         except Exception as e:

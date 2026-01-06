@@ -715,6 +715,7 @@ class VeCPCRBuilder(Builder):
             from agentkit.toolkit.volcengine.services.tos_service import (
                 TOSService,
                 TOSServiceConfig,
+                tos,
             )
 
             # Handle bucket configuration with auto-creation support
@@ -742,55 +743,95 @@ class VeCPCRBuilder(Builder):
 
             tos_service = TOSService(tos_config)
 
-            # Check if bucket exists and create if necessary
-            self.reporter.info(f"Checking TOS bucket existence: {bucket_name}")
-            if not tos_service.bucket_exists():
-                # Case 2: Bucket doesn't exist, create it
-                self.reporter.warning(
-                    f"TOS bucket does not exist, creating: {bucket_name}"
+            # Two-step safety check:
+            # 1) Ensure the bucket exists and is accessible.
+            # 2) Verify the bucket is owned by the current account via ListBuckets before uploading.
+            import time
+
+            created_in_this_run = False
+
+            # Step 1: ensure bucket exists / accessible
+            if auto_created_bucket:
+                self.reporter.info(
+                    f"Creating auto-generated TOS bucket in current account: {bucket_name}"
                 )
 
-                if not tos_service.create_bucket():
-                    error_msg = f"Failed to create TOS bucket: {bucket_name}"
-                    self.reporter.error(error_msg)
-                    logger.error(error_msg)
-                    raise Exception(error_msg)
-
-                self.reporter.success(f"TOS bucket created successfully: {bucket_name}")
-
-                # Verify bucket creation with retry logic (eventual consistency)
-                self.reporter.info(f"Verifying TOS bucket creation: {bucket_name}")
-                import time
-
-                start_time = time.time()
-                timeout = 30  # 30 second timeout
-                check_interval = 2  # Check every 2 seconds
-
-                while time.time() - start_time < timeout:
-                    if tos_service.bucket_exists():
-                        self.reporter.success(
-                            f"TOS bucket verification successful: {bucket_name}"
-                        )
+                # Very low probability: name collision. Retry with a new generated name.
+                max_attempts = 3
+                for attempt in range(1, max_attempts + 1):
+                    tos_service.config.bucket = bucket_name
+                    try:
+                        tos_service.create_bucket()
+                        created_in_this_run = True
                         break
-                    else:
-                        self.reporter.info(
-                            f"Waiting for TOS bucket to be ready... ({time.time() - start_time:.1f}s)"
-                        )
-                        time.sleep(check_interval)
-                else:
-                    # Timeout occurred
-                    error_msg = f"TOS bucket creation verification timeout ({timeout}s): {bucket_name}"
+                    except tos.exceptions.TosServerError as e:
+                        if e.status_code == 409 and attempt < max_attempts:
+                            bucket_name = TOSService.generate_bucket_name()
+                            self.reporter.warning(
+                                "Auto-generated bucket name already taken, retrying with a new name "
+                                f"(attempt {attempt + 1}/{max_attempts}): {bucket_name}"
+                            )
+                            continue
+                        raise
+            else:
+                # User-specified bucket: if not accessible/existing, attempt to create.
+                self.reporter.info(f"Checking TOS bucket accessibility: {bucket_name}")
+                if not tos_service.bucket_exists():
+                    self.reporter.warning(
+                        f"TOS bucket '{bucket_name}' is not accessible or does not exist, attempting to create it..."
+                    )
+                    try:
+                        tos_service.create_bucket()
+                        created_in_this_run = True
+                    except tos.exceptions.TosServerError as e:
+                        if e.status_code == 409:
+                            # The bucket name is already taken (possibly by another account).
+                            # Ownership verification in step 2 will block the upload.
+                            pass
+                        else:
+                            raise
+
+            # Step 2: verify bucket ownership via ListBuckets
+            self.reporter.info(f"Verifying TOS bucket ownership: {bucket_name}")
+
+            def check_owned() -> bool:
+                try:
+                    return tos_service.bucket_is_owned(bucket_name)
+                except Exception as e:
+                    error_msg = (
+                        "Failed to determine TOS bucket ownership via ListBuckets. "
+                        "Upload has been blocked for security reasons. "
+                        "Please ensure your credentials have TOS ListBuckets permission, or set 'tos_bucket: Auto'."
+                    )
                     self.reporter.error(error_msg)
-                    logger.error(error_msg)
+                    logger.error(f"Bucket ownership check failed: {str(e)}")
                     raise Exception(error_msg)
 
-                # Notify user if their configured bucket didn't exist and was auto-created
-                if config.tos_bucket and config.tos_bucket != AUTO_CREATE_VE:
-                    self.reporter.info(
-                        f"Note: Your configured bucket '{config.tos_bucket}' did not exist, auto-created new bucket '{bucket_name}'"
-                    )
+            if created_in_this_run:
+                # ListBuckets may be eventually consistent shortly after creation.
+                timeout_s = 10
+                interval_s = 2
+                deadline = time.time() + timeout_s
+                owned = False
+                while time.time() < deadline:
+                    owned = check_owned()
+                    if owned:
+                        break
+                    time.sleep(interval_s)
             else:
-                self.reporter.success(f"TOS bucket exists: {bucket_name}")
+                owned = check_owned()
+
+            if not owned:
+                error_msg = (
+                    f"Security notice: The configured TOS bucket '{bucket_name}' is not owned by the current account. "
+                    "To prevent uploading your source code to a bucket you do not own (which could leak secrets), this upload has been blocked. "
+                    "Please choose a bucket owned by your account, use 'agentkit config --tos_bucket <your-bucket-name>' to set it."
+                )
+                raise Exception(error_msg)
+
+            self.reporter.success(
+                f"TOS bucket ownership verified for current account: {bucket_name}"
+            )
 
             # Update config with auto-generated bucket name if applicable
             if auto_created_bucket:
