@@ -183,3 +183,11 @@ local_test/
 *deprecated*
 
 .trae/
+
+
+# Agent Coders
+AGENTS.md
+AGENTKIT_CODEBASE_GUIDE.md
+.opencode/
+.specify/
+.claude/
