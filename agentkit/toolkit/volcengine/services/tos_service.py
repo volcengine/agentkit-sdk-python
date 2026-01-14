@@ -49,7 +49,7 @@ class TOSServiceConfig(AutoSerializableMixin):
 class TOSService:
     """Wrapper for Volcano Engine TOS (Object Storage) service."""
 
-    def __init__(self, config: TOSServiceConfig):
+    def __init__(self, config: TOSServiceConfig, provider: Optional[str] = None):
         """Initialize TOS service with configuration.
 
         Args:
@@ -62,6 +62,7 @@ class TOSService:
             raise ImportError("TOS SDK not installed. Install with: pip install tos")
 
         self.config = config
+        self.provider = provider
         self.client = None
         self._init_client()
 
@@ -72,7 +73,7 @@ class TOSService:
 
             # Use configured region if available
             region = self.config.region.strip() if self.config.region else None
-            config = VolcConfiguration(region=region)
+            config = VolcConfiguration(region=region, provider=self.provider)
             creds = config.get_service_credentials("tos")
             ep = config.get_service_endpoint("tos")
 

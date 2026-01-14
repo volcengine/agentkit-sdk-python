@@ -281,6 +281,7 @@ class VeIAM(BaseIAMClient):
             (
                 os.getenv("VOLCENGINE_AGENTKIT_SERVICE")
                 or os.getenv("VOLC_AGENTKIT_SERVICE")
+                or os.getenv("BYTEPLUS_AGENTKIT_SERVICE")
                 or ""
             )
             .strip()

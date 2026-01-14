@@ -125,6 +125,20 @@ class CommonConfig(AutoSerializableMixin):
         },
     )
 
+    cloud_provider: str = field(
+        default="volcengine",
+        metadata={
+            "description": "Cloud provider for platform services (e.g. volcengine/byteplus)",
+            "icon": "☁️",
+            "hidden": True,
+            "persist": "explicit_only",
+            "choices": [
+                {"value": "volcengine", "description": "Volcano Engine (CN)"},
+                {"value": "byteplus", "description": "BytePlus (Overseas)"},
+            ],
+        },
+    )
+
     _config_metadata = {
         "name": "Basic Configuration",
         "welcome_message": "Welcome to AgentKit Configuration Wizard",
@@ -287,8 +301,10 @@ class AgentkitConfigManager:
 
     def _get_default_config(self) -> Dict[str, Any]:
         """Get default configuration."""
+        common = CommonConfig.from_dict({}).to_persist_dict()
+        common = self._filter_config_values(common)
         return {
-            "common": CommonConfig().to_dict(),
+            "common": common,
             STRATEGY_NAME_IN_YAML: {},
             "docker_build": {},
         }
@@ -309,9 +325,16 @@ class AgentkitConfigManager:
         """Get common configuration"""
         return CommonConfig.from_dict(self._data.get("common", {}))
 
+    def get_resolved_cloud_provider(self):
+        from agentkit.toolkit.config.cloud_provider import (
+            resolve_cloud_provider_for_config_manager,
+        )
+
+        return resolve_cloud_provider_for_config_manager(self)
+
     def update_common_config(self, config: CommonConfig):
         """Update common configuration"""
-        self._data["common"] = config.to_dict()
+        self._data["common"] = self._filter_config_values(config.to_persist_dict())
         self._save_config()
 
     def get_docker_build_config(self) -> DockerBuildConfig:

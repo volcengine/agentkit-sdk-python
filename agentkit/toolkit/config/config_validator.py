@@ -19,13 +19,16 @@ from typing import List, Any
 from dataclasses import fields, is_dataclass
 
 from agentkit.toolkit.config.config import CommonConfig
+from agentkit.toolkit.config.choice_resolvers import resolve_field_choices
 
 
 class ConfigValidator:
     """Configuration validator."""
 
     @staticmethod
-    def validate_common_config(config: CommonConfig) -> List[str]:
+    def validate_common_config(
+        config: CommonConfig, *, context: Any = None
+    ) -> List[str]:
         """Validate common configuration.
 
         Args:
@@ -62,6 +65,27 @@ class ConfigValidator:
                     errors.append(f"{desc}: {msg}")
 
             choices = field.metadata.get("choices")
+            # Dynamic choices (if configured) take precedence over static choices
+            resolved = resolve_field_choices(
+                field.name,
+                metadata=field.metadata,
+                current_config=None,
+                dataclass_type=CommonConfig,
+                context=context if isinstance(context, dict) else None,
+            )
+            if resolved is not None:
+                if resolved.validate_against_choices and resolved.choices and value:
+                    valid_values = [
+                        c.get("value") for c in resolved.choices if isinstance(c, dict)
+                    ]
+                    valid_values = [v for v in valid_values if isinstance(v, str)]
+                    if valid_values and value not in valid_values:
+                        desc = field.metadata.get("description", field.name)
+                        errors.append(
+                            f"{desc} must be one of: {', '.join(map(str, valid_values))}"
+                        )
+                continue
+
             if choices and value:
                 valid_values = []
                 if isinstance(choices, list):
@@ -82,7 +106,7 @@ class ConfigValidator:
         return errors
 
     @staticmethod
-    def validate_dataclass(config: Any) -> List[str]:
+    def validate_dataclass(config: Any, *, context: Any = None) -> List[str]:
         if not is_dataclass(config):
             return []
 
@@ -126,11 +150,32 @@ class ConfigValidator:
                     errors.append(f"{desc}: {msg}")
 
             choices = field.metadata.get("choices")
-            if (
-                choices
-                and value
-                and not (disable_region_restrictions and field.name == "region")
-            ):
+            if disable_region_restrictions and field.name == "region":
+                # Preserve legacy behavior: free region input bypasses strict checks
+                continue
+
+            # Dynamic choices (if configured) take precedence over static choices
+            resolved = resolve_field_choices(
+                field.name,
+                metadata=field.metadata,
+                current_config=None,
+                dataclass_type=type(config),
+                context=context if isinstance(context, dict) else None,
+            )
+            if resolved is not None:
+                if resolved.validate_against_choices and resolved.choices and value:
+                    valid_values = [
+                        c.get("value") for c in resolved.choices if isinstance(c, dict)
+                    ]
+                    valid_values = [v for v in valid_values if isinstance(v, str)]
+                    if valid_values and value not in valid_values:
+                        desc = field.metadata.get("description", field.name)
+                        errors.append(
+                            f"{desc} must be one of: {', '.join(map(str, valid_values))}"
+                        )
+                continue
+
+            if choices and value:
                 valid_values = []
                 if isinstance(choices, list):
                     if choices and isinstance(choices[0], dict):

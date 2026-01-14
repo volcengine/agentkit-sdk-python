@@ -88,6 +88,7 @@ class ConfigParamHandler:
         python_version: Optional[str],
         dependencies_file: Optional[str],
         launch_type: Optional[str],
+        cloud_provider: Optional[str],
         runtime_envs: Optional[List[str]],
         strategy_runtime_envs: Optional[List[str]],
         region: Optional[str],
@@ -149,6 +150,8 @@ class ConfigParamHandler:
             common_params["dependencies_file"] = dependencies_file
         if launch_type is not None:
             common_params["launch_type"] = launch_type
+        if cloud_provider is not None:
+            common_params["cloud_provider"] = cloud_provider
 
         if runtime_envs is not None:
             common_params["runtime_envs"] = ConfigParamHandler.parse_runtime_envs(
@@ -263,6 +266,13 @@ class NonInteractiveConfigHandler:
                         setattr(common_config, key, value)
                 else:
                     setattr(common_config, key, value)
+
+                try:
+                    if not hasattr(common_config, "_value_sources"):
+                        common_config._value_sources = {}
+                    common_config._value_sources[key] = "local"
+                except Exception:
+                    pass
             else:
                 console.print(
                     f"[yellow]Warning: Unknown configuration item '{key}'[/yellow]"
@@ -332,7 +342,13 @@ class NonInteractiveConfigHandler:
                 )
 
             if strategy_obj is not None:
-                strategy_errors = self.validator.validate_dataclass(strategy_obj)
+                resolved_provider = (
+                    self.config_manager.get_resolved_cloud_provider().provider.value
+                )
+                strategy_errors = self.validator.validate_dataclass(
+                    strategy_obj,
+                    context={"cloud_provider": resolved_provider},
+                )
                 if strategy_errors:
                     console.print("[red]Configuration validation failed:[/red]")
                     for error in strategy_errors:

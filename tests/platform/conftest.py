@@ -19,9 +19,17 @@ from unittest.mock import MagicMock
 
 @pytest.fixture
 def clean_env(monkeypatch):
-    """Clean up all VOLC related environment variables."""
+    """Clean up environment variables that may affect platform resolution."""
     for key in list(os.environ.keys()):
-        if key.startswith("VOLC"):
+        if (
+            key.startswith("VOLC")
+            or key.startswith("BYTEPLUS")
+            or key
+            in {
+                "AGENTKIT_CLOUD_PROVIDER",
+                "CLOUD_PROVIDER",
+            }
+        ):
             monkeypatch.delenv(key)
 
 

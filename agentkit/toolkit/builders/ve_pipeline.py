@@ -60,6 +60,10 @@ class VeCPCRBuilderConfig(AutoSerializableMixin):
     common_config: Optional[CommonConfig] = field(
         default=None, metadata={"system": True, "description": "Common configuration"}
     )
+    cloud_provider: Optional[str] = field(
+        default=None,
+        metadata={"system": True, "description": "Resolved cloud provider"},
+    )
 
     tos_bucket: str = field(
         default=AUTO_CREATE_VE,
@@ -164,6 +168,30 @@ class VeCPCRBuilder(Builder):
         self._tos_service = None
         self._cr_service = None
         self._pipeline_service = None
+
+    def _resolve_cr_domain(self, config: VeCPCRBuilderConfig, cr_region: str) -> str:
+        from agentkit.platform.provider import (
+            CloudProvider,
+            read_cloud_provider_from_env,
+            resolve_cloud_provider,
+        )
+
+        common_config = getattr(config, "common_config", None)
+        config_provider = (
+            getattr(common_config, "cloud_provider", None) if common_config else None
+        )
+        provider = resolve_cloud_provider(
+            explicit_provider=getattr(config, "cloud_provider", None),
+            env_provider=read_cloud_provider_from_env(),
+            config_provider=config_provider,
+        )
+
+        suffix = (
+            "cr.bytepluses.com"
+            if provider == CloudProvider.BYTEPLUS
+            else "cr.volces.com"
+        )
+        return f"{config.cr_instance_name}-{cr_region}.{suffix}"
 
     def build(self, config: VeCPCRBuilderConfig) -> BuildResult:
         """Execute cloud build process.
@@ -381,7 +409,14 @@ class VeCPCRBuilder(Builder):
                         prefix=builder_config.tos_prefix,
                     )
 
-                    tos_service = TOSService(tos_config)
+                    provider = getattr(
+                        builder_config, "cloud_provider", None
+                    ) or getattr(
+                        getattr(builder_config, "common_config", None),
+                        "cloud_provider",
+                        None,
+                    )
+                    tos_service = TOSService(tos_config, provider=provider)
                     tos_service.delete_file(builder_config.tos_object_key)
                     logger.info(f"Deleted TOS archive: {builder_config.tos_object_key}")
 
@@ -459,6 +494,26 @@ class VeCPCRBuilder(Builder):
             context = {
                 "language_version": common_config.language_version,
             }
+
+            from agentkit.platform.provider import (
+                read_cloud_provider_from_env,
+                resolve_cloud_provider,
+            )
+            from agentkit.toolkit.docker.base_images import (
+                resolve_dockerfile_base_image_defaults,
+            )
+
+            provider = resolve_cloud_provider(
+                explicit_provider=getattr(config, "cloud_provider", None),
+                env_provider=read_cloud_provider_from_env(),
+                config_provider=getattr(common_config, "cloud_provider", None),
+            )
+            base_image_defaults = resolve_dockerfile_base_image_defaults(
+                language=language,
+                language_version=common_config.language_version,
+                provider=provider,
+            )
+            context.update(base_image_defaults.context)
 
             # Inject Docker build configuration parameters
             if docker_build_config:
@@ -618,6 +673,8 @@ class VeCPCRBuilder(Builder):
                 "language_version": common_config.language_version,
                 "entry_point": common_config.entry_point,
                 "dependencies_file": common_config.dependencies_file,
+                "cloud_provider_resolved": provider.value,
+                "dockerfile_base_image_defaults": base_image_defaults.context,
             }
             if docker_build_config:
                 config_hash_dict["docker_build"] = {
@@ -880,7 +937,10 @@ class VeCPCRBuilder(Builder):
                 bucket=bucket_name, region=config.tos_region, prefix=config.tos_prefix
             )
 
-            tos_service = TOSService(tos_config)
+            provider = getattr(config, "cloud_provider", None) or getattr(
+                getattr(config, "common_config", None), "cloud_provider", None
+            )
+            tos_service = TOSService(tos_config, provider=provider)
 
             # Two-step safety check:
             # 1) Ensure the bucket exists and is accessible.
@@ -1046,6 +1106,10 @@ class VeCPCRBuilder(Builder):
             cr_service = CRService(
                 config_callback=DefaultCRConfigCallback(config_updater=config_updater),
                 reporter=self.reporter,
+                provider=getattr(config, "cloud_provider", None)
+                or getattr(
+                    getattr(config, "common_config", None), "cloud_provider", None
+                ),
             )
 
             common_config = config.common_config
@@ -1115,7 +1179,10 @@ class VeCPCRBuilder(Builder):
         try:
             from agentkit.toolkit.volcengine.code_pipeline import VeCodePipeline
 
-            cp_client = VeCodePipeline(region=config.cp_region)
+            provider = getattr(config, "cloud_provider", None) or getattr(
+                getattr(config, "common_config", None), "cloud_provider", None
+            )
+            cp_client = VeCodePipeline(region=config.cp_region, provider=provider)
 
             # Get or create agentkit-cli-workspace
             workspace_name = "agentkit-cli-workspace"
@@ -1373,7 +1440,10 @@ class VeCPCRBuilder(Builder):
             return pipeline_id
 
         except Exception as e:
-            raise Exception(f"Failed to prepare pipeline resources: {str(e)}")
+            logger.exception(f"Failed to prepare pipeline resources: {str(e)}")
+            raise Exception(
+                f"Failed to prepare pipeline resources: {str(e)}, Please Check Code Pipeline Service Is Enabled. See https://console.byteplus.com/cp/"
+            )
 
     def _execute_build(
         self,
@@ -1442,6 +1512,7 @@ class VeCPCRBuilder(Builder):
             overrides = runtime_overrides or {}
             tos_region = overrides.get("tos_region") or config.tos_region
             cr_region = overrides.get("cr_region") or config.cr_region
+            cr_domain = self._resolve_cr_domain(config, cr_region)
 
             build_parameters = [
                 {"Key": "TOS_BUCKET_NAME", "Value": config.tos_bucket},
@@ -1460,7 +1531,7 @@ class VeCPCRBuilder(Builder):
                 {"Key": "CR_INSTANCE", "Value": config.cr_instance_name},
                 {
                     "Key": "CR_DOMAIN",
-                    "Value": f"{config.cr_instance_name}-{cr_region}.cr.volces.com",
+                    "Value": cr_domain,
                 },
                 {"Key": "CR_NAMESPACE", "Value": config.cr_namespace_name},
                 {"Key": "CR_OCI", "Value": config.cr_repo_name},
@@ -1564,8 +1635,7 @@ class VeCPCRBuilder(Builder):
             # Build completed successfully
             self.reporter.success("Pipeline execution completed!")
 
-            # Construct image URL: [instance-name]-[region].cr.volces.com
-            image_url = f"{config.cr_instance_name}-{cr_region}.cr.volces.com/{config.cr_namespace_name}/{config.cr_repo_name}:{config.image_tag}"
+            image_url = f"{cr_domain}/{config.cr_namespace_name}/{config.cr_repo_name}:{config.image_tag}"
             config.image_url = image_url
 
             return image_url

@@ -26,11 +26,17 @@ DEFAULT_CR_REPO_NAME = "agentkit-platform-repo"
 
 
 class VeCR:
-    def __init__(self, access_key: str, secret_key: str, region: str = "cn-beijing"):
+    def __init__(
+        self,
+        access_key: str,
+        secret_key: str,
+        region: str | None = None,
+        provider: str | None = None,
+    ):
         self.ak = access_key
         self.sk = secret_key
 
-        config = VolcConfiguration(region=region or None)
+        config = VolcConfiguration(region=region or None, provider=provider or None)
         ep = resolve_endpoint(
             "cr",
             region=region or None,

@@ -37,7 +37,7 @@ class CRServiceConfig(AutoSerializableMixin):
     instance_name: str = AUTO_CREATE_VE
     namespace_name: str = AUTO_CREATE_VE
     repo_name: str = AUTO_CREATE_VE
-    region: str = "cn-beijing"
+    region: str = ""
     auto_create_instance_type: str = (
         "Micro"  # Instance type when auto-creating: "Micro" or "Enterprise"
     )
@@ -174,6 +174,7 @@ class CRService:
         self,
         config_callback: Optional[CRConfigCallback] = None,
         reporter: Optional[Reporter] = None,
+        provider: Optional[str] = None,
     ):
         """Initialize the Container Registry service.
 
@@ -185,6 +186,7 @@ class CRService:
         self.reporter = (
             reporter if reporter is not None else ExecutionContext.get_reporter()
         )
+        self.provider = provider
         self._vecr_client = None
         self._init_client()
 
@@ -198,7 +200,7 @@ class CRService:
             if region and isinstance(region, str):
                 region = region.strip() or None
 
-            config = VolcConfiguration(region=region)
+            config = VolcConfiguration(region=region, provider=self.provider)
             creds = config.get_service_credentials("cr")
             endpoint = config.get_service_endpoint("cr")
 
@@ -206,6 +208,7 @@ class CRService:
                 access_key=creds.access_key,
                 secret_key=creds.secret_key,
                 region=endpoint.region,
+                provider=self.provider,
             )
             # Expose the actual region resolved by VolcConfiguration
             self.actual_region = endpoint.region
@@ -231,8 +234,7 @@ class CRService:
             CRServiceResult: Operation result with resource details and registry URL.
         """
         try:
-            if getattr(cr_config, "region", None):
-                self._init_client(region=cr_config.region)
+            self._init_client(region=getattr(cr_config, "region", None))
 
             result = CRServiceResult()
 

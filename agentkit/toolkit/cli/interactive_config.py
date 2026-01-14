@@ -174,7 +174,10 @@ class AutoPromptGenerator:
                 pass
 
     def generate_config(
-        self, dataclass_type: type, existing_config: Optional[Dict[str, Any]] = None
+        self,
+        dataclass_type: type,
+        existing_config: Optional[Dict[str, Any]] = None,
+        context: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         self.current_dataclass_type = dataclass_type
         if not is_dataclass(dataclass_type):
@@ -249,6 +252,7 @@ class AutoPromptGenerator:
                 idx,
                 total_fields,
                 config,
+                context,
             )
 
             if value is not None:
@@ -285,6 +289,7 @@ class AutoPromptGenerator:
         current: int = 1,
         total: int = 1,
         current_config: Dict[str, Any] = None,
+        resolver_context: Optional[Dict[str, Any]] = None,
     ) -> Any:
         """Field input coordinator - handles advanced validation logic.
 
@@ -328,36 +333,81 @@ class AutoPromptGenerator:
         if default is MISSING or isinstance(default, type(MISSING)):
             default = None
 
-        choices = metadata.get("choices")
-        # Allow free region input when global defaults disable strict restrictions
-        allow_free_region = False
+        # Dynamic choices framework (decoupled from specific field names)
+        resolved_choices = None
         try:
-            from agentkit.toolkit.config.global_config import get_global_config
+            from agentkit.toolkit.config.choice_resolvers import resolve_field_choices
 
-            global_conf = get_global_config()
-            disabled = bool(
-                getattr(
-                    global_conf.defaults, "disable_region_strict_restrictions", False
-                )
+            resolved_choices = resolve_field_choices(
+                name,
+                metadata=metadata,
+                current_config=current_config,
+                dataclass_type=self.current_dataclass_type,
+                context=resolver_context,
             )
-            if disabled and name == "region":
-                # Limit to Cloud/Hybrid strategy types only
-                try:
-                    from agentkit.toolkit.config.strategy_configs import (
-                        CloudStrategyConfig,
-                        HybridStrategyConfig,
-                    )
-
-                    allow_free_region = self.current_dataclass_type in (
-                        CloudStrategyConfig,
-                        HybridStrategyConfig,
-                    )
-                except Exception:
-                    allow_free_region = False
         except Exception:
-            allow_free_region = False
+            resolved_choices = None
 
-        if choices and not allow_free_region:
+        # Static choices fallback
+        choices = metadata.get("choices")
+
+        # If dynamic resolver is available, it takes precedence
+        if resolved_choices is not None:
+            dyn_choices = resolved_choices.choices or []
+
+            # Allow resolver to override default when the current default is empty
+            if resolved_choices.default_value and (
+                default is None or (isinstance(default, str) and not default.strip())
+            ):
+                default = resolved_choices.default_value
+
+            if dyn_choices and not resolved_choices.allow_free_input:
+                return self._handle_choice_selection(
+                    description, default, dyn_choices, metadata, current, total
+                )
+
+            # Free input mode, optionally validate against provided choices
+            enhanced_description = self._enhance_description_with_hints(
+                description, metadata, current_config
+            )
+
+            validation = metadata.get("validation", {})
+            valid_values = {c.get("value") for c in dyn_choices if isinstance(c, dict)}
+
+            while True:
+                handler = self.type_handlers.get(field_type)
+                if handler:
+                    value = handler(
+                        enhanced_description, default, metadata, current, total
+                    )
+                else:
+                    value = self._handle_string(
+                        enhanced_description, default, metadata, current, total
+                    )
+
+                if (
+                    resolved_choices.validate_against_choices
+                    and dyn_choices
+                    and value not in valid_values
+                ):
+                    console.print(
+                        f"{ICONS['error']} Invalid value. Allowed: {', '.join(sorted(valid_values))}"
+                    )
+                    continue
+
+                if validation.get("type") == "conditional":
+                    errors = self._validate_conditional_value(
+                        name, value, validation, current_config
+                    )
+                    if errors:
+                        for error in errors:
+                            console.print(f"{ICONS['error']} {error}")
+                        continue
+
+                return value
+
+        # Existing static choices behavior
+        if choices:
             return self._handle_choice_selection(
                 description, default, choices, metadata, current, total
             )
@@ -1169,9 +1219,11 @@ auto_prompt = AutoPromptGenerator()
 
 
 def generate_config_from_dataclass(
-    dataclass_type: type, existing_config: Optional[Dict[str, Any]] = None
+    dataclass_type: type,
+    existing_config: Optional[Dict[str, Any]] = None,
+    context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    return auto_prompt.generate_config(dataclass_type, existing_config)
+    return auto_prompt.generate_config(dataclass_type, existing_config, context=context)
 
 
 def create_common_config_interactively(

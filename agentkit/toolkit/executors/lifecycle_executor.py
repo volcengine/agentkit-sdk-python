@@ -143,6 +143,7 @@ class LifecycleExecutor(BaseExecutor):
             FileNotFoundError: Configuration file not found
             ValueError: Invalid configuration
         """
+        token = None
         try:
             self.reporter.info("🚀 Starting launch operation...")
 
@@ -151,6 +152,7 @@ class LifecycleExecutor(BaseExecutor):
             if preflight_mode != PreflightMode.SKIP:
                 # Load config first to get launch_type
                 config = self._load_config(config_dict, config_file)
+                token = self._enter_platform_context(config)
                 launch_type = config.get_common_config().launch_type
 
                 # Resolve region for preflight check
@@ -240,6 +242,8 @@ class LifecycleExecutor(BaseExecutor):
                 error=error_info.get("error"),
                 error_code=error_info.get("error_code"),
             )
+        finally:
+            self._exit_platform_context(token)
 
     def stop(
         self,
@@ -262,12 +266,14 @@ class LifecycleExecutor(BaseExecutor):
             FileNotFoundError: Configuration file not found
             ValueError: Invalid configuration or unknown launch_type
         """
+        token = None
         try:
             self.reporter.info("🛑 Stopping Agent service...")
 
             # Load configuration (priority: config_dict > config_file > default)
             self.logger.info("Loading configuration...")
             config = self._load_config(config_dict, config_file)
+            token = self._enter_platform_context(config)
 
             # Extract launch_type to determine which strategy to use
             common_config = config.get_common_config()
@@ -308,6 +314,8 @@ class LifecycleExecutor(BaseExecutor):
                 error=error_info.get("error"),
                 error_code=error_info.get("error_code"),
             )
+        finally:
+            self._exit_platform_context(token)
 
     def destroy(
         self,
@@ -335,12 +343,14 @@ class LifecycleExecutor(BaseExecutor):
             FileNotFoundError: Configuration file not found
             ValueError: Invalid configuration or unknown launch_type
         """
+        token = None
         try:
             self.reporter.info("💥 Destroying Agent service and resources...")
 
             # Load configuration (priority: config_dict > config_file > default)
             self.logger.info("Loading configuration...")
             config = self._load_config(config_dict, config_file)
+            token = self._enter_platform_context(config)
 
             # Extract launch_type to determine which strategy to use
             common_config = config.get_common_config()
@@ -385,3 +395,5 @@ class LifecycleExecutor(BaseExecutor):
                 error=error_info.get("error"),
                 error_code=error_info.get("error_code"),
             )
+        finally:
+            self._exit_platform_context(token)

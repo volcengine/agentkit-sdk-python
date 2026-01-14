@@ -266,6 +266,8 @@ def ve_request(
 
 
 def check_error(response: dict) -> None:
+    if "Error" in response:
+        raise ValueError(f"Error in response: {response['Error']}")
     if "Error" in response["ResponseMetadata"]:
         error_code = response["ResponseMetadata"]["Error"]["Code"]
         error_message = response["ResponseMetadata"]["Error"]["Message"]

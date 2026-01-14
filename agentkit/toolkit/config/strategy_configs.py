@@ -12,6 +12,7 @@ from .constants import (
     DEFAULT_CR_INSTANCE_TEMPLATE_NAME,
     DEFAULT_TOS_BUCKET_TEMPLATE_NAME,
 )
+from .region_defaults import default_region_for_current_provider
 
 
 @dataclass
@@ -130,15 +131,13 @@ class HybridStrategyConfig(AutoSerializableMixin):
     )
 
     region: str = field(
-        default="cn-beijing",
+        default_factory=default_region_for_current_provider,
         metadata={
-            "description": "Volcano Engine service region",
+            "description": "Cloud service region",
             "icon": "🌏",
             "aliases": ["ve_region"],
-            "choices": [
-                {"value": "cn-beijing", "description": "Beijing"},
-                {"value": "cn-shanghai", "description": "Shanghai"},
-            ],
+            "choices_resolver": "region_by_cloud_provider",
+            "persist": "explicit_only",
         },
     )
 
@@ -340,14 +339,12 @@ class CloudStrategyConfig(AutoSerializableMixin):
     """Cloud build and deployment strategy configuration for Volcano Engine."""
 
     region: str = field(
-        default="cn-beijing",
+        default_factory=default_region_for_current_provider,
         metadata={
-            "description": "Volcano Engine service region",
+            "description": "Cloud service region",
             "icon": "🌏",
-            "choices": [
-                {"value": "cn-beijing", "description": "Beijing"},
-                {"value": "cn-shanghai", "description": "Shanghai"},
-            ],
+            "choices_resolver": "region_by_cloud_provider",
+            "persist": "explicit_only",
         },
     )
 

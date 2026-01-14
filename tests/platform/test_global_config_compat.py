@@ -36,3 +36,20 @@ class TestGlobalConfigCompatibility:
 
         # Verify top-level wins
         assert config.region == "cn-beijing"
+
+    def test_byteplus_region_prefers_byteplus_region_when_default_provider(self):
+        data = {
+            "defaults": {"cloud_provider": "byteplus"},
+            "byteplus": {"region": "ap-southeast-1"},
+            "volcengine": {"region": "cn-shanghai"},
+        }
+        config = GlobalConfig.from_dict(data)
+        assert config.region == "ap-southeast-1"
+
+    def test_byteplus_region_does_not_fall_back_to_volcengine_region(self):
+        data = {
+            "defaults": {"cloud_provider": "byteplus"},
+            "volcengine": {"region": "cn-shanghai"},
+        }
+        config = GlobalConfig.from_dict(data)
+        assert config.region == ""

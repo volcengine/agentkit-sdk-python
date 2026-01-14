@@ -30,12 +30,14 @@ class VeCodePipeline:
         access_key: str = "",
         secret_key: str = "",
         region: str = "",
+        provider: str | None = None,
     ) -> None:
         # Use provided region or None to trigger auto-detection in VolcConfiguration
         config = VolcConfiguration(
             access_key=access_key or None,
             secret_key=secret_key or None,
             region=region or None,
+            provider=provider or None,
         )
 
         # If credentials not fully provided, resolve them

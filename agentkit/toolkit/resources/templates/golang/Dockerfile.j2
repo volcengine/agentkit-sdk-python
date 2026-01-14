@@ -1,6 +1,8 @@
 # Build stage - Support custom image
 {% if base_image_builder %}
 FROM {{ base_image_builder }} AS builder
+{% elif base_image_default_builder %}
+FROM {{ base_image_default_builder }} AS builder
 {% else %}
 FROM agentkit-cn-beijing.cr.volces.com/base/compile_basego:1.24 AS builder
 {% endif %}
@@ -42,6 +44,8 @@ RUN mkdir -p ${BUILD_OUTPUT_DIR} && CGO_ENABLED=0 GOOS=linux go build -a -instal
 # Runtime stage - Support custom image
 {% if base_image_runtime %}
 FROM {{ base_image_runtime }}
+{% elif base_image_default_runtime %}
+FROM {{ base_image_default_runtime }}
 {% else %}
 FROM agentkit-cn-beijing.cr.volces.com/base/runtime_basego:latest
 {% endif %}
