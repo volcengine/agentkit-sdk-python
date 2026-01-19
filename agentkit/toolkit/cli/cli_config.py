@@ -319,6 +319,25 @@ def _interactive_config(config_file: Optional[str] = None):
         console.print(f"[red]❌ Unknown launch type: {strategy_name}[/red]")
         raise typer.Exit(1)
 
+    # When disabling strict region restrictions, default show global region
+    try:
+        from agentkit.toolkit.config.global_config import get_global_config
+
+        global_conf = get_global_config()
+        disabled = bool(
+            getattr(global_conf.defaults, "disable_region_strict_restrictions", False)
+        )
+        if disabled and isinstance(current_strategy_config_dict, dict):
+            global_region = (global_conf.region or "").strip()
+            if global_region:
+                if "region" in current_strategy_config_dict:
+                    if not current_strategy_config_dict.get("region"):
+                        current_strategy_config_dict["region"] = global_region
+                else:
+                    current_strategy_config_dict["region"] = global_region
+    except Exception:
+        pass
+
     # Generate new strategy config
     strategy_config = generate_config_from_dataclass(
         config_class, current_strategy_config_dict
@@ -472,6 +491,8 @@ def _show_global_config():
     console.print(
         f"  Region:     [yellow]{config.region or '[dim](not set)[/dim]'}[/yellow]"
     )
+    if config.defaults.disable_region_strict_restrictions:
+        console.print("  Disable Region Restrictions: [yellow]True[/yellow]")
     console.print()
 
     # Display Volcengine credentials
@@ -581,22 +602,9 @@ def _set_global_field(field_value: str):
                 )
             config_dict[section][field] = clean_value
         elif field == "cr_public_endpoint_check":
-            clean_value = value.strip().lower() if value is not None else None
-            if clean_value == "":
-                clean_value = None
-            if clean_value is None:
-                config_dict[section][field] = None
-            else:
-                truthy = {"true", "1", "yes", "y"}
-                falsy = {"false", "0", "no", "n"}
-                if clean_value in truthy:
-                    config_dict[section][field] = True
-                elif clean_value in falsy:
-                    config_dict[section][field] = False
-                else:
-                    raise AttributeError(
-                        f"Invalid boolean value for cr_public_endpoint_check: {value}"
-                    )
+            _set_bool_field(config_dict[section], field, value)
+        elif field == "disable_region_strict_restrictions":
+            _set_bool_field(config_dict[section], field, value)
         elif field == "iam_role_policies":
             # Simple list parsing for CLI convenience
             if not value:
@@ -631,3 +639,22 @@ def _set_global_field(field_value: str):
     except Exception as e:
         console.print(f"[red]❌ Failed to set config: {e}[/red]")
         raise typer.Exit(code=1)
+
+
+def _set_bool_field(target_dict: dict, field: str, value: str):
+    """Helper to set boolean field from string value."""
+    clean_value = value.strip().lower() if value is not None else None
+    if clean_value == "":
+        clean_value = None
+
+    if clean_value is None:
+        target_dict[field] = None
+    else:
+        truthy = {"true", "1", "yes", "y"}
+        falsy = {"false", "0", "no", "n"}
+        if clean_value in truthy:
+            target_dict[field] = True
+        elif clean_value in falsy:
+            target_dict[field] = False
+        else:
+            raise AttributeError(f"Invalid boolean value for {field}: {value}")
