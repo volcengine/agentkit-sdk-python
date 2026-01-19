@@ -362,10 +362,22 @@ class AgentkitConfigManager:
         self._save_config()
 
     def _filter_config_values(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        """Filter empty and meaningless values from configuration."""
+        """Filter empty and meaningless values from configuration.
+
+        Note: Some config sections intentionally use empty values to represent
+        explicit user intent. For example, `runtime_bindings` may use empty
+        strings ("")/null to indicate unbinding.
+        """
         filtered = {}
 
         for key, value in config.items():
+            # Keep runtime_bindings as-is. It may contain empty strings / null to
+            # explicitly represent "no binding" / "unbind" semantics.
+            if key == "runtime_bindings" and isinstance(value, dict):
+                if value:
+                    filtered[key] = value
+                continue
+
             if value == "" or value is None:
                 continue
 
