@@ -105,6 +105,22 @@ TEMPLATES = {
         "type": "Stream App",
         "extra_requirements": ["langchain", "langchain-litellm"],
     },
+    "basic_go": {
+        "filepath": "veadk_go_basic",
+        "name": "Basic Go Agent App",
+        "language": "Golang",
+        "language_version": "1.24",
+        "description": "Basic Agent App Based on the VeADK-Go Framework",
+        "type": "Basic App",
+    },
+    "a2a_go": {
+        "filepath": "veadk_go_a2a",
+        "name": "A2A Go Agent App",
+        "language": "Golang",
+        "language_version": "1.24",
+        "description": "A2A Application Based on the VeADK-Go Framework",
+        "type": "A2A App",
+    },
 }
 
 
