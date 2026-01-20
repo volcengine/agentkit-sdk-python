@@ -16,6 +16,7 @@ import os
 import logging
 import tempfile
 import uuid
+import sys
 from pathlib import Path
 from typing import Dict, Any, Optional
 from dataclasses import dataclass, field
@@ -666,7 +667,8 @@ class VeCPCRBuilder(Builder):
         """
         try:
             from agentkit.toolkit.volcengine.utils.project_archiver import (
-                create_project_archive,
+                ArchiveConfig,
+                ProjectArchiver,
             )
 
             common_config = config.common_config
@@ -678,12 +680,54 @@ class VeCPCRBuilder(Builder):
             temp_dir = tempfile.mkdtemp()
             source_base_path = self.workdir
 
-            # Create archive using project archiver utility
-            archive_path = create_project_archive(
+            dockerignore_path = source_base_path / ".dockerignore"
+            dockerignore_path_str = (
+                str(dockerignore_path) if dockerignore_path.is_file() else None
+            )
+
+            archive_config = ArchiveConfig(
                 source_dir=str(source_base_path),
                 output_dir=temp_dir,
                 archive_name=archive_name,
+                dockerignore_path=dockerignore_path_str,
             )
+            archiver = ProjectArchiver(archive_config)
+            files_to_include = archiver.collect_files_to_include()
+
+            size_threshold_bytes = 100 * 1024 * 1024
+            total_size_bytes = 0
+            included_files_with_size: list[tuple[str, int]] = []
+            for p in files_to_include:
+                try:
+                    rel = p.relative_to(source_base_path).as_posix()
+                    size = p.stat().st_size
+                except Exception:
+                    continue
+                total_size_bytes += size
+                included_files_with_size.append((rel, size))
+
+            if total_size_bytes > size_threshold_bytes:
+                self._warn_large_archive(
+                    total_size_bytes=total_size_bytes,
+                    threshold_bytes=size_threshold_bytes,
+                    included_files_with_size=included_files_with_size,
+                )
+
+                if sys.stdin.isatty():
+                    confirmed = self.reporter.confirm(
+                        message=(
+                            "The archive to be uploaded is larger than 100 MiB. "
+                            "Do you want to continue uploading all included files?"
+                        ),
+                        default=False,
+                    )
+                    if not confirmed:
+                        raise Exception(
+                            "Archive upload cancelled by user (archive size exceeds 100 MiB)."
+                        )
+
+            # Create archive using pre-collected file list (avoid re-walking directories)
+            archive_path = archiver.create_archive(files_to_include=files_to_include)
 
             logger.info(f"Project archive created: {archive_path}")
             self.reporter.success(f"Project archive created: {archive_path}")
@@ -691,6 +735,91 @@ class VeCPCRBuilder(Builder):
 
         except Exception as e:
             raise Exception(f"Failed to create project archive: {str(e)}")
+
+    def _warn_large_archive(
+        self,
+        total_size_bytes: int,
+        threshold_bytes: int,
+        included_files_with_size: list[tuple[str, int]],
+    ) -> None:
+        def format_bytes(num_bytes: int) -> str:
+            units = ["B", "KiB", "MiB", "GiB", "TiB"]
+            value = float(num_bytes)
+            for unit in units:
+                if value < 1024 or unit == units[-1]:
+                    if unit == "B":
+                        return f"{int(value)} {unit}"
+                    return f"{value:.2f} {unit}"
+                value /= 1024
+            return f"{value:.2f} TiB"
+
+        included_count = len(included_files_with_size)
+        size_str = format_bytes(total_size_bytes)
+        threshold_str = format_bytes(threshold_bytes)
+
+        self.reporter.warning(
+            f"Archive size is {size_str} (threshold: {threshold_str}). Included files: {included_count}."
+        )
+
+        # Top-level folder summary (by total size)
+        top_level_sizes: dict[str, int] = {}
+        for rel_path, size in included_files_with_size:
+            top = rel_path.split("/", 1)[0] if "/" in rel_path else rel_path
+            key = f"{top}/" if top and top != rel_path else top
+            top_level_sizes[key] = top_level_sizes.get(key, 0) + size
+
+        top_level_lines = [
+            "Top-level paths by total size (descending):",
+        ]
+        for path, size in sorted(
+            top_level_sizes.items(), key=lambda kv: kv[1], reverse=True
+        )[:30]:
+            top_level_lines.append(f"  {format_bytes(size):>10}  {path}")
+
+        # Largest files list
+        largest_lines = ["Largest files (descending):"]
+        for rel_path, size in sorted(
+            included_files_with_size, key=lambda kv: kv[1], reverse=True
+        )[:50]:
+            largest_lines.append(f"  {format_bytes(size):>10}  {rel_path}")
+
+        # Sample file list (lexicographic)
+        sample_limit = 200
+        sample_lines = [f"Included files (first {sample_limit} of {included_count}):"]
+        for rel_path, _size in sorted(included_files_with_size, key=lambda kv: kv[0])[
+            :sample_limit
+        ]:
+            sample_lines.append(f"  {rel_path}")
+        if included_count > sample_limit:
+            sample_lines.append(
+                f"  ... ({included_count - sample_limit} more files not shown)"
+            )
+
+        hint_lines = [
+            "How to exclude files from the upload:",
+            "  1) Edit .dockerignore in your project root.",
+            "  2) Add ignore rules, for example:",
+            "     - data/",
+            "     - *.log",
+            "     - .venv/",
+            "     - **/*.bin",
+            "  3) Re-run agentkit build/launch.",
+        ]
+
+        lines = []
+        lines.extend(top_level_lines)
+        lines.append("")
+        lines.extend(largest_lines)
+        lines.append("")
+        lines.extend(sample_lines)
+        lines.append("")
+        lines.extend(hint_lines)
+
+        self.reporter.show_logs(
+            title="Large archive detected (review before upload)",
+            lines=lines,
+            max_lines=400,
+        )
 
     def _upload_to_tos(
         self, archive_path: str, config: VeCPCRBuilderConfig
