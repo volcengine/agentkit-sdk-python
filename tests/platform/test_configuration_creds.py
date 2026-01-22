@@ -14,6 +14,7 @@
 
 import pytest
 import os
+from pathlib import Path
 from agentkit.platform.configuration import VolcConfiguration
 
 
@@ -84,6 +85,101 @@ class TestConfigurationCredentials:
     ):
         """Test fallback to VeFaaS credentials."""
         # No env, no config
+        config = VolcConfiguration()
+        creds = config.get_service_credentials("agentkit")
+
+        assert creds.access_key == "vefaas_ak"
+        assert creds.secret_key == "vefaas_sk"
+        assert creds.session_token == "vefaas_token"
+
+    def test_creds_dotenv_fallback_from_cwd(
+        self, clean_env, mock_global_config, monkeypatch, tmp_path, mocker
+    ):
+        """Test fallback to .env in current working directory when other sources are missing."""
+        # Ensure VeFaaS IAM check fails
+        mocker.patch("pathlib.Path.exists", return_value=False)
+
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / ".env").write_text(
+            "VOLCENGINE_ACCESS_KEY=AK_FROM_DOTENV\nVOLCENGINE_SECRET_KEY=SK_FROM_DOTENV\n",
+            encoding="utf-8",
+        )
+
+        config = VolcConfiguration()
+        creds = config.get_service_credentials("agentkit")
+
+        assert creds.access_key == "AK_FROM_DOTENV"
+        assert creds.secret_key == "SK_FROM_DOTENV"
+
+    def test_creds_dotenv_does_not_override_global_env(
+        self, clean_env, mock_global_config, monkeypatch, tmp_path
+    ):
+        """Test that .env fallback never overrides real process environment variables."""
+        os.environ["VOLCENGINE_ACCESS_KEY"] = "AK_FROM_ENV"
+        os.environ["VOLCENGINE_SECRET_KEY"] = "SK_FROM_ENV"
+
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / ".env").write_text(
+            "VOLCENGINE_ACCESS_KEY=AK_FROM_DOTENV\nVOLCENGINE_SECRET_KEY=SK_FROM_DOTENV\n",
+            encoding="utf-8",
+        )
+
+        config = VolcConfiguration()
+        creds = config.get_service_credentials("agentkit")
+
+        assert creds.access_key == "AK_FROM_ENV"
+        assert creds.secret_key == "SK_FROM_ENV"
+
+    def test_creds_dotenv_does_not_override_global_config(
+        self, clean_env, mock_global_config, monkeypatch, tmp_path, mocker
+    ):
+        """Test that .env fallback never overrides ~/.agentkit/config.yaml credentials."""
+        # Ensure VeFaaS IAM check fails
+        mocker.patch("pathlib.Path.exists", return_value=False)
+
+        mock_global_config.update(
+            {"volcengine": {"access_key": "AK_FROM_CFG", "secret_key": "SK_FROM_CFG"}}
+        )
+
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / ".env").write_text(
+            "VOLCENGINE_ACCESS_KEY=AK_FROM_DOTENV\nVOLCENGINE_SECRET_KEY=SK_FROM_DOTENV\n",
+            encoding="utf-8",
+        )
+
+        config = VolcConfiguration()
+        creds = config.get_service_credentials("agentkit")
+
+        assert creds.access_key == "AK_FROM_CFG"
+        assert creds.secret_key == "SK_FROM_CFG"
+
+    def test_creds_dotenv_partial_is_ignored(
+        self, clean_env, mock_global_config, monkeypatch, tmp_path, mocker
+    ):
+        """Test that partial .env credentials are ignored and lookup continues."""
+        # Ensure VeFaaS IAM check fails
+        mocker.patch("pathlib.Path.exists", return_value=False)
+
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / ".env").write_text(
+            "VOLCENGINE_ACCESS_KEY=AK_ONLY\n",
+            encoding="utf-8",
+        )
+
+        config = VolcConfiguration()
+        with pytest.raises(ValueError, match="Volcengine credentials not found"):
+            config.get_service_credentials("agentkit")
+
+    def test_creds_vefaas_takes_priority_over_dotenv(
+        self, clean_env, mock_global_config, mock_vefaas_file, monkeypatch, tmp_path
+    ):
+        """Test that VeFaaS IAM credentials take priority over .env fallback."""
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / ".env").write_text(
+            "VOLCENGINE_ACCESS_KEY=AK_FROM_DOTENV\nVOLCENGINE_SECRET_KEY=SK_FROM_DOTENV\n",
+            encoding="utf-8",
+        )
+
         config = VolcConfiguration()
         creds = config.get_service_credentials("agentkit")
 
