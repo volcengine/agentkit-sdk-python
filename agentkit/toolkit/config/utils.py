@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 import logging
 
-from dotenv import load_dotenv, dotenv_values
+from dotenv import dotenv_values
 from yaml import safe_load, YAMLError
 
 from .constants import AUTO_CREATE_VE
@@ -48,8 +48,7 @@ def load_dotenv_file(project_dir: Path) -> Dict[str, str]:
     if not env_file_path.exists():
         return {}
 
-    # Load .env into environment temporarily to get the values
-    load_dotenv(env_file_path)
+    # Parse values without mutating the current process environment.
     env_values = dotenv_values(env_file_path)
     return {k: str(v) for k, v in env_values.items() if v is not None}
 
