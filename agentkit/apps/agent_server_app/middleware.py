@@ -27,7 +27,6 @@ class AgentkitTelemetryHTTPMiddleware:
         self.app = app
 
     async def __call__(self, scope, receive, send):
-        print(f"test: {scope}")
         if scope["type"] != "http":
             return await self.app(scope, receive, send)
 
@@ -37,7 +36,7 @@ class AgentkitTelemetryHTTPMiddleware:
         headers = {k.decode("latin-1"): v.decode("latin-1") for k, v in headers_list}
         span = telemetry.tracer.start_span(name="agent_server_request")
         ctx = trace.set_span_in_context(span)
-        context_api.attach(ctx)
+        token = context_api.attach(ctx)
         headers = {
             k: v for k, v in headers.items() if k.lower() not in _EXCLUDED_HEADERS
         }
@@ -45,8 +44,10 @@ class AgentkitTelemetryHTTPMiddleware:
         # Currently unable to retrieve user_id and session_id from headers; keep logic for future use
         user_id = headers.get("user_id")
         session_id = headers.get("session_id")
-        headers["user_id"] = user_id
-        headers["session_id"] = session_id
+        if user_id:
+            headers["user_id"] = user_id
+        if session_id:
+            headers["session_id"] = session_id
         telemetry.trace_agent_server(
             func_name=f"{method} {path}",
             span=span,
@@ -73,3 +74,5 @@ class AgentkitTelemetryHTTPMiddleware:
         except Exception as e:
             telemetry.trace_agent_server_finish(path=path, func_result="", exception=e)
             raise
+        finally:
+            context_api.detach(token)

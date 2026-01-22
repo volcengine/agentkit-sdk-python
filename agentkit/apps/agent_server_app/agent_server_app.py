@@ -15,6 +15,7 @@
 import json
 import logging
 from contextlib import asynccontextmanager
+from typing import Any
 from typing_extensions import override
 
 import uvicorn
@@ -67,6 +68,19 @@ class AgentKitAgentLoader(BaseAgentLoader):
     def list_agents(self) -> list[str]:
         return [self.agent.name]
 
+    @override
+    def list_agents_detailed(self) -> list[dict[str, Any]]:
+        name = self.agent.name
+        description = getattr(self.agent, "description", "") or ""
+        return [
+            {
+                "name": name,
+                "root_agent_name": name,
+                "description": description,
+                "language": "python",
+            }
+        ]
+
 
 class AgentkitAgentServerApp(BaseAgentkitApp):
     def __init__(
@@ -110,8 +124,6 @@ class AgentkitAgentServerApp(BaseAgentkitApp):
 
         self.app = self.server.get_fast_api_app(lifespan=lifespan)
 
-        self.app.mount("/", _a2a_server_app)
-
         # Attach ASGI middleware for unified telemetry across all routes
         self.app.add_middleware(AgentkitTelemetryHTTPMiddleware)
 
@@ -121,9 +133,12 @@ class AgentkitAgentServerApp(BaseAgentkitApp):
 
             # Extract headers (fallback keys supported)
             headers = request.headers
-            user_id = (
-                headers.get("user_id") or headers.get("x-user-id") or "agentkit_user"
-            )
+            telemetry_headers = {
+                k: v
+                for k, v in dict(headers).items()
+                if k.lower() not in {"authorization", "token"}
+            }
+            user_id = headers.get("user_id") or "agentkit_user"
             session_id = headers.get("session_id") or ""
 
             # Determine app_name from loader
@@ -157,7 +172,7 @@ class AgentkitAgentServerApp(BaseAgentkitApp):
             telemetry.trace_agent_server(
                 func_name="_invoke_compat",
                 span=span,
-                headers=dict(headers),
+                headers=telemetry_headers,
                 text=text or "",
             )
 
@@ -209,6 +224,9 @@ class AgentkitAgentServerApp(BaseAgentkitApp):
 
         # Compatibility route for AgentKit CLI invoke
         self.app.add_api_route("/invoke", _invoke_compat, methods=["POST"])
+
+        # Mount A2A server app last to avoid shadowing API routes like `/invoke`.
+        self.app.mount("/", _a2a_server_app)
 
     def run(self, host: str, port: int = 8000) -> None:
         """Run the app with Uvicorn server."""
