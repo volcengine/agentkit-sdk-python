@@ -24,6 +24,7 @@ from fastapi.responses import StreamingResponse
 from google.adk.a2a.utils.agent_to_a2a import to_a2a
 from google.adk.agents.base_agent import BaseAgent
 from google.adk.agents.run_config import RunConfig, StreamingMode
+from google.adk.apps.app import App
 from google.adk.artifacts.in_memory_artifact_service import (
     InMemoryArtifactService,
 )
@@ -42,8 +43,8 @@ from google.adk.utils.context_utils import Aclosing
 from google.genai import types
 from opentelemetry import trace
 from veadk import Agent
-from veadk.memory.short_term_memory import ShortTermMemory
 from veadk.runner import Runner
+from veadk.memory.short_term_memory import ShortTermMemory
 
 from agentkit.apps.agent_server_app.middleware import (
     AgentkitTelemetryHTTPMiddleware,
@@ -55,27 +56,37 @@ logger = logging.getLogger(__name__)
 
 
 class AgentKitAgentLoader(BaseAgentLoader):
-    def __init__(self, agent: BaseAgent) -> None:
+    def __init__(self, agent_or_app: BaseAgent | App) -> None:
         super().__init__()
 
-        self.agent = agent
+        self.agent_or_app = agent_or_app
+        if isinstance(agent_or_app, App):
+            self.root_agent = agent_or_app.root_agent
+            self.app_name = agent_or_app.name or self.root_agent.name
+        else:
+            self.root_agent = agent_or_app
+            self.app_name = agent_or_app.name
 
     @override
-    def load_agent(self, agent_name: str) -> BaseAgent:
-        return self.agent
+    def load_agent(self, agent_name: str) -> BaseAgent | App:
+        if agent_name != self.app_name:
+            raise ValueError(
+                f"Unknown agent '{agent_name}'. Expected '{self.app_name}'."
+            )
+        return self.agent_or_app
 
     @override
     def list_agents(self) -> list[str]:
-        return [self.agent.name]
+        return [self.app_name]
 
     @override
     def list_agents_detailed(self) -> list[dict[str, Any]]:
-        name = self.agent.name
-        description = getattr(self.agent, "description", "") or ""
+        name = self.app_name
+        description = getattr(self.root_agent, "description", "") or ""
         return [
             {
                 "name": name,
-                "root_agent_name": name,
+                "root_agent_name": self.root_agent.name,
                 "description": description,
                 "language": "python",
             }
@@ -85,10 +96,24 @@ class AgentKitAgentLoader(BaseAgentLoader):
 class AgentkitAgentServerApp(BaseAgentkitApp):
     def __init__(
         self,
-        agent: BaseAgent,
-        short_term_memory: BaseSessionService | ShortTermMemory,
+        agent: BaseAgent | App | None = None,
+        short_term_memory: BaseSessionService | ShortTermMemory | None = None,
+        *,
+        app: App | None = None,
     ) -> None:
         super().__init__()
+
+        if short_term_memory is None:
+            raise TypeError("short_term_memory is required.")
+
+        if app is not None and agent is not None:
+            raise TypeError("Only one of 'agent' or 'app' can be provided.")
+
+        entry = app if app is not None else agent
+        if entry is None:
+            raise TypeError("Either 'agent' or 'app' must be provided.")
+
+        root_agent = entry.root_agent if isinstance(entry, App) else entry
 
         _artifact_service = InMemoryArtifactService()
         _credential_service = InMemoryCredentialService()
@@ -97,12 +122,12 @@ class AgentkitAgentServerApp(BaseAgentkitApp):
         _eval_set_results_manager = LocalEvalSetResultsManager(agents_dir=".")
 
         self.server = AdkWebServer(
-            agent_loader=AgentKitAgentLoader(agent),
+            agent_loader=AgentKitAgentLoader(entry),
             session_service=short_term_memory
             if isinstance(short_term_memory, BaseSessionService)
             else short_term_memory.session_service,
-            memory_service=agent.long_term_memory
-            if isinstance(agent, Agent) and agent.long_term_memory
+            memory_service=root_agent.long_term_memory
+            if isinstance(root_agent, Agent) and root_agent.long_term_memory
             else InMemoryMemoryService(),
             artifact_service=_artifact_service,
             credential_service=_credential_service,
@@ -111,8 +136,8 @@ class AgentkitAgentServerApp(BaseAgentkitApp):
             agents_dir=".",
         )
 
-        runner = Runner(agent=agent)
-        _a2a_server_app = to_a2a(agent=agent, runner=runner)
+        runner = Runner(agent=root_agent)
+        _a2a_server_app = to_a2a(agent=root_agent, runner=runner)
 
         @asynccontextmanager
         async def lifespan(app: FastAPI):
