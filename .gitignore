@@ -192,6 +192,7 @@ AGENTKIT_CODEBASE_GUIDE.md
 .specify/
 .claude/
 openspec/
-.sisyphus
+.sisyphus/*
 skills/
+third-party/
 
