@@ -164,6 +164,7 @@ class VolcConfiguration:
         3. Global Env Vars
         4. Global Config File
         5. VeFaaS IAM
+        6. .env file in current working directory (fallback)
         """
         # 1. Explicit
         if self._ak and self._sk:
@@ -189,10 +190,75 @@ class VolcConfiguration:
         if creds := self._get_credential_from_vefaas_iam():
             return creds
 
+        # 6. .env file fallback (Current Working Directory)
+        if creds := self._get_dotenv_credentials(service_key):
+            return creds
+
         raise ValueError(
-            f"Volcengine credentials not found (Service: {service_key}). Please set environment variables VOLCENGINE_ACCESS_KEY and "
-            "VOLCENGINE_SECRET_KEY, or configure in global config file ~/.agentkit/config.yaml."
+            "\n".join(
+                [
+                    f"Volcengine credentials not found (Service: {service_key}).",
+                    "Recommended (global, set once):",
+                    "  agentkit config --global --set volcengine.access_key=YOUR_ACCESS_KEY",
+                    "  agentkit config --global --set volcengine.secret_key=YOUR_SECRET_KEY",
+                    "Alternative (per-shell):",
+                    "  export VOLCENGINE_ACCESS_KEY=YOUR_ACCESS_KEY",
+                    "  export VOLCENGINE_SECRET_KEY=YOUR_SECRET_KEY",
+                ]
+            )
         )
+
+    def _get_dotenv_credentials(self, service_key: str) -> Optional[Credentials]:
+        """Attempt to read credentials from a local .env file.
+
+        This is a last-resort fallback for CLI users who commonly expect `.env` in the
+        current working directory to provide environment variables.
+
+        Notes:
+        - Reads only `Path.cwd() / '.env'`.
+        - Does NOT mutate the current process environment.
+        """
+
+        try:
+            from dotenv import dotenv_values
+        except Exception:
+            return None
+
+        env_file_path = Path.cwd() / ".env"
+
+        try:
+            values = dotenv_values(env_file_path)
+        except Exception:
+            return None
+
+        if not isinstance(values, dict):
+            return None
+
+        def _get(key: str) -> str:
+            v = values.get(key)
+            return str(v) if v is not None else ""
+
+        svc_upper = service_key.upper()
+
+        # Service-specific keys (align with environment variable behavior)
+        ak = _get(f"VOLCENGINE_{svc_upper}_ACCESS_KEY")
+        sk = _get(f"VOLCENGINE_{svc_upper}_SECRET_KEY")
+        if not ak or not sk:
+            # Legacy support
+            ak = ak or _get(f"VOLC_{svc_upper}_ACCESSKEY")
+            sk = sk or _get(f"VOLC_{svc_upper}_SECRETKEY")
+
+        if ak and sk:
+            return Credentials(access_key=ak, secret_key=sk)
+
+        # Global keys
+        ak = _get("VOLCENGINE_ACCESS_KEY") or _get("VOLC_ACCESSKEY")
+        sk = _get("VOLCENGINE_SECRET_KEY") or _get("VOLC_SECRETKEY")
+
+        if ak and sk:
+            return Credentials(access_key=ak, secret_key=sk)
+
+        return None
 
     def _get_service_env_credentials(self, service_key: str) -> Optional[Credentials]:
         svc_upper = service_key.upper()
