@@ -323,7 +323,7 @@ class HybridStrategyConfig(AutoSerializableMixin):
         metadata={
             "hidden": True,
             "description": "Runtime network configuration (advanced, CreateRuntime only)",
-            "examples": "{mode: private, vpc_id: vpc-xxx, subnet_ids: [subnet-aaa, subnet-bbb]}",
+            "examples": "{mode: private, vpc_id: vpc-xxx, subnet_ids: [subnet-aaa, subnet-bbb], enable_shared_internet_access: true}",
         },
     )
     _config_metadata = {
@@ -588,7 +588,7 @@ class CloudStrategyConfig(AutoSerializableMixin):
         metadata={
             "hidden": True,
             "description": "Runtime network configuration (advanced, CreateRuntime only)",
-            "examples": "{mode: private, vpc_id: vpc-xxx, subnet_ids: [subnet-aaa, subnet-bbb]}",
+            "examples": "{mode: private, vpc_id: vpc-xxx, subnet_ids: [subnet-aaa, subnet-bbb], enable_shared_internet_access: true}",
         },
     )
 
