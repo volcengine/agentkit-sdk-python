@@ -98,6 +98,7 @@ exclude = [
     "build",
     "dist",
     "node_modules",
+    "third-party/",
     "venv",
     "agentkit/toolkit/resources/samples/",
 ]

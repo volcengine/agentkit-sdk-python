@@ -63,10 +63,22 @@ class AuthorizerConfigurationForListMCPToolsets(MCPBaseModel):
 
 
 class AuthorizerForGetMCPServiceForInboundAuthorizerConfiguration(MCPBaseModel):
+    custom_jwt_authorizer: Optional[CustomJwtAuthorizerForGetMCPService] = Field(
+        default=None, alias="CustomJwtAuthorizer"
+    )
+    identity_authorizer: Optional[IdentityAuthorizerForGetMCPService] = Field(
+        default=None, alias="IdentityAuthorizer"
+    )
     key_auth: Optional[KeyAuthForGetMCPService] = Field(default=None, alias="KeyAuth")
 
 
 class AuthorizerForGetMCPServiceForOutboundAuthorizerConfiguration(MCPBaseModel):
+    custom_jwt_authorizer: Optional[CustomJwtAuthorizerForGetMCPService] = Field(
+        default=None, alias="CustomJwtAuthorizer"
+    )
+    identity_authorizer: Optional[IdentityAuthorizerForGetMCPService] = Field(
+        default=None, alias="IdentityAuthorizer"
+    )
     key_auth: Optional[KeyAuthForGetMCPService] = Field(default=None, alias="KeyAuth")
 
 
@@ -91,8 +103,14 @@ class BackendConfigurationForGetMCPService(MCPBaseModel):
     custom_mcp_configuration: Optional[CustomMcpConfigurationForGetMCPService] = Field(
         default=None, alias="CustomMcpConfiguration"
     )
+    ecs_configuration: Optional[EcsConfigurationForGetMCPService] = Field(
+        default=None, alias="EcsConfiguration"
+    )
     function_configuration: Optional[FunctionConfigurationForGetMCPService] = Field(
         default=None, alias="FunctionConfiguration"
+    )
+    vke_configuration: Optional[VkeConfigurationForGetMCPService] = Field(
+        default=None, alias="VkeConfiguration"
     )
 
 
@@ -100,6 +118,11 @@ class CustomConfigurationForGetMCPService(MCPBaseModel):
     domain: Optional[str] = Field(default=None, alias="Domain")
     port: Optional[int] = Field(default=None, alias="Port")
     protocol_type: Optional[str] = Field(default=None, alias="ProtocolType")
+
+
+class CustomJwtAuthorizerForGetMCPService(MCPBaseModel):
+    allowed_clients: Optional[list[str]] = Field(default=None, alias="AllowedClients")
+    discovery_url: Optional[str] = Field(default=None, alias="DiscoveryUrl")
 
 
 class CustomJwtAuthorizerForGetMCPToolset(MCPBaseModel):
@@ -124,6 +147,12 @@ class CustomMcpConfigurationForGetMCPService(MCPBaseModel):
     )
 
 
+class EcsConfigurationForGetMCPService(MCPBaseModel):
+    instances: Optional[list[InstancesForGetMCPService]] = Field(
+        default=None, alias="Instances"
+    )
+
+
 class EnvsForGetMCPService(MCPBaseModel):
     key: Optional[str] = Field(default=None, alias="Key")
     value: Optional[str] = Field(default=None, alias="Value")
@@ -134,11 +163,24 @@ class FunctionConfigurationForGetMCPService(MCPBaseModel):
     function_name: Optional[str] = Field(default=None, alias="FunctionName")
 
 
+class IdentityAuthorizerForGetMCPService(MCPBaseModel):
+    credential_provider_name: Optional[str] = Field(
+        default=None, alias="CredentialProviderName"
+    )
+    provider_type: Optional[str] = Field(default=None, alias="ProviderType")
+
+
 class InboundAuthorizerConfigurationForGetMCPService(MCPBaseModel):
     authorizer: Optional[
         AuthorizerForGetMCPServiceForInboundAuthorizerConfiguration
     ] = Field(default=None, alias="Authorizer")
     authorizer_type: Optional[str] = Field(default=None, alias="AuthorizerType")
+
+
+class InstancesForGetMCPService(MCPBaseModel):
+    instance_id: Optional[str] = Field(default=None, alias="InstanceId")
+    ip: Optional[str] = Field(default=None, alias="Ip")
+    port: Optional[int] = Field(default=None, alias="Port")
 
 
 class KeyAuthForGetMCPService(MCPBaseModel):
@@ -171,6 +213,7 @@ class MCPServiceForGetMCPService(MCPBaseModel):
     )
     backend_type: Optional[str] = Field(default=None, alias="BackendType")
     created_at: Optional[str] = Field(default=None, alias="CreatedAt")
+    failed_log_file_url: Optional[str] = Field(default=None, alias="FailedLogFileUrl")
     inbound_authorizer_configuration: Optional[
         InboundAuthorizerConfigurationForGetMCPService
     ] = Field(default=None, alias="InboundAuthorizerConfiguration")
@@ -416,17 +459,33 @@ class TagsForListMCPToolsets(MCPBaseModel):
     value: Optional[str] = Field(default=None, alias="Value")
 
 
+class VkeConfigurationForGetMCPService(MCPBaseModel):
+    cluster_id: Optional[str] = Field(default=None, alias="ClusterId")
+    namespace: Optional[str] = Field(default=None, alias="Namespace")
+    port: Optional[int] = Field(default=None, alias="Port")
+    service_name: Optional[str] = Field(default=None, alias="ServiceName")
+
+
 class VpcConfigurationForGetMCPService(MCPBaseModel):
+    enable_shared_internet_access: Optional[bool] = Field(
+        default=None, alias="EnableSharedInternetAccess"
+    )
     subnet_ids: Optional[list[str]] = Field(default=None, alias="SubnetIds")
     vpc_id: Optional[str] = Field(default=None, alias="VpcId")
 
 
 class VpcConfigurationForGetMCPToolset(MCPBaseModel):
+    enable_shared_internet_access: Optional[bool] = Field(
+        default=None, alias="EnableSharedInternetAccess"
+    )
     subnet_ids: Optional[list[str]] = Field(default=None, alias="SubnetIds")
     vpc_id: Optional[str] = Field(default=None, alias="VpcId")
 
 
 class VpcConfigurationForListMCPServices(MCPBaseModel):
+    enable_shared_internet_access: Optional[bool] = Field(
+        default=None, alias="EnableSharedInternetAccess"
+    )
     security_group_ids: Optional[list[str]] = Field(
         default=None, alias="SecurityGroupIds"
     )
@@ -435,6 +494,9 @@ class VpcConfigurationForListMCPServices(MCPBaseModel):
 
 
 class VpcConfigurationForListMCPToolsets(MCPBaseModel):
+    enable_shared_internet_access: Optional[bool] = Field(
+        default=None, alias="EnableSharedInternetAccess"
+    )
     security_group_ids: Optional[list[str]] = Field(
         default=None, alias="SecurityGroupIds"
     )
@@ -450,8 +512,14 @@ class BackendForCreateMCPService(MCPBaseModel):
     custom_mcp_configuration: Optional[BackendCustomMcpForCreateMCPService] = Field(
         default=None, alias="CustomMcpConfiguration"
     )
+    ecs_configuration: Optional[BackendEcsForCreateMCPService] = Field(
+        default=None, alias="EcsConfiguration"
+    )
     function_configuration: Optional[BackendFunctionForCreateMCPService] = Field(
         default=None, alias="FunctionConfiguration"
+    )
+    vke_configuration: Optional[BackendVkeForCreateMCPService] = Field(
+        default=None, alias="VkeConfiguration"
     )
 
 
@@ -496,9 +564,22 @@ class BackendCustomMcpPublicPackageForCreateMCPService(MCPBaseModel):
     raw_config: Optional[str] = Field(default=None, alias="RawConfig")
 
 
+class BackendEcsForCreateMCPService(MCPBaseModel):
+    instances: Optional[list[BackendEcsInstancesItemForCreateMCPService]] = Field(
+        default=None, alias="Instances"
+    )
+
+
 class BackendFunctionForCreateMCPService(MCPBaseModel):
     function_id: Optional[str] = Field(default=None, alias="FunctionId")
     function_name: Optional[str] = Field(default=None, alias="FunctionName")
+
+
+class BackendVkeForCreateMCPService(MCPBaseModel):
+    cluster_id: Optional[str] = Field(default=None, alias="ClusterId")
+    namespace: Optional[str] = Field(default=None, alias="Namespace")
+    port: Optional[int] = Field(default=None, alias="Port")
+    service_name: Optional[str] = Field(default=None, alias="ServiceName")
 
 
 class InboundAuthorizerForCreateMCPService(MCPBaseModel):
@@ -543,6 +624,9 @@ class NetworkForCreateMCPService(MCPBaseModel):
 
 
 class NetworkVpcForCreateMCPService(MCPBaseModel):
+    enable_shared_internet_access: Optional[bool] = Field(
+        default=None, alias="EnableSharedInternetAccess"
+    )
     subnet_ids: Optional[list[str]] = Field(default=None, alias="SubnetIds")
     vpc_id: str = Field(..., alias="VpcId")
 
@@ -555,9 +639,19 @@ class OutboundAuthorizerForCreateMCPService(MCPBaseModel):
 
 
 class OutboundAuthorizerAuthorizerForCreateMCPService(MCPBaseModel):
+    identity_authorizer: Optional[
+        OutboundAuthorizerAuthorizerIdentityAuthorizerForCreateMCPService
+    ] = Field(default=None, alias="IdentityAuthorizer")
     key_auth: Optional[OutboundAuthorizerAuthorizerKeyAuthForCreateMCPService] = Field(
         default=None, alias="KeyAuth"
     )
+
+
+class OutboundAuthorizerAuthorizerIdentityAuthorizerForCreateMCPService(MCPBaseModel):
+    credential_provider_name: Optional[str] = Field(
+        default=None, alias="CredentialProviderName"
+    )
+    provider_type: Optional[str] = Field(default=None, alias="ProviderType")
 
 
 class OutboundAuthorizerAuthorizerKeyAuthForCreateMCPService(MCPBaseModel):
@@ -582,6 +676,12 @@ class ProtocolHttpApiForCreateMCPService(MCPBaseModel):
 class BackendCustomMcpPrivatePackageEnvsItemForCreateMCPService(MCPBaseModel):
     key: Optional[str] = Field(default=None, alias="Key")
     value: Optional[str] = Field(default=None, alias="Value")
+
+
+class BackendEcsInstancesItemForCreateMCPService(MCPBaseModel):
+    instance_id: Optional[str] = Field(default=None, alias="InstanceId")
+    ip: Optional[str] = Field(default=None, alias="Ip")
+    port: Optional[int] = Field(default=None, alias="Port")
 
 
 class InboundAuthorizerAuthorizerKeyAuthApiKeysItemForCreateMCPService(MCPBaseModel):
@@ -674,6 +774,9 @@ class NetworkForCreateMCPToolset(MCPBaseModel):
 
 
 class NetworkVpcForCreateMCPToolset(MCPBaseModel):
+    enable_shared_internet_access: Optional[bool] = Field(
+        default=None, alias="EnableSharedInternetAccess"
+    )
     security_group_ids: Optional[list[str]] = Field(
         default=None, alias="SecurityGroupIds"
     )
@@ -855,8 +958,14 @@ class BackendForUpdateMCPService(MCPBaseModel):
     custom_mcp_configuration: Optional[BackendCustomMcpForUpdateMCPService] = Field(
         default=None, alias="CustomMcpConfiguration"
     )
+    ecs_configuration: Optional[BackendEcsForUpdateMCPService] = Field(
+        default=None, alias="EcsConfiguration"
+    )
     function_configuration: Optional[BackendFunctionForUpdateMCPService] = Field(
         default=None, alias="FunctionConfiguration"
+    )
+    vke_configuration: Optional[BackendVkeForUpdateMCPService] = Field(
+        default=None, alias="VkeConfiguration"
     )
 
 
@@ -901,9 +1010,22 @@ class BackendCustomMcpPublicPackageForUpdateMCPService(MCPBaseModel):
     raw_config: Optional[str] = Field(default=None, alias="RawConfig")
 
 
+class BackendEcsForUpdateMCPService(MCPBaseModel):
+    instances: Optional[list[BackendEcsInstancesItemForUpdateMCPService]] = Field(
+        default=None, alias="Instances"
+    )
+
+
 class BackendFunctionForUpdateMCPService(MCPBaseModel):
     function_id: Optional[str] = Field(default=None, alias="FunctionId")
     function_name: Optional[str] = Field(default=None, alias="FunctionName")
+
+
+class BackendVkeForUpdateMCPService(MCPBaseModel):
+    cluster_id: Optional[str] = Field(default=None, alias="ClusterId")
+    namespace: Optional[str] = Field(default=None, alias="Namespace")
+    port: Optional[int] = Field(default=None, alias="Port")
+    service_name: Optional[str] = Field(default=None, alias="ServiceName")
 
 
 class InboundAuthorizerForUpdateMCPService(MCPBaseModel):
@@ -943,9 +1065,19 @@ class OutboundAuthorizerForUpdateMCPService(MCPBaseModel):
 
 
 class OutboundAuthorizerAuthorizerForUpdateMCPService(MCPBaseModel):
+    identity_authorizer: Optional[
+        OutboundAuthorizerAuthorizerIdentityAuthorizerForUpdateMCPService
+    ] = Field(default=None, alias="IdentityAuthorizer")
     key_auth: Optional[OutboundAuthorizerAuthorizerKeyAuthForUpdateMCPService] = Field(
         default=None, alias="KeyAuth"
     )
+
+
+class OutboundAuthorizerAuthorizerIdentityAuthorizerForUpdateMCPService(MCPBaseModel):
+    credential_provider_name: Optional[str] = Field(
+        default=None, alias="CredentialProviderName"
+    )
+    provider_type: Optional[str] = Field(default=None, alias="ProviderType")
 
 
 class OutboundAuthorizerAuthorizerKeyAuthForUpdateMCPService(MCPBaseModel):
@@ -959,6 +1091,12 @@ class OutboundAuthorizerAuthorizerKeyAuthForUpdateMCPService(MCPBaseModel):
 class BackendCustomMcpPrivatePackageEnvsItemForUpdateMCPService(MCPBaseModel):
     key: Optional[str] = Field(default=None, alias="Key")
     value: Optional[str] = Field(default=None, alias="Value")
+
+
+class BackendEcsInstancesItemForUpdateMCPService(MCPBaseModel):
+    instance_id: Optional[str] = Field(default=None, alias="InstanceId")
+    ip: Optional[str] = Field(default=None, alias="Ip")
+    port: Optional[int] = Field(default=None, alias="Port")
 
 
 class InboundAuthorizerAuthorizerKeyAuthApiKeysItemForUpdateMCPService(MCPBaseModel):

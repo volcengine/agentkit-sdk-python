@@ -166,11 +166,12 @@ class EnvsForListRuntimes(RuntimeTypeBaseModel):
 
 
 class InstanceItemsForListRuntimeInstances(RuntimeTypeBaseModel):
+    alias_name: Optional[str] = Field(default=None, alias="AliasName")
     create_time: Optional[str] = Field(default=None, alias="CreateTime")
-    function_id: Optional[str] = Field(default=None, alias="FunctionId")
     instance_name: Optional[str] = Field(default=None, alias="InstanceName")
     instance_status: Optional[str] = Field(default=None, alias="InstanceStatus")
     revision_number: Optional[int] = Field(default=None, alias="RevisionNumber")
+    runtime_id: Optional[str] = Field(default=None, alias="RuntimeId")
 
 
 class KeyAuthForGetRuntime(RuntimeTypeBaseModel):
@@ -241,6 +242,9 @@ class TlsConfigurationForListRuntimes(RuntimeTypeBaseModel):
 
 
 class VpcConfigurationForGetRuntime(RuntimeTypeBaseModel):
+    enable_shared_internet_access: Optional[bool] = Field(
+        default=None, alias="EnableSharedInternetAccess"
+    )
     security_group_ids: Optional[list[str]] = Field(
         default=None, alias="SecurityGroupIds"
     )
@@ -249,6 +253,9 @@ class VpcConfigurationForGetRuntime(RuntimeTypeBaseModel):
 
 
 class VpcConfigurationForListRuntimes(RuntimeTypeBaseModel):
+    enable_shared_internet_access: Optional[bool] = Field(
+        default=None, alias="EnableSharedInternetAccess"
+    )
     security_group_ids: Optional[list[str]] = Field(
         default=None, alias="SecurityGroupIds"
     )
@@ -289,6 +296,9 @@ class NetworkForCreateRuntime(RuntimeTypeBaseModel):
 
 
 class NetworkVpcForCreateRuntime(RuntimeTypeBaseModel):
+    enable_shared_internet_access: Optional[bool] = Field(
+        default=None, alias="EnableSharedInternetAccess"
+    )
     subnet_ids: Optional[list[str]] = Field(default=None, alias="SubnetIds")
     vpc_id: str = Field(..., alias="VpcId")
 
@@ -415,9 +425,9 @@ class GetRuntimeCozeTokenResponse(RuntimeTypeBaseModel):
 
 # GetRuntimeInstanceLogs - Request
 class GetRuntimeInstanceLogsRequest(RuntimeTypeBaseModel):
-    function_id: str = Field(..., alias="FunctionId")
     instance_name: str = Field(..., alias="InstanceName")
     limit: Optional[int] = Field(default=None, alias="Limit")
+    runtime_id: str = Field(..., alias="RuntimeId")
 
 
 # GetRuntimeInstanceLogs - Response
