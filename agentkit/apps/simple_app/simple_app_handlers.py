@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import asyncio
+import json
 import inspect
 import logging
 import threading
@@ -22,6 +23,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Callable, Optional
 from typing_extensions import override
 
+from starlette.exceptions import HTTPException
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response, StreamingResponse
 
@@ -31,6 +33,13 @@ from opentelemetry import context as context_api
 from opentelemetry import trace
 
 logger = logging.getLogger("agentkit." + __name__)
+
+
+class InvalidJSONPayloadError(Exception): ...
+
+
+def _build_error_content(message: str, error_type: str) -> dict[str, dict[str, str]]:
+    return {"error": {"message": message, "type": error_type}}
 
 
 class BaseHandler(ABC):
@@ -46,7 +55,13 @@ class InvokeHandler(BaseHandler):
     async def handle(self, request: Request) -> Response | StreamingResponse:
         if not self.func:
             logger.error("Invoke handler function is not set")
-            return Response(status_code=404)
+            return JSONResponse(
+                status_code=404,
+                content=_build_error_content(
+                    message="Entrypoint function is not set. Please register a function with @app.entrypoint.",
+                    error_type="NotFound",
+                ),
+            )
 
         span = telemetry.tracer.start_span(name="agentkit_invocation")
         ctx = trace.set_span_in_context(span)
@@ -72,13 +87,58 @@ class InvokeHandler(BaseHandler):
                     media_type="text/event-stream",
                 )
 
+            if isinstance(result, Response):
+                logger.info("Returning Starlette response")
+                telemetry.trace_agent_finish("", None)
+                return result
+
             logger.info("Returning non-streaming response")
             safe_json_string = safe_serialize_to_json_string(result)
             telemetry.trace_agent_finish(safe_json_string, None)
-        except Exception as e:
-            logger.error("Invoke handler function failed: %s", e)
+        except InvalidJSONPayloadError as e:
+            logger.warning("Failed to parse JSON payload: %s", e)
             telemetry.trace_agent_finish("", e)
-            raise e
+            return JSONResponse(
+                status_code=400,
+                content=_build_error_content(
+                    message="Invalid JSON payload. Please provide a valid JSON object in the request body.",
+                    error_type="BadRequest",
+                ),
+            )
+        except HTTPException as e:
+            logger.info("Returning HTTP exception: %s", e.status_code)
+            status_code = int(getattr(e, "status_code", 500) or 500)
+            detail = getattr(e, "detail", "")
+            if status_code < 500:
+                telemetry.trace_agent_finish("", None)
+                if isinstance(detail, str):
+                    message = detail
+                else:
+                    message = safe_serialize_to_json_string(detail)
+                content = _build_error_content(
+                    message=message, error_type="HTTPException"
+                )
+            else:
+                telemetry.trace_agent_finish("", e)
+                content = _build_error_content(
+                    message="An error occurred inside the user-defined entrypoint function (decorated with @app.entrypoint). This is likely caused by the agent application, not AgentKit. Please contact agent administrator and check the Runtime logs.",
+                    error_type="HTTPException",
+                )
+            return JSONResponse(
+                status_code=status_code,
+                content=content,
+                headers=getattr(e, "headers", None),
+            )
+        except Exception as e:
+            logger.exception("Invoke handler function failed: %s", e)
+            telemetry.trace_agent_finish("", e)
+            return JSONResponse(
+                status_code=500,
+                content=_build_error_content(
+                    message="An error occurred inside the user-defined entrypoint function (decorated with @app.entrypoint). This is likely caused by the agent application, not AgentKit. Please contact agent administrator and check the Runtime logs.",
+                    error_type=type(e).__name__,
+                ),
+            )
 
         return Response(safe_json_string, media_type="application/json")
 
@@ -99,7 +159,10 @@ class InvokeHandler(BaseHandler):
             return {}, {}, {"message": "Invoke handler function is not set."}
 
         # parse request
-        payload: dict = await request.json()
+        try:
+            payload: dict = await request.json()
+        except json.JSONDecodeError as e:
+            raise InvalidJSONPayloadError(str(e)) from e
         headers: dict = dict(request.headers)
 
         # parse entrypoint function params
