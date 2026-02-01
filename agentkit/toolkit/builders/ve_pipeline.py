@@ -625,6 +625,16 @@ class VeCPCRBuilder(Builder):
                     "build_script": docker_build_config.build_script,
                 }
 
+            from agentkit.toolkit.docker.dockerfile.metadata import (
+                calculate_template_hash,
+            )
+
+            template_path = Path(template_dir) / config.dockerfile_template
+            template_hash = calculate_template_hash(template_path)
+
+            config_hash_dict["dockerfile_template"] = config.dockerfile_template
+            config_hash_dict["dockerfile_template_hash"] = template_hash
+
             renderer = DockerfileRenderer(template_dir)
 
             # Content generator function (captures context via closure)

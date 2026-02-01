@@ -317,12 +317,18 @@ class LocalDockerBuilder(Builder):
                     "build_script": docker_build_config.build_script,
                 }
 
+            from agentkit.toolkit.docker.dockerfile.metadata import (
+                calculate_template_hash,
+            )
+
+            template_path = Path(template_dir) / docker_config.template_name
+            template_hash = calculate_template_hash(template_path)
+
+            config_hash_dict["dockerfile_template"] = docker_config.template_name
+            config_hash_dict["dockerfile_template_hash"] = template_hash
+
             def generate_dockerfile_content() -> str:
                 """Generate Dockerfile content."""
-                from io import StringIO
-
-                StringIO()
-
                 # Use renderer to render to string
                 template = renderer.env.get_template(docker_config.template_name)
                 rendered = template.render(**context)
