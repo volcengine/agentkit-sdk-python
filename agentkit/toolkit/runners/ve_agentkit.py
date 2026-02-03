@@ -632,6 +632,9 @@ class VeAgentkitRuntimeRunner(Runner):
         mode = runtime_network.get("mode")
         vpc_id = runtime_network.get("vpc_id")
         subnet_ids = runtime_network.get("subnet_ids")
+        enable_shared_internet_access_raw = runtime_network.get(
+            "enable_shared_internet_access"
+        )
 
         # Convenience: if vpc_id is provided without an explicit mode, assume private.
         if mode is None and vpc_id:
@@ -652,6 +655,30 @@ class VeAgentkitRuntimeRunner(Runner):
         enable_public = mode in {"public", "both"}
         enable_private = mode in {"private", "both"}
 
+        enable_shared_internet_access: Optional[bool] = None
+        if enable_shared_internet_access_raw is not None:
+            if isinstance(enable_shared_internet_access_raw, bool):
+                enable_shared_internet_access = enable_shared_internet_access_raw
+            elif isinstance(enable_shared_internet_access_raw, (int, float)):
+                enable_shared_internet_access = bool(enable_shared_internet_access_raw)
+            else:
+                raw_str = str(enable_shared_internet_access_raw).strip().lower()
+                if raw_str in {"true", "1", "yes", "y"}:
+                    enable_shared_internet_access = True
+                elif raw_str in {"false", "0", "no", "n"}:
+                    enable_shared_internet_access = False
+                else:
+                    raise ValueError(
+                        "Invalid runtime_network.enable_shared_internet_access. "
+                        "Valid values: true/false."
+                    )
+
+        if enable_shared_internet_access and not enable_private:
+            raise ValueError(
+                "runtime_network.enable_shared_internet_access is only effective when "
+                "runtime_network.mode is private/both."
+            )
+
         vpc_configuration = None
         if enable_private:
             vpc_id_str = str(vpc_id or "").strip()
@@ -671,6 +698,9 @@ class VeAgentkitRuntimeRunner(Runner):
             vpc_configuration = runtime_types.NetworkVpcForCreateRuntime(
                 vpc_id=vpc_id_str,
                 subnet_ids=parsed_subnet_ids,
+                enable_shared_internet_access=(
+                    True if enable_shared_internet_access else None
+                ),
             )
 
         return runtime_types.NetworkForCreateRuntime(

@@ -140,6 +140,9 @@ class VpcConfigForGetMemoryCollection(MemoryBaseModel):
 
 
 class VpcConfigurationForListMemoryCollections(MemoryBaseModel):
+    enable_shared_internet_access: Optional[bool] = Field(
+        default=None, alias="EnableSharedInternetAccess"
+    )
     security_group_ids: Optional[list[str]] = Field(
         default=None, alias="SecurityGroupIds"
     )

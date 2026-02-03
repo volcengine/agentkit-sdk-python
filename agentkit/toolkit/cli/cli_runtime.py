@@ -36,6 +36,62 @@ runtime_app = typer.Typer(
 )
 
 
+def _build_network_for_create_runtime(
+    vpc_id: Optional[str],
+    subnet_ids: Optional[str],
+    enable_private_network: bool,
+    enable_public_network: bool,
+    enable_shared_internet_access: bool,
+) -> Optional[rt.NetworkForCreateRuntime]:
+    has_vpc_id = bool((vpc_id or "").strip())
+    has_subnet_ids = bool((subnet_ids or "").strip())
+
+    wants_private_network = (
+        enable_private_network
+        or has_vpc_id
+        or has_subnet_ids
+        or enable_shared_internet_access
+    )
+
+    if enable_shared_internet_access and not wants_private_network:
+        raise ValueError(
+            "enable-shared-internet-access is only effective when private network is enabled."
+        )
+
+    if wants_private_network and not has_vpc_id:
+        raise ValueError(
+            "vpc-id is required when private network is enabled (private/both)."
+        )
+
+    if not wants_private_network and enable_public_network is False:
+        raise ValueError(
+            "At least one network must be enabled. Enable public network or configure private network."
+        )
+
+    should_send_network_configuration = (
+        wants_private_network or enable_public_network is False
+    )
+    if not should_send_network_configuration:
+        return None
+
+    vpc = None
+    if wants_private_network:
+        subs = [s.strip() for s in (subnet_ids or "").split(",") if s.strip()] or None
+        vpc = rt.NetworkVpcForCreateRuntime(
+            vpc_id=(vpc_id or "").strip(),
+            subnet_ids=subs,
+            enable_shared_internet_access=(
+                True if enable_shared_internet_access else None
+            ),
+        )
+
+    return rt.NetworkForCreateRuntime(
+        vpc_configuration=vpc,
+        enable_private_network=wants_private_network,
+        enable_public_network=enable_public_network,
+    )
+
+
 @runtime_app.command("create")
 def create_runtime_command(
     name: str = typer.Option(..., "--name", help="Runtime name"),
@@ -71,7 +127,14 @@ def create_runtime_command(
         False, "--enable-private-network", help="Enable private network"
     ),
     enable_public_network: bool = typer.Option(
-        True, "--enable-public-network", help="Enable public network"
+        True,
+        "--enable-public-network/--no-enable-public-network",
+        help="Enable public network",
+    ),
+    enable_shared_internet_access: bool = typer.Option(
+        False,
+        "--enable-shared-internet-access",
+        help="Enable shared internet egress for private network (effective for private/both)",
     ),
     api_key_name: Optional[str] = typer.Option(
         None, "--apikey-name", help="API key name"
@@ -133,18 +196,13 @@ def create_runtime_command(
                 )
 
             network = None
-            if vpc_id or enable_private_network or enable_public_network:
-                vpc = None
-                if vpc_id:
-                    subs = [
-                        s.strip() for s in (subnet_ids or "").split(",") if s.strip()
-                    ] or None
-                    vpc = rt.NetworkVpcForCreateRuntime(vpc_id=vpc_id, subnet_ids=subs)
-                network = rt.NetworkForCreateRuntime(
-                    vpc_configuration=vpc,
-                    enable_private_network=enable_private_network,
-                    enable_public_network=enable_public_network,
-                )
+            network = _build_network_for_create_runtime(
+                vpc_id=vpc_id,
+                subnet_ids=subnet_ids,
+                enable_private_network=enable_private_network,
+                enable_public_network=enable_public_network,
+                enable_shared_internet_access=enable_shared_internet_access,
+            )
 
             envs = None
             if envs_json:

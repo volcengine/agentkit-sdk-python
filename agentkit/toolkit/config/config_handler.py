@@ -110,6 +110,7 @@ class ConfigParamHandler:
         runtime_network_mode: Optional[str],
         runtime_vpc_id: Optional[str],
         runtime_subnet_ids: Optional[List[str]],
+        runtime_enable_shared_internet_access: Optional[bool],
     ) -> Dict[str, Any]:
         """Collect all CLI parameters.
 
@@ -203,6 +204,10 @@ class ConfigParamHandler:
         if runtime_subnet_ids is not None:
             runtime_network["subnet_ids"] = ConfigParamHandler.parse_id_list(
                 runtime_subnet_ids
+            )
+        if runtime_enable_shared_internet_access is not None:
+            runtime_network["enable_shared_internet_access"] = (
+                runtime_enable_shared_internet_access
             )
         if runtime_network:
             strategy_params["runtime_network"] = runtime_network

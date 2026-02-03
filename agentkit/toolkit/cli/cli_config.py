@@ -201,6 +201,15 @@ def config_command(
         "--runtime-subnet-ids",
         help="Runtime subnet ID (repeatable; cloud/hybrid, CreateRuntime only)",
     ),
+    runtime_enable_shared_internet_access: Optional[bool] = typer.Option(
+        None,
+        "--runtime_enable_shared_internet_access/--no-runtime_enable_shared_internet_access",
+        "--runtime-enable-shared-internet-access/--no-runtime-enable-shared-internet-access",
+        help=(
+            "Enable shared internet egress for Runtime private network "
+            "(cloud/hybrid, CreateRuntime only; effective for private/both)"
+        ),
+    ),
 ):
     """Configure AgentKit (supports interactive and non-interactive modes).
     
@@ -307,6 +316,7 @@ def config_command(
             runtime_network_mode=runtime_network_mode,
             runtime_vpc_id=runtime_vpc_id,
             runtime_subnet_ids=runtime_subnet_ids,
+            runtime_enable_shared_internet_access=runtime_enable_shared_internet_access,
         )
 
         has_cli_params = ConfigParamHandler.has_cli_params(cli_params)
