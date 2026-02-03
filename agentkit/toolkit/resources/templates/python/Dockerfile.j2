@@ -2,7 +2,7 @@
 {% if base_image %}
 FROM {{ base_image }}
 {% else %}
-FROM agentkit-cn-beijing.cr.volces.com/base/py-simple:python{{ language_version }}-bookworm-slim-latest
+FROM agentkit-prod-public-cn-beijing.cr.volces.com/base/py-simple:python{{ language_version }}-bookworm-slim-latest
 {% endif %}
 
 ENV UV_SYSTEM_PYTHON=1 UV_COMPILE_BYTECODE=1 PYTHONUNBUFFERED=1 DOCKER_CONTAINER=1

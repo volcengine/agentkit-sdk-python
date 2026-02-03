@@ -18,12 +18,32 @@ import re
 import hashlib
 import json
 import logging
+from pathlib import Path
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
 from enum import Enum
 
 logger = logging.getLogger(__name__)
+
+
+def calculate_template_hash(template_path: Path) -> str:
+    try:
+        return hashlib.sha256(template_path.read_bytes()).hexdigest()[:16]
+    except Exception as e:
+        version = "unknown"
+        try:
+            from agentkit.version import VERSION
+
+            version = VERSION
+        except Exception:
+            version = "unknown"
+
+        logger.warning(
+            "Failed to read Dockerfile template for hashing: %s (%s)", template_path, e
+        )
+        seed = f"unreadable-template:{template_path}:{version}"
+        return hashlib.sha256(seed.encode("utf-8")).hexdigest()[:16]
 
 
 class DockerfileDecision(Enum):
