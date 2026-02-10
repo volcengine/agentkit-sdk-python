@@ -17,12 +17,14 @@ from __future__ import annotations
 from typing import Optional
 
 from agentkit.platform.configuration import VolcConfiguration, Endpoint, Credentials
+from agentkit.platform.provider import CloudProvider
 from agentkit.platform.constants import DEFAULT_REGION_RULES
 
 __all__ = [
     "VolcConfiguration",
     "Endpoint",
     "Credentials",
+    "CloudProvider",
     "resolve_endpoint",
     "resolve_credentials",
     "DEFAULT_REGION_RULES",
@@ -60,6 +62,8 @@ def resolve_endpoint(
                 region=region,
                 access_key=platform_config._ak,
                 secret_key=platform_config._sk,
+                session_token=platform_config._token,
+                provider=platform_config.provider.value,
             )
         else:
             cfg = platform_config

@@ -44,6 +44,10 @@ class LocalDockerBuilderConfig(AutoSerializableMixin):
     common_config: Optional[CommonConfig] = field(
         default=None, metadata={"system": True, "description": "Common configuration"}
     )
+    cloud_provider: Optional[str] = field(
+        default=None,
+        metadata={"system": True, "description": "Resolved cloud provider"},
+    )
     image_name: str = field(default="", metadata={"description": "Image name"})
     image_tag: str = field(default="latest", metadata={"description": "Image tag"})
     dockerfile_path: str = field(
@@ -189,6 +193,26 @@ class LocalDockerBuilder(Builder):
                 "language_version": common_config.language_version,
             }
 
+            from agentkit.platform.provider import (
+                read_cloud_provider_from_env,
+                resolve_cloud_provider,
+            )
+            from agentkit.toolkit.docker.base_images import (
+                resolve_dockerfile_base_image_defaults,
+            )
+
+            resolved_provider = resolve_cloud_provider(
+                explicit_provider=None,
+                env_provider=read_cloud_provider_from_env(),
+                config_provider=getattr(docker_config, "cloud_provider", None),
+            )
+            base_image_defaults = resolve_dockerfile_base_image_defaults(
+                language=common_config.language,
+                language_version=common_config.language_version,
+                provider=resolved_provider,
+            )
+            context.update(base_image_defaults.context)
+
             if docker_build_config:
                 if docker_build_config.base_image:
                     if common_config.language == "Golang" and isinstance(
@@ -310,6 +334,8 @@ class LocalDockerBuilder(Builder):
                 "language_version": common_config.language_version,
                 "entry_point": common_config.entry_point,
                 "dependencies_file": common_config.dependencies_file,
+                "cloud_provider_resolved": resolved_provider.value,
+                "dockerfile_base_image_defaults": base_image_defaults.context,
             }
             if docker_build_config:
                 config_hash_dict["docker_build"] = {

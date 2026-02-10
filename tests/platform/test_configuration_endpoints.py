@@ -16,6 +16,8 @@ import pytest
 import os
 from agentkit.platform.configuration import VolcConfiguration
 from agentkit.platform.constants import DEFAULT_REGION
+from agentkit.platform.provider import ENV_CLOUD_PROVIDER
+from agentkit.platform.provider import ENV_CLOUD_PROVIDER
 
 
 class TestConfigurationEndpoints:
@@ -102,3 +104,25 @@ class TestConfigurationEndpoints:
         config = VolcConfiguration()
         ep = config.get_service_endpoint("AgentKit")
         assert ep.host == "open.volcengineapi.com"
+
+    def test_byteplus_endpoint_default_metadata(self, clean_env, mock_global_config):
+        """Test BytePlus uses an isolated default endpoint registry."""
+        os.environ[ENV_CLOUD_PROVIDER] = "byteplus"
+
+        config = VolcConfiguration()
+        ep = config.get_service_endpoint("agentkit")
+
+        assert config.provider.value == "byteplus"
+        assert ep.host == "agentkit.ap-southeast-1.byteplusapi.com"
+        assert ep.scheme == "https"
+        assert ep.region == "ap-southeast-1"
+
+    def test_byteplus_env_alias_cloud_provider(self, clean_env, mock_global_config):
+        """Test CLOUD_PROVIDER env var alias is supported (case-insensitive)."""
+        os.environ["CLOUD_PROVIDER"] = "BytePlus"
+
+        config = VolcConfiguration()
+        ep = config.get_service_endpoint("agentkit")
+
+        assert config.provider.value == "byteplus"
+        assert ep.host == "agentkit.ap-southeast-1.byteplusapi.com"

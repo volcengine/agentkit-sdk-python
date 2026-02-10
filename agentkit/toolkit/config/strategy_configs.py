@@ -1,3 +1,17 @@
+# Copyright (c) 2026 Beijing Volcano Engine Technology Co., Ltd. and/or its affiliates.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 from .dataclass_utils import AutoSerializableMixin
@@ -12,6 +26,7 @@ from .constants import (
     DEFAULT_CR_INSTANCE_TEMPLATE_NAME,
     DEFAULT_TOS_BUCKET_TEMPLATE_NAME,
 )
+from .region_defaults import default_region_for_current_provider
 
 
 @dataclass
@@ -130,15 +145,13 @@ class HybridStrategyConfig(AutoSerializableMixin):
     )
 
     region: str = field(
-        default="cn-beijing",
+        default_factory=default_region_for_current_provider,
         metadata={
-            "description": "Volcano Engine service region",
+            "description": "Cloud service region",
             "icon": "🌏",
             "aliases": ["ve_region"],
-            "choices": [
-                {"value": "cn-beijing", "description": "Beijing"},
-                {"value": "cn-shanghai", "description": "Shanghai"},
-            ],
+            "choices_resolver": "region_by_cloud_provider",
+            "persist": "explicit_only",
         },
     )
 
@@ -340,14 +353,12 @@ class CloudStrategyConfig(AutoSerializableMixin):
     """Cloud build and deployment strategy configuration for Volcano Engine."""
 
     region: str = field(
-        default="cn-beijing",
+        default_factory=default_region_for_current_provider,
         metadata={
-            "description": "Volcano Engine service region",
+            "description": "Cloud service region",
             "icon": "🌏",
-            "choices": [
-                {"value": "cn-beijing", "description": "Beijing"},
-                {"value": "cn-shanghai", "description": "Shanghai"},
-            ],
+            "choices_resolver": "region_by_cloud_provider",
+            "persist": "explicit_only",
         },
     )
 

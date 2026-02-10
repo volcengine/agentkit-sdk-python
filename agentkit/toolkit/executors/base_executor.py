@@ -85,6 +85,25 @@ class BaseExecutor:
         self.reporter = reporter or SilentReporter()
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
 
+    def _enter_platform_context(self, config_manager):
+        try:
+            from agentkit.platform.context import set_default_cloud_provider
+
+            provider = config_manager.get_resolved_cloud_provider().provider.value
+            return set_default_cloud_provider(provider)
+        except Exception:
+            return None
+
+    def _exit_platform_context(self, token) -> None:
+        if token is None:
+            return
+        try:
+            from agentkit.platform.context import reset_default_cloud_provider
+
+            reset_default_cloud_provider(token)
+        except Exception:
+            return
+
     def _load_config(
         self, config_dict: Optional[Dict[str, Any]], config_file: Optional[str]
     ):
@@ -121,20 +140,24 @@ class BaseExecutor:
                 self.logger.debug(
                     f"Creating config from dict with base file: {config_file}"
                 )
-                return AgentkitConfigManager.from_dict(
+                cfg = AgentkitConfigManager.from_dict(
                     config_dict=config_dict, base_config_path=config_path
                 )
+                return cfg
             else:
                 self.logger.debug("Creating config from dict (no base file)")
-                return AgentkitConfigManager.from_dict(config_dict=config_dict)
+                cfg = AgentkitConfigManager.from_dict(config_dict=config_dict)
+                return cfg
 
         if config_file:
             config_path = Path(config_file)
             if not config_path.exists():
                 raise FileNotFoundError(f"Configuration file not found: {config_file}")
-            return get_config(config_path=config_path)
+            cfg = get_config(config_path=config_path)
+            return cfg
         else:
-            return get_config()
+            cfg = get_config()
+            return cfg
 
     def _validate_config(self, config) -> None:
         """

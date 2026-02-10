@@ -247,8 +247,18 @@ class LocalStrategy(Strategy):
         if self.config_manager:
             docker_build_config = self.config_manager.get_docker_build_config()
 
+        resolved_provider = None
+        if self.config_manager:
+            try:
+                resolved_provider = (
+                    self.config_manager.get_resolved_cloud_provider().provider.value
+                )
+            except Exception:
+                resolved_provider = None
+
         return LocalDockerBuilderConfig(
             common_config=common_config,
+            cloud_provider=resolved_provider,
             image_name=common_config.agent_name or "agentkit-app",
             image_tag=strategy_config.image_tag,
             docker_build_config=docker_build_config,

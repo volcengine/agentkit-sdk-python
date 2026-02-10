@@ -113,10 +113,12 @@ class BuildExecutor(BaseExecutor):
         """
         if options is None:
             options = BuildOptions()
+        token = None
         try:
             self.logger.info("Loading configuration...")
             config = self._load_config(config_dict, config_file)
             self._validate_config(config)
+            token = self._enter_platform_context(config)
 
             # Apply runtime options to configuration (not persisted to file)
             if options.regenerate_dockerfile:
@@ -173,3 +175,5 @@ class BuildExecutor(BaseExecutor):
             self.logger.exception(f"Build execution error: {e}")
             error_info = self._handle_exception("Build", e)
             return BuildResult(**error_info)
+        finally:
+            self._exit_platform_context(token)

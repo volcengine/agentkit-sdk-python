@@ -75,5 +75,6 @@ regex = '''os\.environ\[".*?KEY"\]\s*=\s*".+"'''
 [allowlist]
 paths = [
     "requirements.txt",
-    "tests/platform/test_configuration_creds.py"
+    "tests/platform/test_configuration_creds.py",
+    "tests/platform/test_configuration_byteplus.py"
 ]

@@ -54,7 +54,7 @@ def generate_runtime_role_name() -> str:
     Returns:
         格式为 "AgentKit-Runtime-Default-ServiceRole-{random_id}" 的角色名称
     """
-    return f"AgentKit-Runtime-Default-ServiceRole-{generate_random_id(7)}"
+    return f"AgentKit_Runtime_Default_ServiceRole_{generate_random_id(7)}"
 
 
 def generate_apikey_name() -> str:

@@ -100,9 +100,11 @@ class InvokeExecutor(BaseExecutor):
             StrategyError: If strategy selection or execution fails
             Exception: Other exceptions are caught and converted to InvokeResult with error info
         """
+        token = None
         try:
             self.logger.info("Loading configuration...")
             config = self._load_config(config_dict, config_file)
+            token = self._enter_platform_context(config)
 
             common_config = config.get_common_config()
             launch_type = common_config.launch_type
@@ -143,3 +145,5 @@ class InvokeExecutor(BaseExecutor):
 
             error_info = self._handle_exception("Invoke", e)
             return InvokeResult(**error_info)
+        finally:
+            self._exit_platform_context(token)

@@ -127,6 +127,8 @@ class GlobalConfig:
     cr: CRGlobalConfig = field(default_factory=CRGlobalConfig)
     tos: TOSGlobalConfig = field(default_factory=TOSGlobalConfig)
     region_policy: dict = field(default_factory=dict)
+    # Optional BytePlus credentials for overseas cloud environment
+    byteplus: VolcengineCredentials = field(default_factory=VolcengineCredentials)
 
     @dataclass
     class Defaults:
@@ -135,6 +137,7 @@ class GlobalConfig:
         cr_public_endpoint_check: Optional[bool] = None
         iam_role_policies: Optional[list] = None
         disable_region_strict_restrictions: Optional[bool] = None
+        cloud_provider: Optional[str] = None
 
         def to_dict(self):
             data = {}
@@ -150,6 +153,8 @@ class GlobalConfig:
                 data["disable_region_strict_restrictions"] = (
                     self.disable_region_strict_restrictions
                 )
+            if self.cloud_provider:
+                data["cloud_provider"] = self.cloud_provider
             return data
 
         @classmethod
@@ -162,6 +167,7 @@ class GlobalConfig:
                 disable_region_strict_restrictions=data.get(
                     "disable_region_strict_restrictions"
                 ),
+                cloud_provider=data.get("cloud_provider"),
             )
 
     defaults: "GlobalConfig.Defaults" = field(
@@ -172,6 +178,7 @@ class GlobalConfig:
         base = {
             "region": self.region,
             "volcengine": self.volcengine.to_dict(),
+            "byteplus": self.byteplus.to_dict(),
             "cr": self.cr.to_dict(),
             "tos": self.tos.to_dict(),
             "region_policy": self.region_policy,
@@ -183,10 +190,26 @@ class GlobalConfig:
 
     @classmethod
     def from_dict(cls, data: dict):
-        # Fallback: check nested volcengine.region if top-level region is missing
-        region = data.get("region", "")
+        region = data.get("region", "") or ""
         if not region:
-            region = data.get("volcengine", {}).get("region", "")
+            defaults = data.get("defaults") or {}
+            provider = None
+            if isinstance(defaults, dict):
+                provider = defaults.get("cloud_provider")
+            provider = provider.strip().lower() if isinstance(provider, str) else None
+
+            if provider == "byteplus":
+                region = (
+                    (data.get("byteplus") or {}).get("region", "")
+                    if isinstance(data.get("byteplus") or {}, dict)
+                    else ""
+                )
+            else:
+                region = (
+                    (data.get("volcengine") or {}).get("region", "")
+                    if isinstance(data.get("volcengine") or {}, dict)
+                    else ""
+                )
 
         return cls(
             region=region,
@@ -195,6 +218,7 @@ class GlobalConfig:
             tos=TOSGlobalConfig.from_dict(data.get("tos", {})),
             region_policy=data.get("region_policy", {}),
             defaults=GlobalConfig.Defaults.from_dict(data.get("defaults", {}) or {}),
+            byteplus=VolcengineCredentials.from_dict(data.get("byteplus", {})),
         )
 
 
@@ -356,19 +380,66 @@ def apply_global_config_defaults(
     # Lazy imports to avoid circular dependencies
     try:
         from .strategy_configs import HybridStrategyConfig, CloudStrategyConfig
+        from .config import CommonConfig
     except ImportError as e:
         logger.debug(
             f"Failed to import strategy config classes, skip applying global config defaults: {e}"
         )
         return config_obj
 
-    # Only handle strategy config classes
+    if isinstance(config_obj, CommonConfig):
+        try:
+            global_config = get_global_config()
+
+            original_project_value = (
+                project_data.get("cloud_provider")
+                if isinstance(project_data, dict)
+                else None
+            )
+            if is_valid_config(original_project_value):
+                return config_obj
+
+            default_provider = getattr(
+                getattr(global_config, "defaults", None), "cloud_provider", None
+            )
+            if is_valid_config(default_provider):
+                config_obj.cloud_provider = default_provider
+                try:
+                    if not hasattr(config_obj, "_value_sources"):
+                        config_obj._value_sources = {}
+                    config_obj._value_sources["cloud_provider"] = "global"
+                except Exception:
+                    pass
+        except Exception as e:
+            logger.debug(
+                f"Error while applying global config defaults (ignored): {e}",
+                exc_info=True,
+            )
+        return config_obj
+
     if not isinstance(config_obj, (HybridStrategyConfig, CloudStrategyConfig)):
         return config_obj
 
     try:
         # Load global config
         global_config = get_global_config()
+
+        original_region = None
+        if isinstance(project_data, dict):
+            original_region = project_data.get("region")
+            if not is_valid_config(original_region) and "ve_region" in project_data:
+                original_region = project_data.get("ve_region")
+
+        if not is_valid_config(original_region):
+            from .region_defaults import default_region_for_current_provider
+
+            config_obj.region = default_region_for_current_provider()
+            try:
+                if not hasattr(config_obj, "_value_sources"):
+                    config_obj._value_sources = {}
+                config_obj._value_sources["region"] = "default"
+            except Exception:
+                pass
 
         # Map project field -> (global config section, attribute)
         field_mappings = {

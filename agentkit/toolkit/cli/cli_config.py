@@ -87,6 +87,12 @@ def config_command(
     launch_type: Optional[str] = typer.Option(
         None, "--launch_type", help="Deployment mode: local/hybrid/cloud"
     ),
+    cloud_provider: Optional[str] = typer.Option(
+        None,
+        "--cloud_provider",
+        "--cloud-provider",
+        help="Cloud provider: volcengine/byteplus",
+    ),
     # Application-level environment variables (CommonConfig)
     runtime_envs: Optional[List[str]] = typer.Option(
         None,
@@ -227,6 +233,7 @@ def config_command(
         --language Python \\
         --language_version 3.12 \\
         --launch_type cloud \\
+        --cloud_provider byteplus \\
         --region cn-beijing \\
         --tos_bucket agentkit \\
         --image_tag 0.0.1 \\
@@ -260,6 +267,10 @@ def config_command(
         --runtime_apikey_name my-custom-apikey
     
     \b
+    # Set project cloud provider (non-interactive)
+    agentkit config --cloud_provider byteplus
+    
+    \b
     # Incremental update (modify specific config only)
     agentkit config --language_version 3.13
     
@@ -275,6 +286,14 @@ def config_command(
     try:
         # Handle global config operations
         if global_config:
+            if cloud_provider is not None:
+                console.print(
+                    "[red]❌ Project-level --cloud_provider cannot be used with --global.[/red]"
+                )
+                console.print(
+                    "Use: [yellow]agentkit config --global --set defaults.cloud_provider=byteplus[/yellow]"
+                )
+                raise typer.Exit(code=1)
             _handle_global_config(show, set_field, init_global)
             return
 
@@ -294,6 +313,7 @@ def config_command(
             python_version=python_version,  # Backward compatibility
             dependencies_file=dependencies_file,
             launch_type=launch_type,
+            cloud_provider=cloud_provider,
             runtime_envs=runtime_envs,
             strategy_runtime_envs=strategy_runtime_envs,
             region=region,
@@ -402,10 +422,16 @@ def _interactive_config(config_file: Optional[str] = None):
         pass
 
     # Generate new strategy config
-    strategy_config = generate_config_from_dataclass(
-        config_class, current_strategy_config_dict
+    resolved_provider = config.get_resolved_cloud_provider().provider.value
+    strategy_config_dict = generate_config_from_dataclass(
+        config_class,
+        current_strategy_config_dict,
+        context={"cloud_provider": resolved_provider},
     )
-    config.update_strategy_config(strategy_name, strategy_config)
+    if not isinstance(strategy_config_dict, dict):
+        console.print("[red]❌ Invalid strategy configuration generated[/red]")
+        raise typer.Exit(1)
+    config.update_strategy_config(strategy_name, strategy_config_dict)
 
 
 def _handle_global_config(show: bool, set_field: Optional[str], init_global: bool):
@@ -554,6 +580,10 @@ def _show_global_config():
     console.print(
         f"  Region:     [yellow]{config.region or '[dim](not set)[/dim]'}[/yellow]"
     )
+    if getattr(config.defaults, "cloud_provider", None):
+        console.print(
+            f"  Cloud Provider: [yellow]{config.defaults.cloud_provider}[/yellow]"
+        )
     if config.defaults.disable_region_strict_restrictions:
         console.print("  Disable Region Restrictions: [yellow]True[/yellow]")
     console.print()
@@ -571,6 +601,23 @@ def _show_global_config():
         console.print("  Access Key: [dim](not set)[/dim]")
 
     if config.volcengine.secret_key:
+        console.print("  Secret Key: [yellow]***[/yellow] (set)")
+    else:
+        console.print("  Secret Key: [dim](not set)[/dim]")
+
+    # Display BytePlus credentials
+    console.print("\n[bold]🔐 BytePlus Credentials[/bold]")
+    if config.byteplus.access_key:
+        masked_ak = (
+            config.byteplus.access_key[:5] + "***"
+            if len(config.byteplus.access_key) > 5
+            else "***"
+        )
+        console.print(f"  Access Key: [yellow]{masked_ak}[/yellow] (set)")
+    else:
+        console.print("  Access Key: [dim](not set)[/dim]")
+
+    if config.byteplus.secret_key:
         console.print("  Secret Key: [yellow]***[/yellow] (set)")
     else:
         console.print("  Secret Key: [dim](not set)[/dim]")
@@ -622,8 +669,11 @@ def _set_global_field(field_value: str):
         console.print(f"[red]❌ Invalid field format: {key}[/red]")
         console.print("\nSupported fields:")
         console.print("  • region")
+        console.print("  • defaults.cloud_provider")
         console.print("  • volcengine.access_key")
         console.print("  • volcengine.secret_key")
+        console.print("  • byteplus.access_key")
+        console.print("  • byteplus.secret_key")
         console.print("  • cr.instance_name")
         console.print("  • tos.bucket")
         raise typer.Exit(code=1)

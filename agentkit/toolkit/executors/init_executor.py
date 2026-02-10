@@ -511,7 +511,16 @@ class InitExecutor(BaseExecutor):
             global_region = None
             if global_config and global_config.region:
                 global_region = global_config.region
-            cloud_config.region = global_region or "cn-beijing"
+            try:
+                from agentkit.platform.constants import DEFAULT_REGION_BY_PROVIDER
+
+                resolved = config_manager.get_resolved_cloud_provider()
+                default_region = DEFAULT_REGION_BY_PROVIDER.get(
+                    resolved.provider, "cn-beijing"
+                )
+            except Exception:
+                default_region = "cn-beijing"
+            cloud_config.region = global_region or default_region
 
             # Empty string means "inherit from global config at runtime"
             if global_config and global_config.cr.instance_name:
@@ -553,7 +562,16 @@ class InitExecutor(BaseExecutor):
             global_region = None
             if global_config and global_config.region:
                 global_region = global_config.region
-            hybrid_config.region = global_region or "cn-beijing"
+            try:
+                from agentkit.platform.constants import DEFAULT_REGION_BY_PROVIDER
+
+                resolved = config_manager.get_resolved_cloud_provider()
+                default_region = DEFAULT_REGION_BY_PROVIDER.get(
+                    resolved.provider, "cn-beijing"
+                )
+            except Exception:
+                default_region = "cn-beijing"
+            hybrid_config.region = global_region or default_region
 
             if global_config and global_config.cr.instance_name:
                 hybrid_config.cr_instance_name = ""

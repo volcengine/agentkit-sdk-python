@@ -88,6 +88,7 @@ class DeployExecutor(BaseExecutor):
             ValueError: Configuration validation failed
             Exception: Any exception during deployment is caught and returned as failed result
         """
+        token = None
         try:
             # Override preflight_mode from global config defaults if configured
             try:
@@ -108,6 +109,7 @@ class DeployExecutor(BaseExecutor):
             self.logger.info("Loading configuration...")
             config = self._load_config(config_dict, config_file)
             self._validate_config(config)
+            token = self._enter_platform_context(config)
 
             common_config = config.get_common_config()
             launch_type = common_config.launch_type
@@ -155,3 +157,5 @@ class DeployExecutor(BaseExecutor):
             self.logger.exception(f"Deployment execution error: {e}")
             error_info = self._handle_exception("Deploy", e)
             return DeployResult(**error_info)
+        finally:
+            self._exit_platform_context(token)

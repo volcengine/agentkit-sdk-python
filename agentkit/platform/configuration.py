@@ -19,9 +19,21 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict
 
-from agentkit.platform.constants import DEFAULT_REGION, SERVICE_METADATA
+from agentkit.platform.constants import (
+    DEFAULT_REGION,
+    SERVICE_METADATA,
+    ServiceMeta,
+    SERVICE_METADATA_BY_PROVIDER,
+    DEFAULT_REGION_BY_PROVIDER,
+    DEFAULT_REGION_RULES_BY_PROVIDER,
+)
+from agentkit.platform.provider import (
+    CloudProvider,
+    normalize_cloud_provider,
+    read_cloud_provider_from_env,
+)
 from agentkit.utils.global_config_io import (
     get_global_config_str,
     get_global_config_value,
@@ -72,11 +84,41 @@ class VolcConfiguration:
         access_key: Optional[str] = None,
         secret_key: Optional[str] = None,
         session_token: Optional[str] = None,
+        provider: Optional[str] = None,
     ):
         self._region = region
         self._ak = access_key
         self._sk = secret_key
         self._token = session_token
+        # Resolve cloud provider at construction time.
+        try:
+            from agentkit.platform.context import get_default_cloud_provider
+
+            context_provider = get_default_cloud_provider()
+        except Exception:
+            context_provider = None
+        env_provider = read_cloud_provider_from_env()
+        try:
+            global_dict = read_global_config_dict()
+            cfg_provider = (
+                (global_dict.get("defaults") or {}).get("cloud_provider")
+                if isinstance(global_dict, dict)
+                else None
+            )
+        except Exception:
+            cfg_provider = None
+
+        self._provider = (
+            normalize_cloud_provider(provider)
+            or context_provider
+            or normalize_cloud_provider(env_provider)
+            or normalize_cloud_provider(cfg_provider)
+            or CloudProvider.VOLCENGINE
+        )
+
+    @property
+    def provider(self) -> CloudProvider:
+        return self._provider
 
     @property
     def region(self) -> str:
@@ -91,20 +133,35 @@ class VolcConfiguration:
         if self._region:
             return self._region
 
-        return (
-            os.getenv("VOLCENGINE_REGION")
-            or os.getenv("VOLC_REGION")
-            or get_global_config_str("region")
-            or get_global_config_str("volcengine", "region")
-            or DEFAULT_REGION
-        )
+        if self._provider == CloudProvider.BYTEPLUS:
+            base_region = (
+                os.getenv("BYTEPLUS_REGION")
+                or get_global_config_str("byteplus", "region")
+                or get_global_config_str("region")
+            )
+        else:
+            base_region = (
+                os.getenv("VOLCENGINE_REGION")
+                or os.getenv("VOLC_REGION")
+                or get_global_config_str("region")
+                or get_global_config_str("volcengine", "region")
+            )
+
+        if base_region:
+            return base_region
+
+        # Fallback to provider-specific default region
+        return DEFAULT_REGION_BY_PROVIDER.get(self._provider, DEFAULT_REGION)
 
     def get_service_endpoint(self, service_key: str) -> Endpoint:
         """
         Resolves the endpoint for a specific service.
         """
         key_lower = service_key.lower()
-        meta = SERVICE_METADATA.get(key_lower)
+        provider_registry: Dict[str, ServiceMeta] = SERVICE_METADATA_BY_PROVIDER.get(
+            self._provider, SERVICE_METADATA
+        )
+        meta = provider_registry.get(key_lower)
         if not meta:
             # Fallback for unknown services if needed, or raise error
             # For strictness, we raise error as in original design
@@ -112,33 +169,10 @@ class VolcConfiguration:
                 f"Unsupported service for endpoint resolution: {service_key}"
             )
 
-        key_upper = key_lower.upper()
-
-        # 1. Check for overrides in environment variables
-        # Format: VOLCENGINE_{SERVICE}_HOST
-        env_host = (
-            os.getenv(f"VOLCENGINE_{key_upper}_HOST")
-            or os.getenv(f"VOLC_{key_upper}_HOST")
-            or get_global_config_value("services", key_lower, "host")
-        )
-
-        env_scheme = (
-            os.getenv(f"VOLCENGINE_{key_upper}_SCHEME")
-            or os.getenv(f"VOLC_{key_upper}_SCHEME")
-            or get_global_config_value("services", key_lower, "scheme")
-        )
-
-        env_version = (
-            os.getenv(f"VOLCENGINE_{key_upper}_API_VERSION")
-            or os.getenv(f"VOLC_{key_upper}_API_VERSION")
-            or get_global_config_value("services", key_lower, "api_version")
-        )
-
-        env_service_code = (
-            os.getenv(f"VOLCENGINE_{key_upper}_SERVICE")
-            or os.getenv(f"VOLC_{key_upper}_SERVICE")
-            or get_global_config_value("services", key_lower, "service")
-        )
+        env_host = self._get_service_override(service_key, "host")
+        env_scheme = self._get_service_override(service_key, "scheme")
+        env_version = self._get_service_override(service_key, "api_version")
+        env_service_code = self._get_service_override(service_key, "service")
 
         svc_region = self._resolve_service_region(service_key)
 
@@ -194,6 +228,12 @@ class VolcConfiguration:
         if creds := self._get_dotenv_credentials(service_key):
             return creds
 
+        if self._provider == CloudProvider.BYTEPLUS:
+            raise ValueError(
+                f"BytePlus credentials not found (Service: {service_key}). Please set environment variables BYTEPLUS_ACCESS_KEY and "
+                "BYTEPLUS_SECRET_KEY, or configure ~/.agentkit/config.yaml under byteplus.access_key/byteplus.secret_key."
+            )
+
         raise ValueError(
             "\n".join(
                 [
@@ -240,20 +280,28 @@ class VolcConfiguration:
 
         svc_upper = service_key.upper()
 
-        # Service-specific keys (align with environment variable behavior)
-        ak = _get(f"VOLCENGINE_{svc_upper}_ACCESS_KEY")
-        sk = _get(f"VOLCENGINE_{svc_upper}_SECRET_KEY")
-        if not ak or not sk:
-            # Legacy support
-            ak = ak or _get(f"VOLC_{svc_upper}_ACCESSKEY")
-            sk = sk or _get(f"VOLC_{svc_upper}_SECRETKEY")
+        if self._provider == CloudProvider.BYTEPLUS:
+            ak = _get(f"BYTEPLUS_{svc_upper}_ACCESS_KEY")
+            sk = _get(f"BYTEPLUS_{svc_upper}_SECRET_KEY")
+        else:
+            # Service-specific keys (align with environment variable behavior)
+            ak = _get(f"VOLCENGINE_{svc_upper}_ACCESS_KEY")
+            sk = _get(f"VOLCENGINE_{svc_upper}_SECRET_KEY")
+            if not ak or not sk:
+                # Legacy support
+                ak = ak or _get(f"VOLC_{svc_upper}_ACCESSKEY")
+                sk = sk or _get(f"VOLC_{svc_upper}_SECRETKEY")
 
         if ak and sk:
             return Credentials(access_key=ak, secret_key=sk)
 
         # Global keys
-        ak = _get("VOLCENGINE_ACCESS_KEY") or _get("VOLC_ACCESSKEY")
-        sk = _get("VOLCENGINE_SECRET_KEY") or _get("VOLC_SECRETKEY")
+        if self._provider == CloudProvider.BYTEPLUS:
+            ak = _get("BYTEPLUS_ACCESS_KEY")
+            sk = _get("BYTEPLUS_SECRET_KEY")
+        else:
+            ak = _get("VOLCENGINE_ACCESS_KEY") or _get("VOLC_ACCESSKEY")
+            sk = _get("VOLCENGINE_SECRET_KEY") or _get("VOLC_SECRETKEY")
 
         if ak and sk:
             return Credentials(access_key=ak, secret_key=sk)
@@ -262,29 +310,41 @@ class VolcConfiguration:
 
     def _get_service_env_credentials(self, service_key: str) -> Optional[Credentials]:
         svc_upper = service_key.upper()
-        ak = os.getenv(f"VOLCENGINE_{svc_upper}_ACCESS_KEY")
-        sk = os.getenv(f"VOLCENGINE_{svc_upper}_SECRET_KEY")
+        if self._provider == CloudProvider.BYTEPLUS:
+            ak = os.getenv(f"BYTEPLUS_{svc_upper}_ACCESS_KEY")
+            sk = os.getenv(f"BYTEPLUS_{svc_upper}_SECRET_KEY")
+        else:
+            ak = os.getenv(f"VOLCENGINE_{svc_upper}_ACCESS_KEY")
+            sk = os.getenv(f"VOLCENGINE_{svc_upper}_SECRET_KEY")
 
-        if not ak or not sk:
-            # Legacy support
-            ak = ak or os.getenv(f"VOLC_{svc_upper}_ACCESSKEY")
-            sk = sk or os.getenv(f"VOLC_{svc_upper}_SECRETKEY")
+            if not ak or not sk:
+                # Legacy support
+                ak = ak or os.getenv(f"VOLC_{svc_upper}_ACCESSKEY")
+                sk = sk or os.getenv(f"VOLC_{svc_upper}_SECRETKEY")
 
         if ak and sk:
             return Credentials(access_key=ak, secret_key=sk)
         return None
 
     def _get_global_env_credentials(self) -> Optional[Credentials]:
-        ak = os.getenv("VOLCENGINE_ACCESS_KEY") or os.getenv("VOLC_ACCESSKEY")
-        sk = os.getenv("VOLCENGINE_SECRET_KEY") or os.getenv("VOLC_SECRETKEY")
+        if self._provider == CloudProvider.BYTEPLUS:
+            ak = os.getenv("BYTEPLUS_ACCESS_KEY")
+            sk = os.getenv("BYTEPLUS_SECRET_KEY")
+        else:
+            ak = os.getenv("VOLCENGINE_ACCESS_KEY") or os.getenv("VOLC_ACCESSKEY")
+            sk = os.getenv("VOLCENGINE_SECRET_KEY") or os.getenv("VOLC_SECRETKEY")
 
         if ak and sk:
             return Credentials(access_key=ak, secret_key=sk)
         return None
 
     def _get_config_file_credentials(self) -> Optional[Credentials]:
-        gc_ak = get_global_config_str("volcengine", "access_key")
-        gc_sk = get_global_config_str("volcengine", "secret_key")
+        if self._provider == CloudProvider.BYTEPLUS:
+            gc_ak = get_global_config_str("byteplus", "access_key")
+            gc_sk = get_global_config_str("byteplus", "secret_key")
+        else:
+            gc_ak = get_global_config_str("volcengine", "access_key")
+            gc_sk = get_global_config_str("volcengine", "secret_key")
         if gc_ak and gc_sk:
             return Credentials(access_key=gc_ak, secret_key=gc_sk)
         return None
@@ -293,6 +353,8 @@ class VolcConfiguration:
         """
         Internal helper to attempt retrieving credentials from VeFaaS IAM environment.
         """
+        if self._provider != CloudProvider.VOLCENGINE:
+            return None
         path = Path(VEFAAS_IAM_CREDENTIAL_PATH)
         if not path.exists():
             return None
@@ -323,13 +385,21 @@ class VolcConfiguration:
         key_lower = service_key.lower()
         key_upper = service_key.upper()
 
-        svc_region = os.getenv(f"VOLCENGINE_{key_upper}_REGION") or os.getenv(
-            f"VOLC_{key_upper}_REGION"
-        )
+        if self._provider == CloudProvider.BYTEPLUS:
+            svc_region = os.getenv(f"BYTEPLUS_{key_upper}_REGION")
+        else:
+            svc_region = os.getenv(f"VOLCENGINE_{key_upper}_REGION") or os.getenv(
+                f"VOLC_{key_upper}_REGION"
+            )
         if svc_region:
             return svc_region
 
-        svc_region = get_global_config_value("services", key_lower, "region")
+        if self._provider == CloudProvider.BYTEPLUS:
+            svc_region = get_global_config_value(
+                "byteplus", "services", key_lower, "region"
+            )
+        else:
+            svc_region = get_global_config_value("services", key_lower, "region")
         if svc_region:
             return svc_region
 
@@ -349,17 +419,59 @@ class VolcConfiguration:
         1. Custom rules from global config
         2. Built-in rules
         """
-        from agentkit.platform.constants import DEFAULT_REGION_RULES
-
         logical_region = logical_region.lower()
         service_key = service_key.lower()
 
         global_config_dict = read_global_config_dict()
-        custom_rules = global_config_dict.get("region_policy", {}).get("rules", {})
+        if self._provider == CloudProvider.BYTEPLUS:
+            custom_rules = (
+                (global_config_dict.get("byteplus") or {})
+                .get("region_policy", {})
+                .get("rules", {})
+                if isinstance(global_config_dict, dict)
+                else {}
+            )
+        else:
+            custom_rules = (
+                global_config_dict.get("region_policy", {}).get("rules", {})
+                if isinstance(global_config_dict, dict)
+                else {}
+            )
 
-        active_rule = DEFAULT_REGION_RULES.get(logical_region, {}).copy()
+        provider_rules = DEFAULT_REGION_RULES_BY_PROVIDER.get(self._provider, {})
+        active_rule = provider_rules.get(logical_region, {}).copy()
         if custom_rules:
             user_rule = custom_rules.get(logical_region, {})
             active_rule.update(user_rule)
 
         return active_rule.get(service_key)
+
+    def _get_service_override(self, service_key: str, field: str) -> Optional[str]:
+        """Resolve provider-aware overrides for endpoint details.
+
+        Supported fields: host, scheme, api_version, service
+
+        Precedence: provider env > provider config > legacy/global config (volcengine only)
+        """
+        key_lower = service_key.lower()
+        key_upper = key_lower.upper()
+
+        if self._provider == CloudProvider.BYTEPLUS:
+            env_prefix = "BYTEPLUS"
+            env_value = os.getenv(f"{env_prefix}_{key_upper}_{field.upper()}")
+            if env_value:
+                return env_value
+
+            cfg_value = get_global_config_value(
+                "byteplus", "services", key_lower, field
+            )
+            return cfg_value
+
+        # Volcano Engine (CN)
+        env_value = os.getenv(f"VOLCENGINE_{key_upper}_{field.upper()}") or os.getenv(
+            f"VOLC_{key_upper}_{field.upper()}"
+        )
+        if env_value:
+            return env_value
+
+        return get_global_config_value("services", key_lower, field)

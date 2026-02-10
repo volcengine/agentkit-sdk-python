@@ -1,6 +1,8 @@
 # Support custom base image
 {% if base_image %}
 FROM {{ base_image }}
+{% elif base_image_default %}
+FROM {{ base_image_default }}
 {% else %}
 FROM agentkit-prod-public-cn-beijing.cr.volces.com/base/py-simple:python{{ language_version }}-bookworm-slim-latest
 {% endif %}

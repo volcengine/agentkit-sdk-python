@@ -15,6 +15,8 @@
 from dataclasses import dataclass
 from typing import Dict
 
+from agentkit.platform.provider import CloudProvider
+
 
 @dataclass(frozen=True)
 class ServiceMeta:
@@ -72,4 +74,59 @@ SERVICE_METADATA: Dict[str, ServiceMeta] = {
     ),
 }
 
+BYTEPLUS_SERVICE_METADATA: Dict[str, ServiceMeta] = {
+    "agentkit": ServiceMeta(
+        code="agentkit",
+        host_template="agentkit.{region}.byteplusapi.com",
+        default_version="2025-10-30",
+    ),
+    "iam": ServiceMeta(
+        code="iam",
+        host_template="open.byteplusapi.com",
+        default_version="2018-01-01",
+    ),
+    "sts": ServiceMeta(
+        code="sts",
+        host_template="sts.{region}.byteplusapi.com",
+        default_version="2018-01-01",
+    ),
+    "identity": ServiceMeta(
+        code="cis_test",
+        host_template="open.byteplusapi.com",
+        default_version="2023-10-01",
+    ),
+    "cr": ServiceMeta(
+        code="cr",
+        host_template="cr.{region}.byteplusapi.com",
+        default_version="2022-05-12",
+    ),
+    "tos": ServiceMeta(
+        code="tos",
+        host_template="tos-{region}.bytepluses.com",
+        default_version="",
+    ),
+    "cp": ServiceMeta(
+        code="CP",
+        host_template="cp.{region}.byteplusapi.com",
+        default_version="2023-05-01",
+    ),
+}
+
+SERVICE_METADATA_BY_PROVIDER: Dict[CloudProvider, Dict[str, ServiceMeta]] = {
+    CloudProvider.VOLCENGINE: SERVICE_METADATA,
+    CloudProvider.BYTEPLUS: BYTEPLUS_SERVICE_METADATA,
+}
+
+
 DEFAULT_REGION = "cn-beijing"
+
+DEFAULT_REGION_BY_PROVIDER: Dict[CloudProvider, str] = {
+    CloudProvider.VOLCENGINE: DEFAULT_REGION,
+    CloudProvider.BYTEPLUS: "ap-southeast-1",
+}
+
+
+DEFAULT_REGION_RULES_BY_PROVIDER: Dict[CloudProvider, Dict[str, Dict[str, str]]] = {
+    CloudProvider.VOLCENGINE: DEFAULT_REGION_RULES,
+    CloudProvider.BYTEPLUS: {},
+}

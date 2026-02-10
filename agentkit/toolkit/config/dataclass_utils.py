@@ -428,6 +428,9 @@ class AutoSerializableMixin:
             source = sources.get(name)
             current_value = getattr(self, name)
             original_tpl = originals.get(name)
+            persist_policy = (
+                field_info.metadata.get("persist") if field_info.metadata else None
+            )
 
             if source == "global":
                 # Global source: write empty string so project config remains "unset"
@@ -435,6 +438,17 @@ class AutoSerializableMixin:
                 logger.debug(
                     "[persist] field=%s source=global -> write='' (keep local unset)",
                     name,
+                )
+            elif (
+                persist_policy == "explicit_only"
+                and source is not None
+                and source != "local"
+            ):
+                result[name] = ""
+                logger.debug(
+                    "[persist] field=%s policy=explicit_only source=%s -> write=''",
+                    name,
+                    source,
                 )
             elif source == "default_template":
                 # Write back the template instead of rendered value

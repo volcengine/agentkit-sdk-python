@@ -289,8 +289,18 @@ class CloudStrategy(Strategy):
 
         resolver = RegionConfigResolver.from_strategy_config(strategy_config)
 
+        resolved_provider = None
+        if self.config_manager:
+            try:
+                resolved_provider = (
+                    self.config_manager.get_resolved_cloud_provider().provider.value
+                )
+            except Exception:
+                resolved_provider = None
+
         return VeCPCRBuilderConfig(
             common_config=common_config,
+            cloud_provider=resolved_provider,
             cp_region=resolver.resolve("cp"),
             tos_bucket=strategy_config.tos_bucket,
             tos_region=resolver.resolve("tos"),
