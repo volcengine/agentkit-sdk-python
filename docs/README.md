@@ -16,6 +16,7 @@ npm install
 npm run docs:dev
 ```
 
+访问 `http://localhost:5173` 查看文档站点。
 ### 构建生产版本
 
 ```bash
