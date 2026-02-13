@@ -8,7 +8,7 @@ hero:
   actions:
     - theme: brand
       text: 快速开始
-      link: /content/1.introduction/3.quickstart.md
+      link: /content/1.introduction/3.quickstart
     - theme: alt
       text: 查看文档
       link: /content/1.introduction/1.overview

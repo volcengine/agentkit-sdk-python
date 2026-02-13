@@ -1,0 +1,40 @@
+---
+layout: home
+
+hero:
+  name: AgentKit
+  text: Python SDK & CLI
+  tagline: Quickly build and deploy Agent applications to the Volcengine AgentKit Platform
+  actions:
+    - theme: brand
+      text: Quick Start
+      link: /en/content/1.introduction/3.quickstart
+    - theme: alt
+      text: View Docs
+      link: /en/content/1.introduction/1.overview
+
+features:
+  - icon: 🚀
+    title: Quick Initialization
+    details: Use the agentkit init command to generate a project template with one click, with multiple built-in app types (Basic App, Stream App, etc.)
+  
+  - icon: 🛠️
+    title: Simple SDK
+    details: Elegant decorator-based API; define the entry function with @app.entrypoint and focus on business logic development
+  
+  - icon: ☁️
+    title: Multiple Deployment Modes
+    details: Supports three deployment modes—Local, Hybrid, and Cloud—flexibly meeting different scenario requirements
+  
+  - icon: 🔧
+    title: Interactive Configuration
+    details: Use the agentkit config command for guided configuration of deployment parameters, environment variables, and image registry
+  
+  - icon: 📦
+    title: One-Click Build & Deploy
+    details: The agentkit launch command combines build and deploy to automatically build the image and deploy to Runtime
+  
+  - icon: 🔌
+    title: Platform Integration
+    details: Seamlessly integrates platform services such as Memory, Knowledge, and MCP Gateway—ready to use out of the box
+---
