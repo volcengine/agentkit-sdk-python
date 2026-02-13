@@ -35,6 +35,7 @@ from agentkit.toolkit.cli.cli_memory import memory_app
 from agentkit.toolkit.cli.cli_knowledge import knowledge_app
 from agentkit.toolkit.cli.cli_tools import tools_app
 from agentkit.toolkit.cli.cli_runtime import runtime_app
+from agentkit.toolkit.cli.cli_skills import skills_app
 
 # Note: Avoid importing heavy packages at the top to keep CLI startup fast
 
@@ -104,6 +105,7 @@ app.add_typer(memory_app, name="memory")
 app.add_typer(knowledge_app, name="knowledge")
 app.add_typer(tools_app, name="tools")
 app.add_typer(runtime_app, name="runtime")
+app.add_typer(skills_app, name="skills")
 
 
 if __name__ == "__main__":

@@ -76,7 +76,8 @@ regex = '''os\.environ\[".*?KEY"\]\s*=\s*".+"'''
 paths = [
     "requirements.txt",
     "tests/platform/test_configuration_creds.py",
-    "tests/platform/test_configuration_byteplus.py"
+    "tests/platform/test_configuration_byteplus.py",
+    "api_jsons/skills_all_apis.json"
 ]
 regexes = [
     '''c05d49af-1234-5678-abcd-xxxx''',
