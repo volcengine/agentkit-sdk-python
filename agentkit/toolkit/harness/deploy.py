@@ -122,6 +122,30 @@ def _record_harness(
     return path
 
 
+def _existing_runtime_ids(client, name: str) -> list:
+    """Return the ids of every runtime whose name equals ``name`` (all pages).
+
+    Used to fast-fail before a harness deploy: the harness config always sets
+    ``runtime_id: Auto`` (always create-new), so without this check re-deploying
+    would pile up duplicate same-name runtimes.
+    """
+    from agentkit.sdk.runtime import types as rt_types
+
+    ids = []
+    next_token = None
+    while True:
+        resp = client.list_runtimes(
+            rt_types.ListRuntimesRequest(max_results=50, next_token=next_token)
+        )
+        for runtime in resp.agent_kit_runtimes or []:
+            if runtime.name == name:
+                ids.append(runtime.runtime_id or "")
+        next_token = resp.next_token
+        if not next_token:
+            break
+    return ids
+
+
 def _load_harness_spec(path: Path) -> Dict[str, Any]:
     """Load a ``<name>.harness.json`` spec; fast-fail when it is missing."""
     if not path.is_file():
@@ -202,6 +226,20 @@ def deploy_harness(
         )
 
     resolved_region = region or os.getenv("VOLCENGINE_REGION") or "cn-beijing"
+
+    # Fast-fail on a name collision: the harness config sets `runtime_id: Auto`
+    # (always create-new), so deploying over an existing same-name runtime would
+    # silently create a duplicate. Refuse and let the user delete/rename first.
+    existing_ids = _existing_runtime_ids(
+        AgentkitRuntimeClient(region=resolved_region), runtime_name
+    )
+    if existing_ids:
+        raise ValueError(
+            f"A runtime named '{runtime_name}' already exists "
+            f"(runtime_id: {', '.join(i for i in existing_ids if i)}). "
+            "Delete it or use a different harness name before deploying."
+        )
+
     cfg = build_agentkit_config(runtime_name, resolved_region, runtime_envs, auth)
 
     # AgentKit's launch path exposes no hook for runtime tags, so tag the runtime

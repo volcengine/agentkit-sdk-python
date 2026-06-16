@@ -118,15 +118,21 @@ def _deploy_harness(
     reporter = ConsoleReporter()
     ExecutionContext.set_reporter(reporter)
 
-    result = deploy_harness(
-        name=name,
-        region=region,
-        access_key=access_key,
-        secret_key=secret_key,
-        discovery_url=discovery_url,
-        allowed_id=allowed_id,
-        reporter=reporter,
-    )
+    # Surface fast-fail input/validation errors (missing spec, missing creds,
+    # name collision) as a clean CLI error + exit code, not a raw traceback.
+    try:
+        result = deploy_harness(
+            name=name,
+            region=region,
+            access_key=access_key,
+            secret_key=secret_key,
+            discovery_url=discovery_url,
+            allowed_id=allowed_id,
+            reporter=reporter,
+        )
+    except (ValueError, FileNotFoundError, NotADirectoryError) as exc:
+        console.print(f"[red]❌ Harness deploy failed: {exc}[/red]")
+        raise typer.Exit(1)
 
     if not result.success:
         console.print(f"[red]❌ Harness deploy failed: {result.error}[/red]")
