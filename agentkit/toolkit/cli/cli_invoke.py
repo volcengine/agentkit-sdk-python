@@ -755,9 +755,19 @@ def harness_command(
         console.print(f"[red]❌ Non-JSON response: {resp.text}[/red]")
         raise typer.Exit(1)
 
+    # The harness returns failures (unsupported tool, skill load failure, or a
+    # runtime error) in `error`; surface it verbatim instead of as normal output.
+    error = data.get("error") if isinstance(data, dict) else None
+
     if raw:
         console.print(json.dumps(data, ensure_ascii=False, indent=2))
+        if error:
+            raise typer.Exit(1)
         return str(data)
+
+    if error:
+        console.print(f"[red]❌ Harness error: {error}[/red]")
+        raise typer.Exit(1)
 
     console.print("[green]✅ Invocation successful[/green]")
     if data.get("overwrite"):

@@ -151,6 +151,28 @@ def test_harness_invoke_no_overrides_omits_harness_key(tmp_path, monkeypatch):
     assert "max_llm_calls" not in captured["json"]["run_agent_request"]
 
 
+def test_harness_error_field_is_surfaced(tmp_path, monkeypatch):
+    _write_registry(tmp_path, {"first": {"url": "https://x", "key": "ak"}})
+    captured = {}
+    _patch_post(
+        monkeypatch,
+        captured,
+        payload={
+            "harness_name": "first",
+            "overwrite": True,
+            "output": "",
+            "error": "Tool 'bogus' is not a supported built-in tool. Available: web_search",
+        },
+    )
+
+    result = _run_harness(
+        ["first", "hi", "--directory", str(tmp_path), "--tools", "bogus"]
+    )
+    assert result.exit_code == 1
+    assert "Harness error" in result.output
+    assert "not a supported built-in tool" in result.output
+
+
 def test_harness_invoke_http_error_fails(tmp_path, monkeypatch):
     _write_registry(tmp_path, {"first": {"url": "https://x", "key": "ak"}})
     captured = {}
