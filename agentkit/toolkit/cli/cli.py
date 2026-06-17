@@ -47,6 +47,7 @@ from agentkit.toolkit.cli.cli_auth import (
 from agentkit.toolkit.cli.cli_add import add_app
 from agentkit.toolkit.cli.cli_list import list_app
 from agentkit.toolkit.cli.cli_delete import delete_app
+from agentkit.toolkit.cli.cli_logs import logs_command
 
 # Note: Avoid importing heavy packages at the top to keep CLI startup fast
 
@@ -109,6 +110,7 @@ app.command(name="deploy")(deploy_command)
 app.command(name="launch")(launch_command)
 app.command(name="status")(status_command)
 app.command(name="destroy")(destroy_command)
+app.command(name="logs")(logs_command)
 
 # Auth: top-level convenience commands + an `auth` group for profiles.
 app.command(name="login")(login_command)
