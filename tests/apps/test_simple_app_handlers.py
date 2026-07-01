@@ -492,16 +492,16 @@ def test_format_ping_status_returns_dict_result_unchanged():
     assert handler._format_ping_status(payload) == payload
 
 
-def test_format_ping_status_on_non_str_non_dict_raises_when_func_is_none():
-    # NOTE: latent bug -- the else branch logs f"... {self.func.__name__} ..."
-    # (simple_app_handlers.py:312). When no ping func has been registered,
-    # self.func is None, so attribute access raises AttributeError *before* the
-    # intended {"status": "error", ...} dict is returned. We pin the ACTUAL
-    # current behavior (AttributeError), not the intended error dict.
+def test_format_ping_status_on_non_str_non_dict_returns_error_dict_when_func_is_none():
+    # After the fix (None-safe func name via getattr): with no registered func
+    # the else branch no longer raises AttributeError -- it returns the intended
+    # error dict for an unexpected (non str/dict) result type.
     handler = PingHandler()
     assert handler.func is None
-    with pytest.raises(AttributeError):
-        handler._format_ping_status(12345)
+    assert handler._format_ping_status(12345) == {
+        "status": "error",
+        "message": "Invalid response type.",
+    }
 
 
 def test_format_ping_status_on_non_str_non_dict_returns_error_dict_when_func_present():
@@ -524,17 +524,15 @@ def test_format_ping_status_on_non_str_non_dict_returns_error_dict_when_func_pre
 # ---------------------------------------------------------------------------
 
 
-def test_async_task_handler_handle_takes_no_request_argument():
-    # NOTE: latent bug -- AsyncTaskHandler.handle is declared as `handle(self)`
-    # (simple_app_handlers.py:325), violating the abstract
-    # BaseHandler.handle(self, request) contract. It therefore cannot be used as
-    # a Starlette route endpoint (which always passes a request). We pin the
-    # ACTUAL current behavior: it accepts NO request argument and returns an
-    # empty Response; passing a request raises TypeError.
+def test_async_task_handler_handle_accepts_optional_request_argument():
+    # After the fix: handle conforms to the BaseHandler.handle(self, request)
+    # contract via an optional request param, so it works both as a no-arg call
+    # and as a Starlette route endpoint (which passes a request). Both return an
+    # empty Response.
     handler = AsyncTaskHandler()
 
     resp = asyncio.run(handler.handle())
     assert isinstance(resp, Response)
 
-    with pytest.raises(TypeError):
-        asyncio.run(handler.handle(object()))
+    resp2 = asyncio.run(handler.handle(object()))
+    assert isinstance(resp2, Response)

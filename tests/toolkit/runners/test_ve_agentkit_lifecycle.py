@@ -587,11 +587,10 @@ def test_update_existing_runtime_direct_to_ready_submits_update_and_skips_releas
     assert ureq.knowledge_id == ""
     # binding key absent -> None (not sent)
     assert ureq.tool_id is None
-    # NOTE: latent bug -- _update_existing_runtime passes client_token= to
-    # UpdateRuntimeRequest, but that pydantic model has no client_token field and
-    # extra is "ignore", so the idempotency token is silently dropped (unlike
-    # CreateRuntimeRequest which does carry it). Pin the actual current behaviour.
-    assert not hasattr(ureq, "client_token")
+    # After the fix: UpdateRuntimeRequest now defines a client_token field
+    # (matching CreateRuntimeRequest), so the idempotency token supplied by
+    # _update_existing_runtime is retained instead of being silently dropped.
+    assert isinstance(ureq.client_token, str) and ureq.client_token
 
     # Reached Ready directly -> no release step.
     assert client.release_calls == []
