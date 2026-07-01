@@ -32,7 +32,7 @@ from typing import Iterator, Optional
 
 import typer
 
-from agentkit.sdk.tools.client import AgentkitToolsClient
+from agentkit.toolkit.cli.sandbox.agentkit_client import AgentkitToolsClient
 from agentkit.toolkit.cli.sandbox.cli_file import (
     _build_remote_extract_command,
     _create_sources_upload_archive,

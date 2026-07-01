@@ -21,8 +21,11 @@ import time
 import uuid
 from typing import Optional
 
-from agentkit.sdk.tools.client import AgentkitToolsClient
 from agentkit.sdk.tools import types as tools_types
+from agentkit.toolkit.cli.sandbox.agentkit_client import (
+    AgentkitToolsClient,
+    is_tip_agentkit_client,
+)
 from agentkit.toolkit.cli.sandbox.model_config import (
     ANTHROPIC_BASE_URL_ENV_KEYS,
     CODEX_CONFIG_TOML_ENV,
@@ -305,18 +308,21 @@ def _create_session(
     ttl: int,
     envs: Optional[list[tools_types.EnvsItemForCreateSession]] = None,
 ) -> dict[str, object]:
-    tool = client.get_tool(tools_types.GetToolRequest(tool_id=tool_id))
+    tos_mount_points = None
+    if not is_tip_agentkit_client(client):
+        tool = client.get_tool(tools_types.GetToolRequest(tool_id=tool_id))
+        tos_mount_points = build_session_tos_mount_points(
+            tool,
+            tool_id=tool_id,
+            session_id=session_id,
+        )
     request = tools_types.CreateSessionRequest(
         tool_id=tool_id,
         ttl=ttl,
         ttl_unit="second",
         user_session_id=session_id,
         envs=envs,
-        tos_mount_points=build_session_tos_mount_points(
-            tool,
-            tool_id=tool_id,
-            session_id=session_id,
-        ),
+        tos_mount_points=tos_mount_points,
     )
     try:
         response = client.create_session(request)

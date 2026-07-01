@@ -20,7 +20,7 @@ from typing import Optional
 
 import typer
 
-from agentkit.sdk.tools.client import AgentkitToolsClient
+from agentkit.toolkit.cli.sandbox.agentkit_client import AgentkitToolsClient
 from agentkit.toolkit.cli.sandbox.session_create import SANDBOX_TOOL_ID_ENV
 from agentkit.toolkit.cli.sandbox.session_sync import sync_remote_sessions
 from agentkit.toolkit.cli.sandbox.tool_resolve import SandboxToolType
@@ -92,11 +92,7 @@ def get_command(
         )
         raise typer.Exit(1)
 
-    if (
-        session_id
-        and resolved_tool_id
-        and result.get("tool_id") != resolved_tool_id
-    ):
+    if session_id and resolved_tool_id and result.get("tool_id") != resolved_tool_id:
         echo_json(
             _session_not_found_result(
                 session_id=session_id,

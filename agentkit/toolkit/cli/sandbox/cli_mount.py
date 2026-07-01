@@ -26,9 +26,9 @@ from urllib.request import urlopen
 
 import typer
 
-from agentkit.sdk.tools.client import AgentkitToolsClient
 from agentkit.utils.http_defaults import http_timeout
 from agentkit.sdk.tools import types as tools_types
+from agentkit.toolkit.cli.sandbox.agentkit_client import AgentkitToolsClient
 from agentkit.toolkit.cli.sandbox.session_create import SANDBOX_TOOL_ID_ENV
 from agentkit.toolkit.cli.sandbox.session_sync import sync_remote_sessions
 from agentkit.toolkit.cli.sandbox.sandbox_client import (
