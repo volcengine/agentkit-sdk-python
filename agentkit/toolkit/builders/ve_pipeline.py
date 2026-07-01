@@ -1088,6 +1088,11 @@ class VeCPCRBuilder(Builder):
             logger.info(f"File uploaded to TOS: {tos_url} (Region: {actual_region})")
             return tos_url, actual_region
 
+        except ValueError:
+            # Config errors (e.g. an unrendered {{template}} bucket name) are
+            # surfaced as-is per the documented contract, not masked as a
+            # generic upload failure.
+            raise
         except Exception as e:
             if "AccountDisable" in str(e):
                 from agentkit.platform import (

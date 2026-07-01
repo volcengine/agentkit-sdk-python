@@ -420,19 +420,14 @@ def test_unrendered_template_bucket_name_raises_value_error_before_service_use(
     # Inject an unrendered template AFTER construction to reach the L933 guard.
     config.tos_bucket = "{{agent_name}}-bucket"
 
-    # NOTE: latent bug -- the docstring advertises `Raises: ValueError` for an
-    # unrendered bucket name, and the guard at L933-936 does raise ValueError.
-    # But that raise happens INSIDE the outer try/except (L914/L1091), so the
-    # broad `except Exception` tail swallows the ValueError and re-raises it as
-    # a plain Exception wrapped with the generic "Failed to upload to TOS:"
-    # prefix (L1120). Callers can therefore never catch this specific failure
-    # as ValueError. We pin the ACTUAL current behavior.
-    with pytest.raises(Exception) as excinfo:
+    # After the fix: an `except ValueError: raise` clause precedes the broad
+    # `except Exception` tail, so the documented ValueError propagates unwrapped
+    # (rather than being masked as a generic "Failed to upload to TOS:"), and
+    # callers can catch this config error as ValueError per the docstring.
+    with pytest.raises(ValueError) as excinfo:
         builder._upload_to_tos(str(archive), config)
 
-    assert not isinstance(excinfo.value, ValueError)
     msg = str(excinfo.value)
-    assert msg.startswith("Failed to upload to TOS:")
     assert "unrendered template variables" in msg
     assert "{{agent_name}}-bucket" in msg
 

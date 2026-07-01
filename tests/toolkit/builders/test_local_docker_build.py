@@ -167,7 +167,9 @@ def test_python_happy_path_returns_image_info_and_calls_build_image(tmp_path):
     assert result.image.tag == "v1.2"
     assert result.image.digest == "sha256:deadbeefimageid"
     assert result.image.full_name == "my-repo:v1.2"
-    # build_logs echoes the raw string returned by build_image (see note below).
+    # build_logs is normalized to a list of lines (split from build_image's
+    # single log string) for a consistent BuildResult.build_logs contract.
+    assert isinstance(result.build_logs, list)
     assert "Successfully built abc123" in result.build_logs
     assert result.build_timestamp is not None
 

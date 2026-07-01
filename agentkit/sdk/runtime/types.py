@@ -579,6 +579,7 @@ class UpdateRuntimeRequest(RuntimeTypeBaseModel):
     apmplus_enable: Optional[bool] = Field(default=None, alias="ApmplusEnable")
     artifact_type: Optional[str] = Field(default=None, alias="ArtifactType")
     artifact_url: Optional[str] = Field(default=None, alias="ArtifactUrl")
+    client_token: Optional[str] = Field(default=None, alias="ClientToken")
     cpu_milli: Optional[int] = Field(default=None, alias="CpuMilli")
     description: Optional[str] = Field(default=None, alias="Description")
     knowledge_id: Optional[str] = Field(default=None, alias="KnowledgeId")

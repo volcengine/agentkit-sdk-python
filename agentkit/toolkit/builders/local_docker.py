@@ -393,6 +393,11 @@ class LocalDockerBuilder(Builder):
             success, build_logs, image_id = self.docker_manager.build_image(
                 **build_kwargs
             )
+            # build_image returns logs as a single string; BuildResult.build_logs
+            # is List[str] (the docker-unavailable path already splits), so
+            # normalize to a list of lines here for a consistent contract.
+            if isinstance(build_logs, str):
+                build_logs = build_logs.splitlines()
 
             if success:
                 self.reporter.success(

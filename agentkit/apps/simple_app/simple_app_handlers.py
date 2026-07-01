@@ -308,8 +308,9 @@ class PingHandler(BaseHandler):
         elif isinstance(result, dict):
             return result
         else:
+            func_name = getattr(self.func, "__name__", "<unknown>")
             logger.error(
-                f"Health check function {self.func.__name__} must return `dict` or `str` type."
+                f"Health check function {func_name} must return `dict` or `str` type."
             )
             return {"status": "error", "message": "Invalid response type."}
 
@@ -322,7 +323,7 @@ class AsyncTaskHandler(BaseHandler):
         self._task_counter_lock: threading.Lock = threading.Lock()
 
     @override
-    async def handle(self) -> Response:
+    async def handle(self, request: Request | None = None) -> Response:
         return Response()
 
     def get_async_task_info(self) -> dict[str, Any]:
