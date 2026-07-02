@@ -37,7 +37,7 @@ from agentkit.toolkit.cli.sandbox.sandbox_client import error
 
 SANDBOX_TOOL_STORE_PATH = Path(".agentkit") / "sandbox" / "tools.json"
 DEFAULT_SANDBOX_TOOL_TYPE = "CodeEnv"
-VALID_SANDBOX_TOOL_TYPES = ("CodeEnv", "SkillEnv")
+VALID_SANDBOX_TOOL_TYPES = ("CodeEnv", "SkillEnv", "CustomToolEnv")
 READY_TOOL_STATUS = "Ready"
 TOOL_NOT_FOUND_ERROR_CODE = "InvalidResource.NotFound"
 
@@ -45,6 +45,7 @@ TOOL_NOT_FOUND_ERROR_CODE = "InvalidResource.NotFound"
 class SandboxToolType(str, Enum):
     CODE_ENV = "CodeEnv"
     SKILL_ENV = "SkillEnv"
+    CUSTOM_TOOL_ENV = "CustomToolEnv"
 
 
 def normalize_tool_type(tool_type: str | SandboxToolType | None) -> str:

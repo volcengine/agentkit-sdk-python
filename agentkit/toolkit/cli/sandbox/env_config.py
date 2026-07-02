@@ -50,6 +50,108 @@ from agentkit.toolkit.cli.sandbox.model_config import (
 )
 
 DEFAULT_CREATE_TOOL_TYPE = "CodeEnv"
+CUSTOM_TOOL_ENV_TOOL_TYPE = "CustomToolEnv"
+CUSTOM_TOOL_ENV_OPENAPI_TOOL_TYPE = "Private"
+CUSTOM_TOOL_ENV_COMMAND = "/opt/gem/run.sh"
+CUSTOM_TOOL_ENV_PORT = 8080
+CUSTOM_TOOL_ENV_VARS = (
+    (
+        "PATH",
+        "/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:"
+        "/usr/sbin:/usr/bin:/sbin:/bin",
+    ),
+    ("DEBIAN_FRONTEND", "noninteractive"),
+    ("USER", "gem"),
+    ("USER_UID", "1000"),
+    ("USER_GID", "1000"),
+    ("DISPLAY", ":99.0"),
+    ("DISPLAY_WIDTH", "1280"),
+    ("DISPLAY_HEIGHT", "1024"),
+    ("DISPLAY_DEPTH", "24"),
+    ("XDG_RUNTIME_DIR", "/tmp/runtime-gem"),
+    ("BROWSER_EXECUTABLE_PATH", "/usr/local/bin/browser"),
+    ("BROWSER_REMOTE_DEBUGGING_PORT", "9222"),
+    (
+        "BROWSER_COMMANDLINE_ARGS",
+        "--disable-backgrounding-occluded-windows     "
+        "--disable-background-timer-throttling     "
+        "--disable-blink-features=AutomationControlled     "
+        "--disable-dev-shm-usage     "
+        "--disable-external-intent-requests     "
+        "--disable-features=IPH_DesktopCustomizeChrome,IsolateOrigins,"
+        "site-per-proces,Translate     "
+        "--disable-focus-on-load     "
+        "--disable-gpu     "
+        "--disable-infobars     "
+        "--disable-popup-blocking     "
+        "--disable-prompt-on-repost     "
+        "--disable-renderer-backgrounding     "
+        "--disable-site-isolation-trials     "
+        "--disable-web-security     "
+        "--disable-window-activation     "
+        "--mute-audio     "
+        "--no-default-browser-check     "
+        "--no-first-run     "
+        "--noerrdialogs     "
+        "--remote-allow-origins=*     "
+        "--remote-debugging-port=9222     "
+        "--suppress-message-center-popups     "
+        "--start-maximized",
+    ),
+    ("BROWSER_EXTRA_ARGS", ""),
+    ("DNS_OVER_HTTPS_TEMPLATES", ""),
+    ("LOG_DIR", "/var/log/gem"),
+    ("JWT_PUBLIC_KEY", ""),
+    ("VNC_SERVER_PORT", "5900"),
+    ("WEBSOCKET_PROXY_PORT", "6080"),
+    ("GEM_SERVER_PORT", "8088"),
+    ("MCP_SERVER_PORT", "8089"),
+    ("PUBLIC_PORT", "8080"),
+    ("AUTH_BACKEND_PORT", "8081"),
+    ("WAIT_PORTS", "8091"),
+    ("WAIT_TIMEOUT", "300"),
+    ("WAIT_INTERVAL", "0.25"),
+    ("RUN_HOOK_INIT", ""),
+    ("RUN_HOOK_PRE_SERVICES", ""),
+    ("RUN_HOOK_POST_READY", ""),
+    ("RUN_HOOKS_STRICT", "false"),
+    ("SANDBOX_SRV_PORT", "8091"),
+    ("JUPYTER_LAB_PORT", "8888"),
+    ("CODE_SERVER_PORT", "8200"),
+    ("MCP_SERVER_BROWSER_PORT", "8100"),
+    ("TINYPROXY_PORT", "8118"),
+    ("MAX_SHELL_SESSIONS", "50"),
+    ("PYTHONPATH", ""),
+    ("LOG_TOOL_TRACE", "false"),
+    ("LANG", "en_US.UTF-8"),
+    ("LANGUAGE", "en_US:en"),
+    ("LC_ALL", "en_US.UTF-8"),
+    ("PUPPETEER_EXECUTABLE_PATH", "/usr/local/bin/browser"),
+    ("PUPPETEER_SKIP_CHROMIUM_DOWNLOAD", "true"),
+    ("BROWSER_NO_SANDBOX", ""),
+    ("BROWSER_LANG", "en-US"),
+    (
+        "BROWSER_USER_AGENT",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/140.0.0.0 Safari/537.36",
+    ),
+    ("UV_TOOL_BIN_DIR", "/usr/local/bin/"),
+    ("UV_TOOL_DIR", "/usr/local/share/uv/tools"),
+    ("DISABLE_JUPYTER", "false"),
+    ("DISABLE_CODE_SERVER", "false"),
+    ("EXTRA_MCP_SERVERS", ""),
+    ("OTEL_SDK_DISABLED", "false"),
+    (
+        "SRV_PYTHONPATH",
+        "/otel-auto-instrumentation-python/opentelemetry/instrumentation/"
+        "auto_instrumentation:/otel-auto-instrumentation-python",
+    ),
+    ("OTEL_PYTHON_DISABLED_INSTRUMENTATIONS", "redis"),
+    ("FAAS_SANDBOX_RUNTIME_INJECTION_ENABLE_SANDBOXD", "false"),
+    ("PYTHON_CODE_EXEC_VERSION", "python3"),
+    ("GO_PATH", "/usr/local/go"),
+)
 DISABLED_SERVICE_ENV_KEYS = (
     "DISABLE_JUPYTER",
     "DISABLE_CODE_SERVER",
@@ -317,6 +419,39 @@ def build_create_tool_envs(
                     ),
                 )
     return bundle.to_create_tool_envs()
+
+
+def build_custom_tool_envs(
+    *,
+    model_name: Optional[str] = None,
+    model_api_key: Optional[str] = None,
+    model_provider: str | ModelProviderType | None = None,
+    model_base_url: Optional[str] = None,
+    model_provider_was_provided: Optional[bool] = None,
+    model_base_url_was_provided: Optional[bool] = None,
+    websearch_apikey: Optional[str] = None,
+) -> list[tools_types.EnvsItemForCreateTool]:
+    """Build CreateTool.Envs for CustomToolEnv plus CodeEnv-only envs."""
+
+    envs = [
+        tools_types.EnvsItemForCreateTool(Key=key, Value=value)
+        for key, value in CUSTOM_TOOL_ENV_VARS
+    ]
+    custom_tool_env_keys = {key for key, _value in CUSTOM_TOOL_ENV_VARS}
+    code_envs = build_create_tool_envs(
+        tool_type=DEFAULT_CREATE_TOOL_TYPE,
+        model_name=model_name,
+        model_api_key=model_api_key,
+        model_provider=model_provider,
+        model_base_url=model_base_url,
+        model_provider_was_provided=model_provider_was_provided,
+        model_base_url_was_provided=model_base_url_was_provided,
+        websearch_apikey=websearch_apikey,
+    )
+    for env in code_envs or []:
+        if env.key not in custom_tool_env_keys:
+            envs.append(env)
+    return envs
 
 
 def build_exec_session_envs(

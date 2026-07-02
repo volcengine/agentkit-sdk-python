@@ -572,6 +572,66 @@ def test_build_create_tool_request_skips_tos_mount_without_bucket(monkeypatch):
     assert request.tos_mount_config is None
 
 
+def test_build_create_tool_request_translates_custom_tool_env_to_private(monkeypatch):
+    from agentkit.toolkit.cli.sandbox import cli_create
+    from agentkit.toolkit.cli.sandbox.env_config import (
+        CUSTOM_TOOL_ENV_COMMAND,
+        CUSTOM_TOOL_ENV_VARS,
+    )
+
+    _reset_fake_tools_client()
+    monkeypatch.delenv("MODEL_API_KEY", raising=False)
+    monkeypatch.setattr(cli_create, "TOSService", _FakeTOSService)
+
+    request = cli_create._build_create_tool_request(
+        tool_type="CustomToolEnv",
+        name="demo-tool",
+        tos_bucket=None,
+        tos_region="cn-beijing",
+        image_url="registry.example.com/custom-image:latest",
+        model_name="ignored-model",
+        **{"model_" + "api_key": _PLACEHOLDER_MODEL_VALUE},
+    )
+
+    assert request.tool_type == "Private"
+    assert request.image_url == "registry.example.com/custom-image:latest"
+    assert request.command == CUSTOM_TOOL_ENV_COMMAND
+    assert request.port == 8080
+    assert request.tos_mount_config is None
+    env_map = {item.key: item.value for item in request.envs}
+    assert [
+        (item.key, item.value)
+        for item in request.envs[: len(CUSTOM_TOOL_ENV_VARS)]
+    ] == list(CUSTOM_TOOL_ENV_VARS)
+    env_keys = set(env_map)
+    assert "ABC" not in env_keys
+    assert env_map["OPENCODE_MODEL"] == "ignored-model"
+    assert env_map["CODEX_MODEL"] == "ignored-model"
+    assert env_map["ANTHROPIC_MODEL"] == "ignored-model"
+    assert env_map["CODEX_API_KEY"] == _PLACEHOLDER_MODEL_VALUE
+    assert env_map["CODEX_BASE_URL"] == "https://ark.cn-beijing.volces.com/api/v3"
+    assert "CODEX_CONFIG_TOML" in env_map
+    assert "CODEX_MODEL_CATALOG_JSON" in env_map
+    assert env_map["DISABLE_JUPYTER"] == "false"
+    assert env_map["DISABLE_CODE_SERVER"] == "false"
+    assert env_map["BROWSER_EXTRA_ARGS"] == ""
+
+
+def test_build_create_tool_request_requires_image_url_for_custom_tool_env(monkeypatch):
+    from agentkit.toolkit.cli.sandbox import cli_create
+
+    _reset_fake_tools_client()
+    monkeypatch.setattr(cli_create, "TOSService", _FakeTOSService)
+
+    with pytest.raises(cli_create.typer.Exit):
+        cli_create._build_create_tool_request(
+            tool_type="CustomToolEnv",
+            name="demo-tool",
+            tos_bucket=None,
+            tos_region="cn-beijing",
+        )
+
+
 def test_build_create_tool_request_derives_memory_from_cpu(monkeypatch):
     from agentkit.toolkit.cli.sandbox import cli_create
 
@@ -588,6 +648,46 @@ def test_build_create_tool_request_derives_memory_from_cpu(monkeypatch):
 
     assert request.cpu_milli == 8000
     assert request.memory_mb == 16384
+
+
+def test_create_command_translates_custom_tool_env_and_caches_cli_type(
+    monkeypatch,
+    tool_store_path,
+):
+    from agentkit.toolkit.cli.cli import app
+    from agentkit.toolkit.cli.sandbox import cli_create
+
+    _reset_fake_tools_client()
+    monkeypatch.setattr(cli_create, "AgentkitToolsClient", _FakeToolsClient)
+    monkeypatch.setattr(cli_create, "TOSService", _FakeTOSService)
+
+    result = runner.invoke(
+        app,
+        [
+            "sandbox",
+            "create",
+            "--tool-type",
+            "CustomToolEnv",
+            "--tool-name",
+            "demo-aio",
+            "--image-url",
+            "registry.example.com/custom-image:latest",
+        ],
+    )
+
+    assert result.exit_code == 0
+    request = _FakeToolsClient.last_request
+    assert request.tool_type == "Private"
+    assert request.command == "/opt/gem/run.sh"
+    assert request.image_url == "registry.example.com/custom-image:latest"
+    assert request.port == 8080
+    tool_store = json.loads(tool_store_path.read_text(encoding="utf-8"))
+    assert tool_store["CustomToolEnv"] == {
+        "ToolId": "t-created",
+        "Name": "demo-tool",
+        "Status": "Ready",
+        "ToolType": "CustomToolEnv",
+    }
 
 
 def test_build_create_tool_request_adds_model_envs(monkeypatch):
