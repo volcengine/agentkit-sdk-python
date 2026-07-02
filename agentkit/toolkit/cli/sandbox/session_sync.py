@@ -18,8 +18,8 @@ from __future__ import annotations
 
 from typing import Optional
 
-from agentkit.sdk.tools.client import AgentkitToolsClient
 from agentkit.sdk.tools import types as tools_types
+from agentkit.toolkit.cli.sandbox.agentkit_client import AgentkitToolsClient
 from agentkit.toolkit.cli.sandbox.tool_resolve import (
     SandboxToolType,
     resolve_existing_sandbox_tool_id,

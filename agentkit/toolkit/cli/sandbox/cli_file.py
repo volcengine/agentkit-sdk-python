@@ -29,7 +29,7 @@ import uuid
 import requests
 import typer
 
-from agentkit.sdk.tools.client import AgentkitToolsClient
+from agentkit.toolkit.cli.sandbox.agentkit_client import AgentkitToolsClient
 from agentkit.toolkit.cli.sandbox.session_create import SANDBOX_TOOL_ID_ENV
 from agentkit.toolkit.cli.sandbox.session_sync import sync_remote_sessions
 from agentkit.toolkit.cli.sandbox.tool_resolve import SandboxToolType

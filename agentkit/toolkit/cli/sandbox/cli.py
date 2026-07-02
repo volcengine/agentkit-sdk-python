@@ -22,6 +22,7 @@ from agentkit.toolkit.cli.sandbox.cli_create import create_command
 from agentkit.toolkit.cli.sandbox.cli_exec import exec_command
 from agentkit.toolkit.cli.sandbox.cli_file import file_command
 from agentkit.toolkit.cli.sandbox.cli_get import get_command
+from agentkit.toolkit.cli.sandbox.cli_invoke import invoke_command
 from agentkit.toolkit.cli.sandbox.cli_model_login import codex_login_command
 from agentkit.toolkit.cli.sandbox.cli_mount import mount_command
 from agentkit.toolkit.cli.sandbox.cli_run import run_command
@@ -44,6 +45,10 @@ sandbox_app.command(
     name="exec",
     context_settings={"allow_extra_args": True},
 )(exec_command)
+sandbox_app.command(
+    name="invoke",
+    context_settings={"allow_extra_args": True},
+)(invoke_command)
 sandbox_app.command(name="run")(run_command)
 sandbox_app.command(
     name="shell",

@@ -22,8 +22,11 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional
 
-from agentkit.sdk.tools.client import AgentkitToolsClient
 from agentkit.sdk.tools import types as tools_types
+from agentkit.toolkit.cli.sandbox.agentkit_client import (
+    AgentkitToolsClient,
+    is_tip_agentkit_client,
+)
 from agentkit.toolkit.cli.sandbox.model_config import (
     ANTHROPIC_BASE_URL_ENV_KEYS,
     MODEL_BASE_URL_ENV_KEYS,
@@ -222,6 +225,9 @@ def _validate_existing_tool_id(
     tool_type: str | SandboxToolType | None,
     save_result: bool = False,
 ) -> str:
+    if is_tip_agentkit_client(client):
+        return tool_id
+
     try:
         response = client.get_tool(tools_types.GetToolRequest(tool_id=tool_id))
     except Exception as exc:
@@ -492,6 +498,11 @@ def resolve_sandbox_tool_id(
         return resolved_tool_id
 
     resolved_tool_type = normalize_tool_type(tool_type)
+    if is_tip_agentkit_client(client):
+        error(
+            "TIP sandbox auth requires an existing sandbox tool ID. "
+            f"Set --tool-id or {env_var_name}."
+        )
     return _create_tool(resolved_tool_type)
 
 
@@ -535,6 +546,9 @@ def resolve_existing_sandbox_tool_id(
             tool_type=resolved_tool_type,
             save_result=True,
         )
+
+    if is_tip_agentkit_client(client):
+        return None
 
     listed_tool_id = _list_first_tool(client, resolved_tool_type)
     if listed_tool_id:
