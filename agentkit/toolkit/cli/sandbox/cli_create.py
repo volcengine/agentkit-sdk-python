@@ -26,28 +26,15 @@ import typer
 from agentkit.platform import VolcConfiguration
 from agentkit.sdk.tools.client import AgentkitToolsClient
 from agentkit.sdk.tools import types as tools_types
+from agentkit.toolkit.cli.sandbox.env_config import (
+    DEFAULT_CREATE_TOOL_TYPE,
+    build_create_tool_envs,
+)
 from agentkit.toolkit.cli.sandbox.model_config import (
-    ANTHROPIC_BASE_URL_ENV_KEYS,
-    CODE_ENV_CODEX_HOME,
-    CODE_ENV_HOME,
-    CODEX_CONFIG_TOML_ENV,
-    CODEX_MODEL_CATALOG_JSON_ENV,
     ModelProviderType,
-    MODEL_API_KEY_ENV,
-    MODEL_API_KEY_ENV_KEYS,
-    MODEL_BASE_URL_ENV_KEYS,
-    MODEL_NAME_ENV_KEYS,
-    MODEL_PROVIDER_ENV,
     infer_model_provider_from_base_url,
     normalize_model_base_url,
     normalize_model_provider,
-    resolve_model_base_urls,
-    resolve_model_name,
-    should_emit_codex_model_catalog,
-    should_emit_codex_model_config,
-    validate_model_provider_base_url,
-    build_codex_config_toml as _shared_build_codex_config_toml,
-    build_codex_model_catalog_json as _shared_build_codex_model_catalog_json,
 )
 from agentkit.toolkit.cli.sandbox.tool_resolve import save_tool_result
 from agentkit.toolkit.cli.sandbox.tos_config import (
@@ -63,21 +50,9 @@ from agentkit.utils.misc import generate_apikey_name, generate_random_id
 
 SANDBOX_REGION_ENV = "AGENTKIT_SANDBOX_REGION"
 SANDBOX_TOS_REGION_ENV = "AGENTKIT_SANDBOX_TOS_REGION"
-DEFAULT_CREATE_TOOL_TYPE = "CodeEnv"
 DEFAULT_CPU = 4
 VALID_CPU_VALUES = (2, 4, 8, 16)
 MEMORY_MB_PER_CPU = 2048
-DISABLED_SERVICE_ENV_KEYS = (
-    "DISABLE_JUPYTER",
-    "DISABLE_CODE_SERVER",
-    "DISABLE_NODEJS_REPL",
-)
-BROWSER_EXTRA_ARGS_ENV = "BROWSER_EXTRA_ARGS"
-DEFAULT_BROWSER_EXTRA_ARGS = (
-    "--enable-unsafe-swiftshader --use-gl=angle "
-    "--use-angle=swiftshader-webgl --ignore-gpu-blocklist"
-)
-WEB_SEARCH_API_KEY_ENV = "WEB_SEARCH_API_KEY"
 SKILL_ROLE_NAME_OPTION = "--skill-role-name"
 TOOL_READY_STATUS = "Ready"
 TOOL_FAILED_STATUSES = {"Error", "Failed", "CreateFailed", "Deleting", "Deleted"}
@@ -109,140 +84,6 @@ def _validate_cpu(value: int) -> int:
 def _cpu_to_resource_shape(cpu: int) -> tuple[int, int]:
     resolved_cpu = _validate_cpu(cpu)
     return resolved_cpu * 1000, resolved_cpu * MEMORY_MB_PER_CPU
-
-
-def _append_tool_envs(
-    envs: list[tools_types.EnvsItemForCreateTool],
-    keys: tuple[str, ...],
-    value: Optional[str],
-) -> None:
-    resolved = (value or "").strip()
-    if not resolved:
-        return
-
-    envs.extend(
-        tools_types.EnvsItemForCreateTool(Key=key, Value=resolved) for key in keys
-    )
-
-
-def _build_codex_config_toml(
-    model_name: str,
-    model_provider: str | ModelProviderType | None = None,
-    model_base_url: Optional[str] = None,
-) -> str:
-    return _shared_build_codex_config_toml(model_name, model_provider, model_base_url)
-
-
-def _build_codex_model_catalog_json(
-    model_name: str,
-    model_provider: str | ModelProviderType | None = None,
-) -> str:
-    return _shared_build_codex_model_catalog_json(model_name, model_provider)
-
-
-def _append_code_env_tool_envs(
-    envs: list[tools_types.EnvsItemForCreateTool],
-    model_name: str,
-    model_provider: str | ModelProviderType | None,
-    model_base_url: Optional[str],
-    *,
-    include_codex_model_config: bool = True,
-) -> None:
-    code_envs = [
-        tools_types.EnvsItemForCreateTool(
-            Key="OPENCODE_DISABLE_AUTOUPDATE",
-            Value="1",
-        ),
-        tools_types.EnvsItemForCreateTool(
-            Key="HOME",
-            Value=CODE_ENV_HOME,
-        ),
-        tools_types.EnvsItemForCreateTool(
-            Key="CODEX_HOME",
-            Value=CODE_ENV_CODEX_HOME,
-        ),
-    ]
-    if include_codex_model_config:
-        code_envs.append(
-            tools_types.EnvsItemForCreateTool(
-                Key=CODEX_CONFIG_TOML_ENV,
-                Value=_build_codex_config_toml(
-                    model_name,
-                    model_provider,
-                    model_base_url,
-                ),
-            )
-        )
-        if should_emit_codex_model_catalog(model_provider):
-            code_envs.append(
-                tools_types.EnvsItemForCreateTool(
-                    Key=CODEX_MODEL_CATALOG_JSON_ENV,
-                    Value=_build_codex_model_catalog_json(model_name, model_provider),
-                )
-            )
-    envs.extend(code_envs)
-
-
-def _build_tool_model_envs(
-    *,
-    tool_type: str,
-    model_name: Optional[str] = None,
-    model_api_key: Optional[str] = None,
-    model_provider: str | ModelProviderType | None = None,
-    model_base_url: Optional[str] = None,
-    model_provider_was_provided: Optional[bool] = None,
-    model_base_url_was_provided: Optional[bool] = None,
-    websearch_apikey: Optional[str] = None,
-) -> list[tools_types.EnvsItemForCreateTool] | None:
-    envs: list[tools_types.EnvsItemForCreateTool] = []
-    validate_model_provider_base_url(
-        model_provider=model_provider,
-        model_base_url=model_base_url,
-        model_provider_was_provided=model_provider_was_provided,
-        model_base_url_was_provided=model_base_url_was_provided,
-    )
-    resolved_model_base_url = normalize_model_base_url(model_base_url)
-    effective_model_provider = model_provider or infer_model_provider_from_base_url(
-        resolved_model_base_url
-    )
-    resolved_model_provider = normalize_model_provider(effective_model_provider)
-    resolved_model_name = resolve_model_name(model_name, resolved_model_provider)
-    resolved_base_url, resolved_anthropic_base_url = resolve_model_base_urls(
-        model_provider=resolved_model_provider,
-        model_base_url=resolved_model_base_url,
-    )
-    resolved_model_api_key = model_api_key or os.getenv(MODEL_API_KEY_ENV)
-    _append_tool_envs(envs, (MODEL_PROVIDER_ENV,), resolved_model_provider)
-    _append_tool_envs(envs, MODEL_NAME_ENV_KEYS, resolved_model_name)
-    _append_tool_envs(envs, MODEL_API_KEY_ENV_KEYS, resolved_model_api_key)
-    _append_tool_envs(
-        envs,
-        MODEL_BASE_URL_ENV_KEYS,
-        resolved_base_url,
-    )
-    _append_tool_envs(
-        envs,
-        ANTHROPIC_BASE_URL_ENV_KEYS,
-        resolved_anthropic_base_url,
-    )
-    _append_tool_envs(envs, DISABLED_SERVICE_ENV_KEYS, "true")
-    _append_tool_envs(envs, (BROWSER_EXTRA_ARGS_ENV,), DEFAULT_BROWSER_EXTRA_ARGS)
-    _append_tool_envs(envs, (WEB_SEARCH_API_KEY_ENV,), websearch_apikey)
-    if tool_type.strip() == DEFAULT_CREATE_TOOL_TYPE:
-        _append_code_env_tool_envs(
-            envs,
-            resolved_model_name,
-            resolved_model_provider,
-            resolved_model_base_url,
-            include_codex_model_config=(
-                bool(resolved_model_name)
-                and should_emit_codex_model_config(
-                    model_provider=resolved_model_provider,
-                    model_base_url=resolved_model_base_url,
-                )
-            ),
-        )
-    return envs or None
 
 
 def _build_create_tool_request(
@@ -290,7 +131,7 @@ def _build_create_tool_request(
             EnablePrivateNetwork=False,
         ),
         TosMountConfig=tos_mount_config,
-        Envs=_build_tool_model_envs(
+        Envs=build_create_tool_envs(
             tool_type=resolved_tool_type,
             model_name=model_name,
             model_api_key=model_api_key,

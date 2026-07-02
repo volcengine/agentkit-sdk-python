@@ -26,26 +26,9 @@ from agentkit.toolkit.cli.sandbox.agentkit_client import (
     AgentkitToolsClient,
     is_tip_agentkit_client,
 )
-from agentkit.toolkit.cli.sandbox.model_config import (
-    ANTHROPIC_BASE_URL_ENV_KEYS,
-    CODEX_CONFIG_TOML_ENV,
-    CODEX_MODEL_CATALOG_JSON_ENV,
-    MODEL_API_KEY_ENV,
-    MODEL_API_KEY_ENV_KEYS,
-    MODEL_BASE_URL_ENV_KEYS,
-    MODEL_NAME_ENV_KEYS,
-    MODEL_PROVIDER_ENV,
-    ModelProviderType,
-    build_codex_config_toml,
-    build_codex_model_catalog_json,
-    infer_model_provider_from_base_url,
-    normalize_model_base_url,
-    normalize_optional_model_provider,
-    resolve_model_base_urls,
-    resolve_model_name,
-    should_emit_codex_model_catalog,
-    should_emit_codex_model_config,
-    validate_model_provider_base_url,
+from agentkit.toolkit.cli.sandbox.env_config import (
+    WEB_SEARCH_API_KEY_ENV as _WEB_SEARCH_API_KEY_ENV,
+    build_exec_session_envs,
 )
 from agentkit.toolkit.cli.sandbox.session_sync import (
     session_info_to_result,
@@ -65,128 +48,16 @@ from agentkit.toolkit.cli.sandbox.sandbox_client import (
 DEFAULT_SANDBOX_TTL = 28800
 SANDBOX_TOOL_ID_ENV = "AGENTKIT_SANDBOX_TOOL_ID"
 SANDBOX_TTL_ENV = "AGENTKIT_SANDBOX_TTL"
-WEB_SEARCH_API_KEY_ENV = "WEB_SEARCH_API_KEY"
+WEB_SEARCH_API_KEY_ENV = _WEB_SEARCH_API_KEY_ENV
 CREATE_SESSION_START_FAIL_CODE = "ErrCreateSessionFail"
 CREATE_SESSION_CONFIRM_ATTEMPTS = 6
 CREATE_SESSION_CONFIRM_INTERVAL_SECONDS = 5
 CREATE_SESSION_READY_STATUS = "ready"
 
 
-def _append_envs(
-    envs: list[tools_types.EnvsItemForCreateSession],
-    keys: tuple[str, ...],
-    value: Optional[str],
-) -> None:
-    resolved = (value or "").strip()
-    if not resolved:
-        return
-
-    envs.extend(
-        tools_types.EnvsItemForCreateSession(key=key, value=resolved) for key in keys
-    )
-
-
-def _append_codex_config_envs(
-    envs: list[tools_types.EnvsItemForCreateSession],
-    model_name: Optional[str],
-    model_provider: str | ModelProviderType | None,
-    model_base_url: Optional[str],
-) -> None:
-    resolved_model_name = (model_name or "").strip()
-    if not resolved_model_name:
-        return
-
-    envs.append(
-        tools_types.EnvsItemForCreateSession(
-            key=CODEX_CONFIG_TOML_ENV,
-            value=build_codex_config_toml(
-                resolved_model_name,
-                model_provider,
-                model_base_url,
-            ),
-        )
-    )
-    if should_emit_codex_model_catalog(model_provider):
-        envs.append(
-            tools_types.EnvsItemForCreateSession(
-                key=CODEX_MODEL_CATALOG_JSON_ENV,
-                value=build_codex_model_catalog_json(
-                    resolved_model_name,
-                    model_provider,
-                ),
-            )
-        )
-
-
-def build_model_envs(
-    *,
-    model_name: Optional[str] = None,
-    model_api_key: Optional[str] = None,
-    model_provider: str | ModelProviderType | None = None,
-    model_base_url: Optional[str] = None,
-    model_provider_was_provided: Optional[bool] = None,
-    model_base_url_was_provided: Optional[bool] = None,
-    include_codex_config: bool = False,
-    disable_websearch_apikey: bool = False,
-) -> list[tools_types.EnvsItemForCreateSession] | None:
-    envs: list[tools_types.EnvsItemForCreateSession] = []
-    validate_model_provider_base_url(
-        model_provider=model_provider,
-        model_base_url=model_base_url,
-        model_provider_was_provided=model_provider_was_provided,
-        model_base_url_was_provided=model_base_url_was_provided,
-    )
-    resolved_model_base_url = normalize_model_base_url(model_base_url)
-    effective_model_provider = model_provider or infer_model_provider_from_base_url(
-        resolved_model_base_url
-    )
-    resolved_model_provider = normalize_optional_model_provider(
-        effective_model_provider
-    )
-    resolved_model_name = (
-        resolve_model_name(model_name, resolved_model_provider)
-        if resolved_model_provider
-        else (model_name or "").strip()
-    )
-    resolved_base_url, resolved_anthropic_base_url = (
-        resolve_model_base_urls(
-            model_provider=resolved_model_provider,
-            model_base_url=resolved_model_base_url,
-        )
-        if resolved_model_provider or resolved_model_base_url
-        else (None, None)
-    )
-    resolved_model_api_key = model_api_key or os.getenv(MODEL_API_KEY_ENV)
-    _append_envs(envs, (MODEL_PROVIDER_ENV,), resolved_model_provider)
-    _append_envs(envs, MODEL_NAME_ENV_KEYS, resolved_model_name)
-    if resolved_base_url:
-        _append_envs(envs, MODEL_BASE_URL_ENV_KEYS, resolved_base_url)
-    if resolved_anthropic_base_url:
-        _append_envs(
-            envs,
-            ANTHROPIC_BASE_URL_ENV_KEYS,
-            resolved_anthropic_base_url,
-        )
-    if (
-        include_codex_config
-        and resolved_model_name
-        and should_emit_codex_model_config(
-            model_provider=resolved_model_provider,
-            model_base_url=resolved_model_base_url,
-        )
-    ):
-        _append_codex_config_envs(
-            envs,
-            resolved_model_name,
-            resolved_model_provider,
-            resolved_model_base_url,
-        )
-    _append_envs(envs, MODEL_API_KEY_ENV_KEYS, resolved_model_api_key)
-    if disable_websearch_apikey:
-        envs.append(
-            tools_types.EnvsItemForCreateSession(key=WEB_SEARCH_API_KEY_ENV, value="")
-        )
-    return envs or None
+def build_model_envs(**kwargs):
+    """Backward-compatible wrapper for the exec session env profile."""
+    return build_exec_session_envs(**kwargs)
 
 
 def _resolve_ttl(ttl: Optional[int]) -> int:
