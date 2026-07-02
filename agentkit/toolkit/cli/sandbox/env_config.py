@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+from dataclasses import dataclass
 import json
 import os
 from pathlib import Path
@@ -177,6 +178,86 @@ class EnvBundle:
         ]
 
 
+@dataclass(frozen=True)
+class ResolvedSandboxModelEnv:
+    provider: str | None
+    model_name: str | None
+    base_url: str | None
+    anthropic_base_url: str | None
+    api_key: str | None
+    model_base_url: str | None
+
+
+def _resolve_sandbox_model_env(
+    *,
+    model_name: Optional[str],
+    model_api_key: Optional[str],
+    model_provider: str | ModelProviderType | None,
+    model_base_url: Optional[str],
+    model_provider_was_provided: Optional[bool],
+    model_base_url_was_provided: Optional[bool],
+    require_provider: bool,
+) -> ResolvedSandboxModelEnv:
+    validate_model_provider_base_url(
+        model_provider=model_provider,
+        model_base_url=model_base_url,
+        model_provider_was_provided=model_provider_was_provided,
+        model_base_url_was_provided=model_base_url_was_provided,
+    )
+    resolved_model_base_url = normalize_model_base_url(model_base_url)
+    effective_model_provider = model_provider or infer_model_provider_from_base_url(
+        resolved_model_base_url
+    )
+    resolved_model_provider = (
+        normalize_model_provider(effective_model_provider)
+        if require_provider
+        else normalize_optional_model_provider(effective_model_provider)
+    )
+    resolved_model_name = (
+        resolve_model_name(model_name, resolved_model_provider)
+        if resolved_model_provider
+        else (model_name or "").strip()
+    )
+    should_resolve_urls = bool(
+        require_provider or resolved_model_provider or resolved_model_base_url
+    )
+    resolved_base_url, resolved_anthropic_base_url = (
+        resolve_model_base_urls(
+            model_provider=resolved_model_provider,
+            model_base_url=resolved_model_base_url,
+        )
+        if should_resolve_urls
+        else (None, None)
+    )
+    return ResolvedSandboxModelEnv(
+        provider=resolved_model_provider,
+        model_name=resolved_model_name,
+        base_url=resolved_base_url,
+        anthropic_base_url=resolved_anthropic_base_url,
+        api_key=model_api_key or os.getenv(MODEL_API_KEY_ENV),
+        model_base_url=resolved_model_base_url,
+    )
+
+
+def _append_standard_model_envs(
+    bundle: EnvBundle,
+    resolved: ResolvedSandboxModelEnv,
+    *,
+    include_base_urls: bool,
+    include_api_key: bool,
+    api_key_before_base_urls: bool = False,
+) -> None:
+    bundle.add_many((MODEL_PROVIDER_ENV,), resolved.provider)
+    bundle.add_many(MODEL_NAME_ENV_KEYS, resolved.model_name)
+    if include_api_key and api_key_before_base_urls:
+        bundle.add_many(MODEL_API_KEY_ENV_KEYS, resolved.api_key)
+    if include_base_urls:
+        bundle.add_many(MODEL_BASE_URL_ENV_KEYS, resolved.base_url)
+        bundle.add_many(ANTHROPIC_BASE_URL_ENV_KEYS, resolved.anthropic_base_url)
+    if include_api_key and not api_key_before_base_urls:
+        bundle.add_many(MODEL_API_KEY_ENV_KEYS, resolved.api_key)
+
+
 def build_create_tool_envs(
     *,
     tool_type: str,
@@ -191,29 +272,22 @@ def build_create_tool_envs(
     """Build CreateTool.Envs for the sandbox create profile."""
 
     bundle = EnvBundle()
-    validate_model_provider_base_url(
+    resolved = _resolve_sandbox_model_env(
+        model_name=model_name,
+        model_api_key=model_api_key,
         model_provider=model_provider,
         model_base_url=model_base_url,
         model_provider_was_provided=model_provider_was_provided,
         model_base_url_was_provided=model_base_url_was_provided,
+        require_provider=True,
     )
-    resolved_model_base_url = normalize_model_base_url(model_base_url)
-    effective_model_provider = model_provider or infer_model_provider_from_base_url(
-        resolved_model_base_url
+    _append_standard_model_envs(
+        bundle,
+        resolved,
+        include_base_urls=True,
+        include_api_key=True,
+        api_key_before_base_urls=True,
     )
-    resolved_model_provider = normalize_model_provider(effective_model_provider)
-    resolved_model_name = resolve_model_name(model_name, resolved_model_provider)
-    resolved_base_url, resolved_anthropic_base_url = resolve_model_base_urls(
-        model_provider=resolved_model_provider,
-        model_base_url=resolved_model_base_url,
-    )
-    resolved_model_api_key = model_api_key or os.getenv(MODEL_API_KEY_ENV)
-
-    bundle.add_many((MODEL_PROVIDER_ENV,), resolved_model_provider)
-    bundle.add_many(MODEL_NAME_ENV_KEYS, resolved_model_name)
-    bundle.add_many(MODEL_API_KEY_ENV_KEYS, resolved_model_api_key)
-    bundle.add_many(MODEL_BASE_URL_ENV_KEYS, resolved_base_url)
-    bundle.add_many(ANTHROPIC_BASE_URL_ENV_KEYS, resolved_anthropic_base_url)
     bundle.add_many(DISABLED_SERVICE_ENV_KEYS, "true")
     bundle.add(BROWSER_EXTRA_ARGS_ENV, DEFAULT_BROWSER_EXTRA_ARGS)
     bundle.add(WEB_SEARCH_API_KEY_ENV, websearch_apikey)
@@ -222,24 +296,24 @@ def build_create_tool_envs(
         bundle.add("OPENCODE_DISABLE_AUTOUPDATE", "1")
         bundle.add("HOME", CODE_ENV_HOME)
         bundle.add("CODEX_HOME", CODE_ENV_CODEX_HOME)
-        if resolved_model_name and should_emit_codex_model_config(
-            model_provider=resolved_model_provider,
-            model_base_url=resolved_model_base_url,
+        if resolved.model_name and should_emit_codex_model_config(
+            model_provider=resolved.provider,
+            model_base_url=resolved.model_base_url,
         ):
             bundle.add(
                 CODEX_CONFIG_TOML_ENV,
                 build_codex_config_toml(
-                    resolved_model_name,
-                    resolved_model_provider,
-                    resolved_model_base_url,
+                    resolved.model_name,
+                    resolved.provider,
+                    resolved.model_base_url,
                 ),
             )
-            if should_emit_codex_model_catalog(resolved_model_provider):
+            if should_emit_codex_model_catalog(resolved.provider):
                 bundle.add(
                     CODEX_MODEL_CATALOG_JSON_ENV,
                     build_codex_model_catalog_json(
-                        resolved_model_name,
-                        resolved_model_provider,
+                        resolved.model_name,
+                        resolved.provider,
                     ),
                 )
     return bundle.to_create_tool_envs()
@@ -259,65 +333,46 @@ def build_exec_session_envs(
     """Build CreateSession.Envs for the exec/shell CodeEnv profile."""
 
     bundle = EnvBundle()
-    validate_model_provider_base_url(
+    resolved = _resolve_sandbox_model_env(
+        model_name=model_name,
+        model_api_key=model_api_key,
         model_provider=model_provider,
         model_base_url=model_base_url,
         model_provider_was_provided=model_provider_was_provided,
         model_base_url_was_provided=model_base_url_was_provided,
+        require_provider=False,
     )
-    resolved_model_base_url = normalize_model_base_url(model_base_url)
-    effective_model_provider = model_provider or infer_model_provider_from_base_url(
-        resolved_model_base_url
+    _append_standard_model_envs(
+        bundle,
+        resolved,
+        include_base_urls=bool(resolved.base_url or resolved.anthropic_base_url),
+        include_api_key=False,
     )
-    resolved_model_provider = normalize_optional_model_provider(
-        effective_model_provider
-    )
-    resolved_model_name = (
-        resolve_model_name(model_name, resolved_model_provider)
-        if resolved_model_provider
-        else (model_name or "").strip()
-    )
-    resolved_base_url, resolved_anthropic_base_url = (
-        resolve_model_base_urls(
-            model_provider=resolved_model_provider,
-            model_base_url=resolved_model_base_url,
-        )
-        if resolved_model_provider or resolved_model_base_url
-        else (None, None)
-    )
-    resolved_model_api_key = model_api_key or os.getenv(MODEL_API_KEY_ENV)
-
-    bundle.add_many((MODEL_PROVIDER_ENV,), resolved_model_provider)
-    bundle.add_many(MODEL_NAME_ENV_KEYS, resolved_model_name)
-    if resolved_base_url:
-        bundle.add_many(MODEL_BASE_URL_ENV_KEYS, resolved_base_url)
-    if resolved_anthropic_base_url:
-        bundle.add_many(ANTHROPIC_BASE_URL_ENV_KEYS, resolved_anthropic_base_url)
     if (
         include_codex_config
-        and resolved_model_name
+        and resolved.model_name
         and should_emit_codex_model_config(
-            model_provider=resolved_model_provider,
-            model_base_url=resolved_model_base_url,
+            model_provider=resolved.provider,
+            model_base_url=resolved.model_base_url,
         )
     ):
         bundle.add(
             CODEX_CONFIG_TOML_ENV,
             build_codex_config_toml(
-                resolved_model_name,
-                resolved_model_provider,
-                resolved_model_base_url,
+                resolved.model_name,
+                resolved.provider,
+                resolved.model_base_url,
             ),
         )
-        if should_emit_codex_model_catalog(resolved_model_provider):
+        if should_emit_codex_model_catalog(resolved.provider):
             bundle.add(
                 CODEX_MODEL_CATALOG_JSON_ENV,
                 build_codex_model_catalog_json(
-                    resolved_model_name,
-                    resolved_model_provider,
+                    resolved.model_name,
+                    resolved.provider,
                 ),
             )
-    bundle.add_many(MODEL_API_KEY_ENV_KEYS, resolved_model_api_key)
+    bundle.add_many(MODEL_API_KEY_ENV_KEYS, resolved.api_key)
     if disable_websearch_apikey:
         bundle.add(WEB_SEARCH_API_KEY_ENV, "", include_empty=True)
     return bundle.to_create_session_envs()
