@@ -111,6 +111,22 @@ def test_signed_request_retries_zero_means_single_attempt(monkeypatch, no_sleep)
     assert counter["attempts"] == 1
 
 
+def test_retry_after_is_capped_and_sanitized():
+    """Server-provided Retry-After must be capped (a misconfigured/hostile
+    server saying 3600 must not stall the client for an hour) and invalid
+    values must be ignored."""
+
+    class _Resp:
+        def __init__(self, value):
+            self.headers = {} if value is None else {"Retry-After": value}
+
+    assert ve_sign._retry_after_seconds(_Resp("5")) == 5.0
+    assert ve_sign._retry_after_seconds(_Resp("3600")) == ve_sign._RETRY_AFTER_CAP
+    assert ve_sign._retry_after_seconds(_Resp("-1")) == 0.0
+    assert ve_sign._retry_after_seconds(_Resp("not-a-number")) is None
+    assert ve_sign._retry_after_seconds(_Resp(None)) is None
+
+
 # --------------------------------------------------------------------------- #
 # http_defaults env clamping
 # --------------------------------------------------------------------------- #

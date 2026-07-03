@@ -46,6 +46,10 @@ def _wrap_agent_executor_execute_func(execute_func: Callable) -> Callable:
 
         with telemetry.tracer.start_as_current_span(name="a2a_invocation") as span:
             exception = None
+            # Initialize before try: if execute_func raises, the finally block
+            # below would otherwise hit UnboundLocalError and mask the original
+            # exception (mcp_app's equivalent wrapper already does this).
+            result = None
             try:
                 result = await execute_func(
                     executor_instance, context=context, event_queue=event_queue

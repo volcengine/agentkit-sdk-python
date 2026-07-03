@@ -261,7 +261,19 @@ class AgentkitAgentServerApp(BaseAgentkitApp):
                     telemetry.trace_agent_server_finish(
                         path="/run_sse", func_result="", exception=e
                     )
-                    yield f"data: {json.dumps({'error': str(e)})}\n\n"
+                    # Do not echo internal exception details (paths, backend
+                    # errors) to the client; full detail stays in server logs.
+                    yield (
+                        "data: "
+                        + json.dumps(
+                            {
+                                "error": "internal error while running agent; "
+                                "see server logs",
+                                "error_type": type(e).__name__,
+                            }
+                        )
+                        + "\n\n"
+                    )
                 # Returns a streaming response with the proper media type for SSE
 
             return StreamingResponse(

@@ -69,6 +69,10 @@ MAX_X_CUSTOM_SOURCE_LENGTH = 256
 # Tunable via env; AGENTKIT_HTTP_RETRIES=0 disables retries.
 _RETRYABLE_STATUS = frozenset({429, 503})
 
+# Cap server-provided Retry-After: without it a hostile/misconfigured server
+# saying "Retry-After: 3600" would stall the client for an hour per attempt.
+_RETRY_AFTER_CAP = 30.0
+
 
 def _backoff_seconds(attempt: int) -> float:
     return min(8.0, 0.5 * (2**attempt))
@@ -79,7 +83,7 @@ def _retry_after_seconds(resp: requests.Response) -> float | None:
     if not raw:
         return None
     try:
-        return max(0.0, float(raw))
+        return min(max(0.0, float(raw)), _RETRY_AFTER_CAP)
     except ValueError:
         return None
 
