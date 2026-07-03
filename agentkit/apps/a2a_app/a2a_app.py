@@ -56,7 +56,11 @@ def _wrap_agent_executor_execute_func(execute_func: Callable) -> Callable:
                 )
 
             except Exception as e:
-                logger.error("Invoke agent execute function failed: %s", e)
+                logger.exception(
+                    "Invoke agent execute function failed (context_id=%s): %s",
+                    context.context_id,
+                    e,
+                )
                 exception = e
                 raise e
             finally:

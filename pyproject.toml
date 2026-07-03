@@ -62,6 +62,11 @@ include-package-data = true
 [dependency-groups]
 dev = [
     "pre-commit>=4.3.0",
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    # tests/apps drives the ADK-based agent server; google-adk is otherwise
+    # an optional runtime integration, not a package dependency.
+    "google-adk>=2.0",
 ]
 toolkit = [
     "pyyaml>=6.0.2",
@@ -73,6 +78,12 @@ toolkit = [
 extensions = []
 toolkit = []
 dev = []
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["agentkit"]
 
 [tool.ruff.lint]
 

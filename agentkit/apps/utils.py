@@ -14,8 +14,46 @@
 
 import json
 import logging
+import traceback
 
 logger = logging.getLogger("agentkit." + __name__)
+
+# Credential-bearing headers that must never be recorded on telemetry spans:
+# span attributes bypass the logging redaction filter. Single source of truth
+# for every app's telemetry/middleware header filtering.
+SENSITIVE_HEADERS = frozenset(
+    {
+        "authorization",
+        "proxy-authorization",
+        "token",
+        "x-security-token",  # STS credentials (see agentkit.auth._sigv4)
+        "x-api-key",
+        "api-key",
+        "cookie",
+        "set-cookie",
+    }
+)
+
+
+def dont_throw(func):
+    """
+    A decorator that wraps the passed in function and logs exceptions instead of throwing them.
+
+    @param func: The function to wrap
+    @return: The wrapper function
+    """
+
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception:
+            logger.error(
+                "Agentkit failed to trace in %s, error: %s",
+                func.__name__,
+                traceback.format_exc(),
+            )
+
+    return wrapper
 
 
 def safe_serialize_to_json_string(obj):

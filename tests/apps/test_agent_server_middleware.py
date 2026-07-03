@@ -124,6 +124,9 @@ def test_sensitive_headers_are_excluded_before_reaching_telemetry(fake_telemetry
         "headers": [
             (b"authorization", b"Bearer secret-token"),
             (b"token", b"another-secret"),
+            (b"x-security-token", b"sts-session-token"),
+            (b"cookie", b"session=abc"),
+            (b"x-api-key", b"key-123"),
             (b"content-type", b"text/plain"),
         ],
     }
@@ -135,6 +138,9 @@ def test_sensitive_headers_are_excluded_before_reaching_telemetry(fake_telemetry
     headers = kwargs["headers"]
     assert "authorization" not in headers
     assert "token" not in headers
+    assert "x-security-token" not in headers
+    assert "cookie" not in headers
+    assert "x-api-key" not in headers
     # The non-sensitive header survives with its decoded value.
     assert headers == {"content-type": "text/plain"}
 

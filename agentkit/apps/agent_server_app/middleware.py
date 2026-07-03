@@ -18,8 +18,9 @@ from opentelemetry import trace
 from opentelemetry import context as context_api
 
 from agentkit.apps.agent_server_app.telemetry import telemetry
+from agentkit.apps.utils import SENSITIVE_HEADERS
 
-_EXCLUDED_HEADERS = {"authorization", "token"}
+_EXCLUDED_HEADERS = SENSITIVE_HEADERS
 
 
 class AgentkitTelemetryHTTPMiddleware:

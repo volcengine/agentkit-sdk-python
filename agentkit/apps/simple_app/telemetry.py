@@ -15,7 +15,6 @@
 
 import logging
 import time
-import traceback
 from typing import Callable
 
 from opentelemetry import trace
@@ -23,7 +22,11 @@ from opentelemetry.trace import get_tracer
 from opentelemetry.metrics import get_meter
 from opentelemetry.trace.span import Span
 
-from agentkit.apps.utils import safe_serialize_to_json_string
+from agentkit.apps.utils import (
+    SENSITIVE_HEADERS,
+    dont_throw,
+    safe_serialize_to_json_string,
+)
 
 _GEN_AI_CLIENT_OPERATION_DURATION_BUCKETS = [
     0.01,
@@ -46,34 +49,11 @@ _GEN_AI_CLIENT_OPERATION_DURATION_BUCKETS = [
 
 logger = logging.getLogger("agentkit." + __name__)
 
-# Keep in sync with agent_server_app.middleware._EXCLUDED_HEADERS: credential
-# headers must never be recorded on spans (they bypass the logging redaction).
-_EXCLUDED_HEADERS = {"authorization", "token"}
+_EXCLUDED_HEADERS = SENSITIVE_HEADERS
 
 
 def _redact_headers(headers: dict) -> dict:
     return {k: v for k, v in headers.items() if k.lower() not in _EXCLUDED_HEADERS}
-
-
-def dont_throw(func):
-    """
-    A decorator that wraps the passed in function and logs exceptions instead of throwing them.
-
-    @param func: The function to wrap
-    @return: The wrapper function
-    """
-
-    def wrapper(*args, **kwargs):
-        try:
-            return func(*args, **kwargs)
-        except Exception:
-            logger.error(
-                "Agentkit failed to trace in %s, error: %s",
-                func.__name__,
-                traceback.format_exc(),
-            )
-
-    return wrapper
 
 
 class Telemetry:

@@ -58,6 +58,7 @@ from agentkit.apps.agent_server_app.origin import (
 )
 from agentkit.apps.agent_server_app.telemetry import telemetry
 from agentkit.apps.base_app import BaseAgentkitApp
+from agentkit.apps.utils import SENSITIVE_HEADERS
 
 logger = logging.getLogger(__name__)
 
@@ -304,7 +305,7 @@ class AgentkitAgentServerApp(BaseAgentkitApp):
             telemetry_headers = {
                 k: v
                 for k, v in dict(headers).items()
-                if k.lower() not in {"authorization", "token"}
+                if k.lower() not in SENSITIVE_HEADERS
             }
             # trace request attributes on current span
             telemetry.trace_agent_server(
@@ -383,10 +384,23 @@ class AgentkitAgentServerApp(BaseAgentkitApp):
                     # finish span on successful end of stream handled by middleware
                     pass
                 except Exception as e:
+                    logger.exception("Error in /invoke event_generator: %s", e)
                     telemetry.trace_agent_server_finish(
                         path="/invoke", func_result="", exception=e
                     )
-                    yield f'data: {{"error": "{str(e)}"}}\n\n'
+                    # Do not echo internal exception details to the client;
+                    # keep parity with the /run_sse error frame above.
+                    yield (
+                        "data: "
+                        + json.dumps(
+                            {
+                                "error": "internal error while running agent; "
+                                "see server logs",
+                                "error_type": type(e).__name__,
+                            }
+                        )
+                        + "\n\n"
+                    )
 
             return StreamingResponse(
                 event_generator(),

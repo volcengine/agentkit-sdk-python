@@ -22,9 +22,8 @@ from opentelemetry.trace import get_tracer
 from opentelemetry.metrics import get_meter
 from opentelemetry.trace.span import Span
 from a2a.server.agent_execution.context import RequestContext
-from google.adk.a2a.converters.request_converter import _get_user_id
 
-from agentkit.apps.utils import safe_serialize_to_json_string
+from agentkit.apps.utils import dont_throw, safe_serialize_to_json_string
 
 _GEN_AI_CLIENT_OPERATION_DURATION_BUCKETS = [
     0.01,
@@ -47,6 +46,15 @@ _GEN_AI_CLIENT_OPERATION_DURATION_BUCKETS = [
 logger = logging.getLogger("agentkit." + __name__)
 
 
+def _get_user_id(request: RequestContext) -> str:
+    # Inlined from google-adk's private a2a request converter helper: a2a_app
+    # must not import google-adk (an undeclared dependency for pure-A2A apps).
+    call_context = getattr(request, "call_context", None)
+    if call_context and call_context.user and call_context.user.user_name:
+        return call_context.user.user_name
+    return f"A2A_USER_{request.context_id}"
+
+
 class Telemetry:
     def __init__(self):
         self.tracer = get_tracer("agentkit.a2a_app")
@@ -58,6 +66,7 @@ class Telemetry:
             explicit_bucket_boundaries_advisory=_GEN_AI_CLIENT_OPERATION_DURATION_BUCKETS,
         )
 
+    @dont_throw
     def trace_a2a_agent(
         self,
         func: Callable,
@@ -89,10 +98,12 @@ class Telemetry:
         if user_id:
             span.set_attribute(key="gen_ai.user.id", value=user_id)
 
-        span.set_attribute(
-            key="gen_ai.input",
-            value=safe_serialize_to_json_string(request.message.parts),
-        )
+        message = getattr(request, "message", None)
+        if message is not None:
+            span.set_attribute(
+                key="gen_ai.input",
+                value=safe_serialize_to_json_string(message.parts),
+            )
 
         span.set_attribute(key="gen_ai.span.kind", value="a2a_agent")
         span.set_attribute(key="gen_ai.operation.name", value="invoke_agent")
