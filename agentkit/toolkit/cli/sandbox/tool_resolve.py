@@ -37,7 +37,7 @@ from agentkit.toolkit.cli.sandbox.sandbox_client import error
 
 SANDBOX_TOOL_STORE_PATH = Path(".agentkit") / "sandbox" / "tools.json"
 DEFAULT_SANDBOX_TOOL_TYPE = "CodeEnv"
-VALID_SANDBOX_TOOL_TYPES = ("CodeEnv", "SkillEnv", "CustomToolEnv")
+VALID_SANDBOX_TOOL_TYPES = ("CodeEnv", "SkillEnv", "Private")
 READY_TOOL_STATUS = "Ready"
 TOOL_NOT_FOUND_ERROR_CODE = "InvalidResource.NotFound"
 
@@ -45,7 +45,7 @@ TOOL_NOT_FOUND_ERROR_CODE = "InvalidResource.NotFound"
 class SandboxToolType(str, Enum):
     CODE_ENV = "CodeEnv"
     SKILL_ENV = "SkillEnv"
-    CUSTOM_TOOL_ENV = "CustomToolEnv"
+    PRIVATE = "Private"
 
 
 def normalize_tool_type(tool_type: str | SandboxToolType | None) -> str:
@@ -54,6 +54,12 @@ def normalize_tool_type(tool_type: str | SandboxToolType | None) -> str:
     if resolved not in VALID_SANDBOX_TOOL_TYPES:
         error("--tool-type must be one of: " + ", ".join(VALID_SANDBOX_TOOL_TYPES))
     return resolved
+
+
+def is_resolvable_tool_type(tool_type: str | SandboxToolType | None) -> bool:
+    value = tool_type.value if isinstance(tool_type, SandboxToolType) else tool_type
+    resolved = (value or DEFAULT_SANDBOX_TOOL_TYPE).strip()
+    return resolved in VALID_SANDBOX_TOOL_TYPES
 
 
 def _get_tool_store_path() -> Path:
@@ -316,6 +322,18 @@ def save_tool_result(tool_type: str, result: dict[str, object]) -> None:
     )
 
 
+def save_tool_result_if_resolvable(
+    tool_type: str | SandboxToolType | None,
+    result: dict[str, object],
+) -> bool:
+    result_tool_type = _get_string_value(result, "ToolType", "tool_type")
+    if result_tool_type and not is_resolvable_tool_type(result_tool_type):
+        return False
+
+    save_tool_result(normalize_tool_type(tool_type), result)
+    return True
+
+
 def find_tool_result(tool_type: str) -> dict[str, object] | None:
     resolved_tool_type = normalize_tool_type(tool_type)
     data = _load_tool_store(_get_tool_store_path())
@@ -393,7 +411,7 @@ def get_tool_websearch_config(
     record = _build_tool_record(response, resolved_tool_type)
     if not record:
         return None
-    save_tool_result(resolved_tool_type, record)
+    save_tool_result_if_resolvable(resolved_tool_type, record)
     return {
         "has_role": bool(_get_string_value(record, "RoleName", "role_name")),
         "websearch_apikey_set": bool(record.get("WebSearchApiKeySet")),
@@ -410,7 +428,7 @@ def get_remote_tool_model_provider(
     response = client.get_tool(tools_types.GetToolRequest(tool_id=tool_id))
     record = _build_tool_record(response, normalize_tool_type(tool_type))
     if record:
-        save_tool_result(normalize_tool_type(tool_type), record)
+        save_tool_result_if_resolvable(tool_type, record)
         return model_provider_from_env_value(
             _get_string_value(record, "ModelProvider", "model_provider")
         )
@@ -426,7 +444,7 @@ def get_remote_tool_model_base_urls(
     response = client.get_tool(tools_types.GetToolRequest(tool_id=tool_id))
     record = _build_tool_record(response, normalize_tool_type(tool_type))
     if record:
-        save_tool_result(normalize_tool_type(tool_type), record)
+        save_tool_result_if_resolvable(tool_type, record)
         return (
             _get_string_value(record, "ModelBaseUrl", "model_base_url"),
             _get_string_value(record, "AnthropicBaseUrl", "anthropic_base_url"),

@@ -572,11 +572,11 @@ def test_build_create_tool_request_skips_tos_mount_without_bucket(monkeypatch):
     assert request.tos_mount_config is None
 
 
-def test_build_create_tool_request_translates_custom_tool_env_to_private(monkeypatch):
+def test_build_create_tool_request_adds_private_defaults(monkeypatch):
     from agentkit.toolkit.cli.sandbox import cli_create
     from agentkit.toolkit.cli.sandbox.env_config import (
-        CUSTOM_TOOL_ENV_COMMAND,
-        CUSTOM_TOOL_ENV_VARS,
+        PRIVATE_TOOL_COMMAND,
+        PRIVATE_TOOL_VARS,
     )
 
     _reset_fake_tools_client()
@@ -584,7 +584,7 @@ def test_build_create_tool_request_translates_custom_tool_env_to_private(monkeyp
     monkeypatch.setattr(cli_create, "TOSService", _FakeTOSService)
 
     request = cli_create._build_create_tool_request(
-        tool_type="CustomToolEnv",
+        tool_type="Private",
         name="demo-tool",
         tos_bucket=None,
         tos_region="cn-beijing",
@@ -595,14 +595,14 @@ def test_build_create_tool_request_translates_custom_tool_env_to_private(monkeyp
 
     assert request.tool_type == "Private"
     assert request.image_url == "registry.example.com/custom-image:latest"
-    assert request.command == CUSTOM_TOOL_ENV_COMMAND
+    assert request.command == PRIVATE_TOOL_COMMAND
     assert request.port == 8080
     assert request.tos_mount_config is None
     env_map = {item.key: item.value for item in request.envs}
     assert [
         (item.key, item.value)
-        for item in request.envs[: len(CUSTOM_TOOL_ENV_VARS)]
-    ] == list(CUSTOM_TOOL_ENV_VARS)
+        for item in request.envs[: len(PRIVATE_TOOL_VARS)]
+    ] == list(PRIVATE_TOOL_VARS)
     env_keys = set(env_map)
     assert "ABC" not in env_keys
     assert env_map["OPENCODE_MODEL"] == "ignored-model"
@@ -617,7 +617,7 @@ def test_build_create_tool_request_translates_custom_tool_env_to_private(monkeyp
     assert env_map["BROWSER_EXTRA_ARGS"] == ""
 
 
-def test_build_create_tool_request_requires_image_url_for_custom_tool_env(monkeypatch):
+def test_build_create_tool_request_requires_image_url_for_private(monkeypatch):
     from agentkit.toolkit.cli.sandbox import cli_create
 
     _reset_fake_tools_client()
@@ -625,7 +625,7 @@ def test_build_create_tool_request_requires_image_url_for_custom_tool_env(monkey
 
     with pytest.raises(cli_create.typer.Exit):
         cli_create._build_create_tool_request(
-            tool_type="CustomToolEnv",
+            tool_type="Private",
             name="demo-tool",
             tos_bucket=None,
             tos_region="cn-beijing",
@@ -650,7 +650,7 @@ def test_build_create_tool_request_derives_memory_from_cpu(monkeypatch):
     assert request.memory_mb == 16384
 
 
-def test_create_command_translates_custom_tool_env_and_caches_cli_type(
+def test_create_command_adds_private_defaults_and_caches_private_type(
     monkeypatch,
     tool_store_path,
 ):
@@ -660,6 +660,15 @@ def test_create_command_translates_custom_tool_env_and_caches_cli_type(
     _reset_fake_tools_client()
     monkeypatch.setattr(cli_create, "AgentkitToolsClient", _FakeToolsClient)
     monkeypatch.setattr(cli_create, "TOSService", _FakeTOSService)
+    monkeypatch.setattr(
+        cli_create,
+        "_wait_for_tool_ready",
+        lambda _client, _tool_id: SimpleNamespace(
+            tool_type="Private",
+            name="demo-tool",
+            status="Ready",
+        ),
+    )
 
     result = runner.invoke(
         app,
@@ -667,7 +676,7 @@ def test_create_command_translates_custom_tool_env_and_caches_cli_type(
             "sandbox",
             "create",
             "--tool-type",
-            "CustomToolEnv",
+            "Private",
             "--tool-name",
             "demo-aio",
             "--image-url",
@@ -682,11 +691,12 @@ def test_create_command_translates_custom_tool_env_and_caches_cli_type(
     assert request.image_url == "registry.example.com/custom-image:latest"
     assert request.port == 8080
     tool_store = json.loads(tool_store_path.read_text(encoding="utf-8"))
-    assert tool_store["CustomToolEnv"] == {
+    assert tool_store["Private"] == {
         "ToolId": "t-created",
         "Name": "demo-tool",
         "Status": "Ready",
-        "ToolType": "CustomToolEnv",
+        "ToolType": "Private",
+        "ModelProvider": "model_square",
     }
 
 

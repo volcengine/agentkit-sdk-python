@@ -53,12 +53,12 @@ agentkit sandbox create \
 Options:
 
 - `--tool-type`: optional. Tool type to create; defaults to `CodeEnv`.
-  `CustomToolEnv` is a CLI-side convention for private images based on aio-sandbox.
-  It is sent to CreateTool as `ToolType: Private`.
+  `Private` creates a private-image tool and applies the CLI's default
+  aio-sandbox environment, command, and port profile.
 - `--tool-name`: optional. Tool name. If omitted, the CLI generates a name like
   `agentkit-codeenv-<random>`.
 - `--image-url`: optional custom image URL. Required when
-  `--tool-type CustomToolEnv`.
+  `--tool-type Private`.
 - `--tos-bucket`: optional. TOS bucket to mount. If omitted, the tool is
   created without TOS mount configuration.
 - `--tos-mount`: optional. Local mount path for `--tos-bucket`; defaults to
@@ -89,19 +89,18 @@ Options:
 The sandbox create request maps `--cpu` to `CpuMilli=<cpu * 1000>` and
 `MemoryMb=<cpu * 2048>`, so the default shape is 4 vCPU / 8 GiB.
 
-When `--tool-type CustomToolEnv` is used, the CLI creates a private-image tool
-without requiring a control-plane tool type change:
+When `--tool-type Private` is used, the CLI creates a private-image tool and
+applies the default aio-sandbox startup profile:
 
 ```bash
 agentkit sandbox create \
-  --tool-type CustomToolEnv \
+  --tool-type Private \
   --image-url registry.example.com/custom-image:latest
 ```
 
-The CreateTool request is translated to `ToolType: Private`,
-`Command: /opt/gem/run.sh`, and the environment variables matching the
-aio-sandbox startup profile. The CLI stores the resulting tool locally under the
-`CustomToolEnv` type for future sandbox resolution.
+The CreateTool request uses `ToolType: Private`, `Command: /opt/gem/run.sh`,
+port `8080`, and the environment variables matching the aio-sandbox startup
+profile. Future CLI options may expose command, port, and environment overrides.
 
 The tool injects the selected built-in provider's Volcengine Ark compatible
 endpoints into `OPENCODE_BASE_URL`, `CODEX_BASE_URL`, `MODEL_BASE_URL`, and

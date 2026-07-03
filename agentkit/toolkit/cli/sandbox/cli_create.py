@@ -27,13 +27,12 @@ from agentkit.platform import VolcConfiguration
 from agentkit.sdk.tools.client import AgentkitToolsClient
 from agentkit.sdk.tools import types as tools_types
 from agentkit.toolkit.cli.sandbox.env_config import (
-    CUSTOM_TOOL_ENV_COMMAND,
-    CUSTOM_TOOL_ENV_OPENAPI_TOOL_TYPE,
-    CUSTOM_TOOL_ENV_PORT,
-    CUSTOM_TOOL_ENV_TOOL_TYPE,
     DEFAULT_CREATE_TOOL_TYPE,
+    PRIVATE_TOOL_COMMAND,
+    PRIVATE_TOOL_PORT,
+    PRIVATE_TOOL_TYPE,
     build_create_tool_envs,
-    build_custom_tool_envs,
+    build_private_tool_envs,
 )
 from agentkit.toolkit.cli.sandbox.model_config import (
     ModelProviderType,
@@ -41,7 +40,7 @@ from agentkit.toolkit.cli.sandbox.model_config import (
     normalize_model_base_url,
     normalize_model_provider,
 )
-from agentkit.toolkit.cli.sandbox.tool_resolve import save_tool_result
+from agentkit.toolkit.cli.sandbox.tool_resolve import save_tool_result_if_resolvable
 from agentkit.toolkit.cli.sandbox.tos_config import (
     DEFAULT_TOS_LOCAL_PATH,
     build_create_tool_tos_mount_config,
@@ -57,6 +56,7 @@ SANDBOX_REGION_ENV = "AGENTKIT_SANDBOX_REGION"
 SANDBOX_TOS_REGION_ENV = "AGENTKIT_SANDBOX_TOS_REGION"
 DEFAULT_CPU = 4
 VALID_CPU_VALUES = (2, 4, 8, 16)
+VALID_CREATE_TOOL_TYPES = ("CodeEnv", "SkillEnv", "Private")
 MEMORY_MB_PER_CPU = 2048
 SKILL_ROLE_NAME_OPTION = "--skill-role-name"
 TOOL_READY_STATUS = "Ready"
@@ -86,6 +86,14 @@ def _validate_cpu(value: int) -> int:
     return value
 
 
+def _validate_tool_type(value: str) -> str:
+    resolved = value.strip() or DEFAULT_CREATE_TOOL_TYPE
+    if resolved not in VALID_CREATE_TOOL_TYPES:
+        allowed = ", ".join(VALID_CREATE_TOOL_TYPES)
+        error(f"--tool-type must be one of: {allowed}")
+    return resolved
+
+
 def _cpu_to_resource_shape(cpu: int) -> tuple[int, int]:
     resolved_cpu = _validate_cpu(cpu)
     return resolved_cpu * 1000, resolved_cpu * MEMORY_MB_PER_CPU
@@ -109,20 +117,15 @@ def _build_create_tool_request(
     websearch_apikey: Optional[str] = None,
     image_url: Optional[str] = None,
 ) -> tools_types.CreateToolRequest:
-    resolved_tool_type = tool_type.strip() or DEFAULT_CREATE_TOOL_TYPE
+    resolved_tool_type = _validate_tool_type(tool_type)
     resolved_name = (name or "").strip() or _generate_tool_name(resolved_tool_type)
-    is_custom_tool_env = resolved_tool_type == CUSTOM_TOOL_ENV_TOOL_TYPE
-    if is_custom_tool_env and not (image_url or "").strip():
-        error("--image-url is required when --tool-type CustomToolEnv")
-    openapi_tool_type = (
-        CUSTOM_TOOL_ENV_OPENAPI_TOOL_TYPE
-        if is_custom_tool_env
-        else resolved_tool_type
-    )
-    command = CUSTOM_TOOL_ENV_COMMAND if is_custom_tool_env else None
-    port = CUSTOM_TOOL_ENV_PORT if is_custom_tool_env else None
+    is_private_tool = resolved_tool_type == PRIVATE_TOOL_TYPE
+    if is_private_tool and not (image_url or "").strip():
+        error("--image-url is required when --tool-type Private")
+    command = PRIVATE_TOOL_COMMAND if is_private_tool else None
+    port = PRIVATE_TOOL_PORT if is_private_tool else None
     envs = (
-        build_custom_tool_envs(
+        build_private_tool_envs(
             model_name=model_name,
             model_api_key=model_api_key,
             model_provider=model_provider,
@@ -131,7 +134,7 @@ def _build_create_tool_request(
             model_base_url_was_provided=model_base_url_was_provided,
             websearch_apikey=websearch_apikey,
         )
-        if is_custom_tool_env
+        if is_private_tool
         else build_create_tool_envs(
             tool_type=resolved_tool_type,
             model_name=model_name,
@@ -154,7 +157,7 @@ def _build_create_tool_request(
 
     return tools_types.CreateToolRequest(
         Name=resolved_name,
-        ToolType=openapi_tool_type,
+        ToolType=resolved_tool_type,
         Command=command,
         ImageUrl=(image_url or "").strip() or None,
         Port=port,
@@ -348,7 +351,6 @@ def create_tool(
     websearch_apikey: Optional[str] = None,
     image_url: Optional[str] = None,
 ) -> dict[str, object]:
-    is_custom_tool_env = tool_type.strip() == CUSTOM_TOOL_ENV_TOOL_TYPE
     resolved_model_base_url = normalize_model_base_url(model_base_url)
     raw_model_provider = (
         model_provider.value
@@ -399,15 +401,11 @@ def create_tool(
     final_tool = _wait_for_tool_ready(client, tool_id)
     return {
         "tool_id": tool_id,
-        "tool_type": (
-            CUSTOM_TOOL_ENV_TOOL_TYPE
-            if is_custom_tool_env
-            else final_tool.tool_type or request.tool_type
-        ),
+        "tool_type": final_tool.tool_type or request.tool_type,
         "name": final_tool.name or request.name,
         "status": final_tool.status or TOOL_READY_STATUS,
-        "model_provider": None if is_custom_tool_env else resolved_model_provider,
-        "model_base_url": None if is_custom_tool_env else resolved_model_base_url,
+        "model_provider": resolved_model_provider,
+        "model_base_url": resolved_model_base_url,
         "role_name": resolved_role_name,
         "websearch_apikey_set": bool(resolved_websearch_apikey),
     }
@@ -485,7 +483,7 @@ def create_command(
     image_url: Optional[str] = typer.Option(
         None,
         "--image-url",
-        help="Custom image URL. Required when --tool-type CustomToolEnv.",
+        help="Custom image URL. Required when --tool-type Private.",
     ),
 ) -> None:
     """Create an AgentKit Tool with optional TOS mount.
@@ -514,7 +512,7 @@ def create_command(
             websearch_apikey=websearch_apikey,
             image_url=image_url,
         )
-        save_tool_result(str(result["tool_type"]), result)
+        save_tool_result_if_resolvable(str(result["tool_type"]), result)
     except (typer.Abort, typer.Exit):
         raise
     except Exception as exc:

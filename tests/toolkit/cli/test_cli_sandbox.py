@@ -490,6 +490,59 @@ def test_cli_exec_reports_missing_explicit_tool_id(
     assert _FakeToolsClient.create_call_count == 0
 
 
+def test_cli_exec_allows_private_tool_id_during_websearch_check(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    from agentkit.toolkit.cli.cli import app
+    import agentkit.toolkit.cli.sandbox.cli_exec as cli_exec
+    import agentkit.toolkit.cli.sandbox.tool_resolve as tool_resolve
+
+    stored_session = {
+        "session_id": "user-1",
+        "tool_id": "tool-private",
+        "instance_id": "session-1",
+        "endpoint": "https://sandbox.example.com/?token=abc",
+    }
+    _patch_store_path(monkeypatch, tmp_path)
+    _patch_tool_store_path(monkeypatch, tmp_path)
+    _patch_exec_session(monkeypatch, cli_exec, stored_session)
+    monkeypatch.setattr(
+        tool_resolve,
+        "AgentkitToolsClient",
+        lambda: _FakeToolsClient(),
+    )
+    _FakeToolsClient.get_tool_response = _FakeGetToolResponse(
+        tool_id="tool-private",
+        tool_type="Private",
+        status="Ready",
+    )
+    captured = {}
+
+    def fake_connect(ws_url, initial_command, on_shell_id=None):
+        captured["ws_url"] = ws_url
+        captured["initial_command"] = initial_command
+
+    monkeypatch.setattr(cli_exec, "_connect_terminal", fake_connect)
+
+    result = runner.invoke(
+        app,
+        [
+            "sandbox",
+            "exec",
+            "--tool-id",
+            "tool-private",
+            "--model-api-key",
+            "model-value",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert captured["ws_url"] == "ws://sandbox.example.com/v1/shell/ws?token=abc"
+    assert captured["initial_command"] is None
+    assert _FakeToolsClient.get_tool_call_count == 1
+
+
 def test_cli_shell_reports_raw_get_tool_not_found_response(
     monkeypatch,
     tmp_path,

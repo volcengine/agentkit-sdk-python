@@ -50,11 +50,10 @@ from agentkit.toolkit.cli.sandbox.model_config import (
 )
 
 DEFAULT_CREATE_TOOL_TYPE = "CodeEnv"
-CUSTOM_TOOL_ENV_TOOL_TYPE = "CustomToolEnv"
-CUSTOM_TOOL_ENV_OPENAPI_TOOL_TYPE = "Private"
-CUSTOM_TOOL_ENV_COMMAND = "/opt/gem/run.sh"
-CUSTOM_TOOL_ENV_PORT = 8080
-CUSTOM_TOOL_ENV_VARS = (
+PRIVATE_TOOL_TYPE = "Private"
+PRIVATE_TOOL_COMMAND = "/opt/gem/run.sh"
+PRIVATE_TOOL_PORT = 8080
+PRIVATE_TOOL_VARS = (
     (
         "PATH",
         "/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:"
@@ -421,7 +420,7 @@ def build_create_tool_envs(
     return bundle.to_create_tool_envs()
 
 
-def build_custom_tool_envs(
+def build_private_tool_envs(
     *,
     model_name: Optional[str] = None,
     model_api_key: Optional[str] = None,
@@ -431,13 +430,13 @@ def build_custom_tool_envs(
     model_base_url_was_provided: Optional[bool] = None,
     websearch_apikey: Optional[str] = None,
 ) -> list[tools_types.EnvsItemForCreateTool]:
-    """Build CreateTool.Envs for CustomToolEnv plus CodeEnv-only envs."""
+    """Build CreateTool.Envs for Private plus CodeEnv-only envs."""
 
     envs = [
         tools_types.EnvsItemForCreateTool(Key=key, Value=value)
-        for key, value in CUSTOM_TOOL_ENV_VARS
+        for key, value in PRIVATE_TOOL_VARS
     ]
-    custom_tool_env_keys = {key for key, _value in CUSTOM_TOOL_ENV_VARS}
+    private_tool_keys = {key for key, _value in PRIVATE_TOOL_VARS}
     code_envs = build_create_tool_envs(
         tool_type=DEFAULT_CREATE_TOOL_TYPE,
         model_name=model_name,
@@ -449,7 +448,7 @@ def build_custom_tool_envs(
         websearch_apikey=websearch_apikey,
     )
     for env in code_envs or []:
-        if env.key not in custom_tool_env_keys:
+        if env.key not in private_tool_keys:
             envs.append(env)
     return envs
 
