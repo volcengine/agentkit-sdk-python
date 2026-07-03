@@ -799,6 +799,62 @@ def test_ensure_sandbox_session_creates_tool_when_no_tool_exists(
     }
 
 
+def test_save_tool_result_omits_model_base_url_fields(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    import agentkit.toolkit.cli.sandbox.tool_resolve as tool_resolve
+
+    tool_store_path = _patch_tool_store_path(monkeypatch, tmp_path)
+    tool_store_path.parent.mkdir(parents=True, exist_ok=True)
+    tool_store_path.write_text(
+        json.dumps(
+            {
+                "SkillEnv": {
+                    "ToolId": "tool-old",
+                    "ToolType": "SkillEnv",
+                    "Name": "old-tool",
+                    "Status": "Ready",
+                    "ModelBaseUrl": "https://models.example.com/v1",
+                    "AnthropicBaseUrl": "https://models.example.com/v1",
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    tool_resolve.save_tool_result(
+        "CodeEnv",
+        {
+            "ToolId": "tool-new",
+            "ToolType": "CodeEnv",
+            "Name": "new-tool",
+            "Status": "Ready",
+            "ModelProvider": "model_square",
+            "ModelBaseUrl": "https://models.example.com/v1",
+            "AnthropicBaseUrl": "https://models.example.com/v1",
+        },
+    )
+
+    assert json.loads(tool_store_path.read_text(encoding="utf-8")) == {
+        "SkillEnv": {
+            "ToolId": "tool-old",
+            "ToolType": "SkillEnv",
+            "Name": "old-tool",
+            "Status": "Ready",
+            "ModelBaseUrl": "https://models.example.com/v1",
+            "AnthropicBaseUrl": "https://models.example.com/v1",
+        },
+        "CodeEnv": {
+            "ToolId": "tool-new",
+            "Name": "new-tool",
+            "Status": "Ready",
+            "ToolType": "CodeEnv",
+            "ModelProvider": "model_square",
+        },
+    }
+
+
 def test_ensure_sandbox_session_options_override_env(monkeypatch, tmp_path) -> None:
     import agentkit.toolkit.cli.sandbox.session_create as session_create
 
@@ -4982,7 +5038,7 @@ def test_cli_exec_model_name_uses_cached_tool_model_provider(
     )
 
 
-def test_cli_exec_model_name_inherits_cached_custom_model_base_url(
+def test_cli_exec_model_name_ignores_cached_custom_model_base_url(
     monkeypatch,
     tmp_path,
 ) -> None:
@@ -5050,15 +5106,20 @@ def test_cli_exec_model_name_inherits_cached_custom_model_base_url(
     envs = {item.key: item.value for item in captured_session["envs"]}
     assert envs["AGENTKIT_SANDBOX_MODEL_PROVIDER"] == "model_square"
     assert envs["CODEX_MODEL"] == "custom-model"
-    assert envs["CODEX_BASE_URL"] == "https://models.example.com/v1"
-    assert envs["ANTHROPIC_BASE_URL"] == "https://models.example.com/v1"
+    assert envs["CODEX_BASE_URL"] == "https://ark.cn-beijing.volces.com/api/v3"
+    assert envs["ANTHROPIC_BASE_URL"] == (
+        "https://ark.cn-beijing.volces.com/api/compatible"
+    )
     assert 'model_provider = "model_square"' in envs["CODEX_CONFIG_TOML"]
     assert 'model = "custom-model"' in envs["CODEX_CONFIG_TOML"]
-    assert 'base_url = "https://models.example.com/v1"' in envs["CODEX_CONFIG_TOML"]
+    assert (
+        'base_url = "https://ark.cn-beijing.volces.com/api/v3"'
+        in envs["CODEX_CONFIG_TOML"]
+    )
     assert "CODEX_MODEL_CATALOG_JSON" in envs
 
 
-def test_cli_exec_model_name_inherits_default_cached_custom_model_base_url(
+def test_cli_exec_model_name_ignores_default_cached_custom_model_base_url(
     monkeypatch,
     tmp_path,
 ) -> None:
@@ -5118,11 +5179,16 @@ def test_cli_exec_model_name_inherits_default_cached_custom_model_base_url(
     assert captured_session["tool_id"] is None
     assert envs["AGENTKIT_SANDBOX_MODEL_PROVIDER"] == "model_square"
     assert envs["CODEX_MODEL"] == "custom-model"
-    assert envs["CODEX_BASE_URL"] == "https://models.example.com/v1"
-    assert envs["ANTHROPIC_BASE_URL"] == "https://models.example.com/v1"
+    assert envs["CODEX_BASE_URL"] == "https://ark.cn-beijing.volces.com/api/v3"
+    assert envs["ANTHROPIC_BASE_URL"] == (
+        "https://ark.cn-beijing.volces.com/api/compatible"
+    )
     assert 'model_provider = "model_square"' in envs["CODEX_CONFIG_TOML"]
     assert 'model = "custom-model"' in envs["CODEX_CONFIG_TOML"]
-    assert 'base_url = "https://models.example.com/v1"' in envs["CODEX_CONFIG_TOML"]
+    assert (
+        'base_url = "https://ark.cn-beijing.volces.com/api/v3"'
+        in envs["CODEX_CONFIG_TOML"]
+    )
     assert "CODEX_MODEL_CATALOG_JSON" in envs
 
 

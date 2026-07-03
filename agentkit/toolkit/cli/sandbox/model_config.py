@@ -303,31 +303,6 @@ def codex_model_provider_id(
     return resolved_provider
 
 
-def is_custom_model_base_url(
-    *,
-    model_provider: str | ModelProviderType | None,
-    model_base_url: Optional[str],
-    anthropic_base_url: Optional[str] = None,
-) -> bool:
-    resolved_model_base_url = normalize_model_base_url(model_base_url)
-    if not resolved_model_base_url:
-        return False
-
-    config = get_model_provider_config_if_known(model_provider)
-    if not config:
-        return True
-
-    resolved_anthropic_base_url = normalize_model_base_url(anthropic_base_url)
-    if resolved_model_base_url != config.model_base_url:
-        return True
-    if (
-        resolved_anthropic_base_url
-        and resolved_anthropic_base_url != config.anthropic_base_url
-    ):
-        return True
-    return False
-
-
 def _toml_quote(value: str) -> str:
     return json.dumps(value, ensure_ascii=False)
 
