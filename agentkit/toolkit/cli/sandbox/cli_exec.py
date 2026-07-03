@@ -48,16 +48,11 @@ from agentkit.toolkit.cli.sandbox.session_create import (
     ensure_sandbox_session,
 )
 from agentkit.toolkit.cli.sandbox.git_config import apply_git_config_to_session
-from agentkit.toolkit.cli.sandbox.model_config import (
-    is_custom_model_base_url,
-    normalize_model_base_url,
-)
+from agentkit.toolkit.cli.sandbox.model_config import normalize_model_base_url
 from agentkit.toolkit.cli.sandbox.tos_config import DEFAULT_SANDBOX_WORKSPACE
 from agentkit.toolkit.cli.sandbox.tool_resolve import (
     SandboxToolType,
-    find_tool_model_base_urls,
     find_tool_model_provider,
-    get_remote_tool_model_base_urls,
     get_remote_tool_model_provider,
     get_tool_websearch_config,
 )
@@ -395,60 +390,6 @@ def _resolve_exec_model_provider(
         return None
 
 
-def _resolve_exec_inherited_model_base_url(
-    *,
-    session_id: Optional[str],
-    tool_id: Optional[str],
-    tool_type: SandboxToolType,
-    model_name: Optional[str],
-    model_provider: Optional[str],
-    model_base_url: Optional[str],
-) -> str | None:
-    if normalize_model_base_url(model_base_url) or not (model_name or "").strip():
-        return None
-
-    resolved_tool_id = _resolve_exec_model_tool_id(
-        session_id=session_id,
-        tool_id=tool_id,
-        model_name=model_name,
-    )
-    cached_model_base_url, cached_anthropic_base_url = find_tool_model_base_urls(
-        tool_id=resolved_tool_id,
-        tool_type=tool_type,
-    )
-    if cached_model_base_url and is_custom_model_base_url(
-        model_provider=model_provider,
-        model_base_url=cached_model_base_url,
-        anthropic_base_url=cached_anthropic_base_url,
-    ):
-        return cached_model_base_url
-
-    if not resolved_tool_id:
-        return None
-
-    if not (tool_id or "").strip():
-        return None
-
-    try:
-        remote_model_base_url, remote_anthropic_base_url = (
-            get_remote_tool_model_base_urls(
-                AgentkitToolsClient(),
-                resolved_tool_id,
-                tool_type=tool_type,
-            )
-        )
-    except Exception:
-        return None
-
-    if remote_model_base_url and is_custom_model_base_url(
-        model_provider=model_provider,
-        model_base_url=remote_model_base_url,
-        anthropic_base_url=remote_anthropic_base_url,
-    ):
-        return remote_model_base_url
-    return None
-
-
 def _normalize_exec_mode(mode: Optional[str]) -> Optional[str]:
     resolved = (mode or "").strip()
     if not resolved:
@@ -599,15 +540,6 @@ def exec_command(
         )
         explicit_model_provider = bool((model_provider or "").strip())
         resolved_model_base_url = normalize_model_base_url(model_base_url)
-        if not resolved_model_base_url and not explicit_model_provider:
-            resolved_model_base_url = _resolve_exec_inherited_model_base_url(
-                session_id=session_id,
-                tool_id=tool_id,
-                tool_type=tool_type,
-                model_name=model_name,
-                model_provider=resolved_model_provider,
-                model_base_url=model_base_url,
-            )
 
         resolved_tool_id = (tool_id or "").strip()
         ws_config = get_tool_websearch_config(

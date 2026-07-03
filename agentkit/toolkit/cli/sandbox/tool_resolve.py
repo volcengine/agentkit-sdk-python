@@ -28,8 +28,6 @@ from agentkit.toolkit.cli.sandbox.agentkit_client import (
     is_tip_agentkit_client,
 )
 from agentkit.toolkit.cli.sandbox.model_config import (
-    ANTHROPIC_BASE_URL_ENV_KEYS,
-    MODEL_BASE_URL_ENV_KEYS,
     MODEL_PROVIDER_ENV,
     model_provider_from_env_value,
 )
@@ -117,22 +115,6 @@ def _get_tool_model_provider(payload: object) -> str | None:
     )
 
 
-def _get_first_tool_env_value(payload: object, keys: tuple[str, ...]) -> str | None:
-    for key in keys:
-        value = _get_tool_env_value(payload, key)
-        if isinstance(value, str) and value.strip():
-            return value.strip()
-    return None
-
-
-def _get_tool_model_base_url(payload: object) -> str | None:
-    return _get_first_tool_env_value(payload, MODEL_BASE_URL_ENV_KEYS)
-
-
-def _get_tool_anthropic_base_url(payload: object) -> str | None:
-    return _get_first_tool_env_value(payload, ANTHROPIC_BASE_URL_ENV_KEYS)
-
-
 def _build_tool_record(tool: object, tool_type: str) -> dict[str, object] | None:
     payload = _get_tool_payload(tool)
     tool_id = _get_string_field(payload, "ToolId", "tool_id")
@@ -147,12 +129,6 @@ def _build_tool_record(tool: object, tool_type: str) -> dict[str, object] | None
     model_provider = _get_tool_model_provider(payload)
     if model_provider:
         record["ModelProvider"] = model_provider
-    model_base_url = _get_tool_model_base_url(payload)
-    if model_base_url:
-        record["ModelBaseUrl"] = model_base_url
-    anthropic_base_url = _get_tool_anthropic_base_url(payload)
-    if anthropic_base_url:
-        record["AnthropicBaseUrl"] = anthropic_base_url
     role_name = _get_string_field(payload, "RoleName", "role_name")
     if isinstance(role_name, str) and role_name.strip():
         record["RoleName"] = role_name.strip()
@@ -281,16 +257,6 @@ def _normalize_tool_record(
     )
     if model_provider:
         stored["ModelProvider"] = model_provider
-    model_base_url = _get_string_value(result, "ModelBaseUrl", "model_base_url")
-    if model_base_url:
-        stored["ModelBaseUrl"] = model_base_url
-    anthropic_base_url = _get_string_value(
-        result,
-        "AnthropicBaseUrl",
-        "anthropic_base_url",
-    )
-    if anthropic_base_url:
-        stored["AnthropicBaseUrl"] = anthropic_base_url
     role_name = _get_string_value(result, "RoleName", "role_name")
     if role_name:
         stored["RoleName"] = role_name
@@ -346,24 +312,6 @@ def find_tool_model_provider(
     )
 
 
-def find_tool_model_base_urls(
-    *,
-    tool_id: Optional[str],
-    tool_type: str | SandboxToolType | None,
-) -> tuple[str | None, str | None]:
-    result = find_tool_result(normalize_tool_type(tool_type))
-    if not result:
-        return None, None
-
-    cached_tool_id = _get_string_value(result, "ToolId", "tool_id")
-    if tool_id and cached_tool_id != tool_id:
-        return None, None
-    return (
-        _get_string_value(result, "ModelBaseUrl", "model_base_url"),
-        _get_string_value(result, "AnthropicBaseUrl", "anthropic_base_url"),
-    )
-
-
 def get_tool_websearch_config(
     *,
     tool_id: Optional[str],
@@ -415,23 +363,6 @@ def get_remote_tool_model_provider(
             _get_string_value(record, "ModelProvider", "model_provider")
         )
     return None
-
-
-def get_remote_tool_model_base_urls(
-    client: AgentkitToolsClient,
-    tool_id: str,
-    *,
-    tool_type: str | SandboxToolType | None,
-) -> tuple[str | None, str | None]:
-    response = client.get_tool(tools_types.GetToolRequest(tool_id=tool_id))
-    record = _build_tool_record(response, normalize_tool_type(tool_type))
-    if record:
-        save_tool_result(normalize_tool_type(tool_type), record)
-        return (
-            _get_string_value(record, "ModelBaseUrl", "model_base_url"),
-            _get_string_value(record, "AnthropicBaseUrl", "anthropic_base_url"),
-        )
-    return None, None
 
 
 def _get_cached_tool_id(tool_type: str) -> str | None:
