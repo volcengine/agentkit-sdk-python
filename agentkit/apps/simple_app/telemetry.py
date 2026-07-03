@@ -46,6 +46,14 @@ _GEN_AI_CLIENT_OPERATION_DURATION_BUCKETS = [
 
 logger = logging.getLogger("agentkit." + __name__)
 
+# Keep in sync with agent_server_app.middleware._EXCLUDED_HEADERS: credential
+# headers must never be recorded on spans (they bypass the logging redaction).
+_EXCLUDED_HEADERS = {"authorization", "token"}
+
+
+def _redact_headers(headers: dict) -> dict:
+    return {k: v for k, v in headers.items() if k.lower() not in _EXCLUDED_HEADERS}
+
 
 def dont_throw(func):
     """
@@ -105,7 +113,8 @@ class Telemetry:
         span.set_attribute(key="gen_ai.func_name", value=func.__name__)
 
         span.set_attribute(
-            key="gen_ai.request.headers", value=safe_serialize_to_json_string(headers)
+            key="gen_ai.request.headers",
+            value=safe_serialize_to_json_string(_redact_headers(headers)),
         )
         session_id = headers.get("session_id")
         if session_id:

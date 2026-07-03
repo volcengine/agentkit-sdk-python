@@ -18,7 +18,13 @@ import pytest
 
 @pytest.fixture
 def clean_env(monkeypatch):
-    """Clean up environment variables that may affect platform resolution."""
+    """Clean up environment variables that may affect platform resolution.
+
+    Snapshots the full environment and restores it on teardown, so tests that
+    set variables via raw ``os.environ[...]`` (instead of monkeypatch.setenv)
+    cannot leak into later tests and create order-dependent failures.
+    """
+    snapshot = os.environ.copy()
     for key in list(os.environ.keys()):
         if (
             key.startswith("VOLC")
@@ -30,6 +36,9 @@ def clean_env(monkeypatch):
             }
         ):
             monkeypatch.delenv(key)
+    yield
+    os.environ.clear()
+    os.environ.update(snapshot)
 
 
 @pytest.fixture

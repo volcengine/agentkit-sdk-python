@@ -52,14 +52,16 @@ def no_sleep(monkeypatch):
 
 
 def _count_request(monkeypatch, exc_factory):
-    """Patch ``requests.request`` to always raise; return an attempt counter."""
+    """Patch the shared session's ``request`` to always raise; return an
+    attempt counter. (``_signed_request`` goes through ``ve_sign._session``
+    for connection pooling, so that is the seam to patch.)"""
     counter = {"attempts": 0}
 
     def _fake_request(**_kwargs):
         counter["attempts"] += 1
         raise exc_factory()
 
-    monkeypatch.setattr(ve_sign.requests, "request", _fake_request)
+    monkeypatch.setattr(ve_sign._session, "request", _fake_request)
     return counter
 
 

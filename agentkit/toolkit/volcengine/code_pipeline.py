@@ -914,14 +914,22 @@ class VeCodePipeline:
                                 step_name=step_name,
                             )
 
-                            # Download the log content
-                            response = requests.get(log_url, timeout=30)
-                            response.raise_for_status()
+                            # Download the log content, streaming chunks to
+                            # disk so peak memory stays flat for large logs.
+                            with requests.get(
+                                log_url, timeout=30, stream=True
+                            ) as response:
+                                response.raise_for_status()
+                                response.encoding = response.encoding or "utf-8"
+                                last_chunk = ""
+                                for chunk in response.iter_content(
+                                    chunk_size=65536, decode_unicode=True
+                                ):
+                                    if chunk:
+                                        out_file.write(chunk)
+                                        last_chunk = chunk
 
-                            log_content = response.text
-                            out_file.write(log_content)
-
-                            if not log_content.endswith("\n"):
+                            if not last_chunk.endswith("\n"):
                                 out_file.write("\n")
 
                             successful_downloads += 1

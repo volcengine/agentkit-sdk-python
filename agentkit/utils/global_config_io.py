@@ -14,9 +14,11 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any, Optional, Tuple
 
+logger = logging.getLogger("agentkit." + __name__)
 
 _cache: Tuple[Optional[float], dict] = (None, {})
 
@@ -81,14 +83,16 @@ def write_global_config_dict(
 
     try:
         path.chmod(0o600)
-    except Exception:
-        pass
+    except Exception as e:
+        # Security-relevant fallback: the config may hold credentials, so
+        # leave a trace when tightening permissions fails.
+        logger.debug("chmod 0600 on %s failed, continuing: %s", path, e)
 
     try:
         mtime = path.stat().st_mtime
         _cache = (mtime, data)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("mtime cache refresh for %s failed: %s", path, e)
 
 
 def get_path_value(data: Any, *keys: str) -> Any:
