@@ -21,7 +21,7 @@ from opentelemetry.trace import get_tracer
 from opentelemetry.metrics import get_meter
 from opentelemetry.trace.span import Span
 
-from agentkit.apps.utils import safe_serialize_to_json_string
+from agentkit.apps.utils import redact_span_value
 
 _INVOKE_PATH = ["/run_sse", "/run", "/invoke"]
 
@@ -69,7 +69,7 @@ class Telemetry:
 
         span.set_attribute(
             key="gen_ai.request.headers",
-            value=safe_serialize_to_json_string(headers),
+            value=redact_span_value(headers),
         )
 
         session_id = headers.get("session_id")

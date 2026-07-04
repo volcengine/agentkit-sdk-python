@@ -25,7 +25,7 @@ from opentelemetry.trace.span import Span
 from agentkit.apps.utils import (
     SENSITIVE_HEADERS,
     dont_throw,
-    safe_serialize_to_json_string,
+    redact_span_value,
 )
 
 _GEN_AI_CLIENT_OPERATION_DURATION_BUCKETS = [
@@ -94,7 +94,7 @@ class Telemetry:
 
         span.set_attribute(
             key="gen_ai.request.headers",
-            value=safe_serialize_to_json_string(_redact_headers(headers)),
+            value=redact_span_value(_redact_headers(headers)),
         )
         session_id = headers.get("session_id")
         if session_id:
@@ -104,7 +104,7 @@ class Telemetry:
             span.set_attribute(key="gen_ai.user.id", value=user_id)
 
         span.set_attribute(
-            key="gen_ai.input", value=safe_serialize_to_json_string(payload)
+            key="gen_ai.input", value=redact_span_value(payload)
         )
 
         span.set_attribute(key="gen_ai.span.kind", value="workflow")
@@ -120,7 +120,7 @@ class Telemetry:
         span = trace.get_current_span()
 
         if span and span.is_recording():
-            span.set_attribute(key="gen_ai.output", value=func_result)
+            span.set_attribute(key="gen_ai.output", value=redact_span_value(func_result))
             attributes = {
                 "gen_ai_operation_name": "invoke_agent",
                 "gen_ai_operation_type": "agent",

@@ -23,7 +23,7 @@ from opentelemetry.metrics import get_meter
 from opentelemetry.trace.span import Span
 from a2a.server.agent_execution.context import RequestContext
 
-from agentkit.apps.utils import dont_throw, safe_serialize_to_json_string
+from agentkit.apps.utils import dont_throw, redact_span_value
 
 _GEN_AI_CLIENT_OPERATION_DURATION_BUCKETS = [
     0.01,
@@ -102,7 +102,7 @@ class Telemetry:
         if message is not None:
             span.set_attribute(
                 key="gen_ai.input",
-                value=safe_serialize_to_json_string(message.parts),
+                value=redact_span_value(message.parts),
             )
 
         span.set_attribute(key="gen_ai.span.kind", value="a2a_agent")

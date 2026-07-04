@@ -25,8 +25,18 @@ import re
 
 # JWTs: three base64url segments separated by dots.
 _JWT = re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b")
-# Volcengine STS / access tokens and long opaque secrets (>= 16 url-safe chars).
-_OPAQUE = re.compile(r"\b[A-Za-z0-9/+_-]{16,}={0,2}\b")
+# Volcengine STS / access tokens and long opaque secrets: long url-safe runs
+# are only candidates — well-known identifier shapes (UUIDs, trace/git/digest
+# hex ids, filesystem paths, plain words/numbers) are spared by
+# _redact_opaque, otherwise error logs lose the very ids needed to debug them.
+_OPAQUE_CANDIDATE = re.compile(r"\b[A-Za-z0-9/+_-]{20,}={0,2}\b")
+_UUID = re.compile(
+    r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\Z"
+)
+_HEX = re.compile(r"[0-9a-fA-F]+\Z")
+# OTel trace_id (32), git sha (40), sha256 digest (64). Labeled hex secrets
+# are still caught by _FIELD regardless of shape.
+_HEX_ID_LENGTHS = frozenset({32, 40, 64})
 # Explicit secret-bearing query/JSON/header fields.
 _FIELD = re.compile(
     r"(?i)(\"?(?:access_token|refresh_token|id_token|client_secret|secret_access_key"
@@ -36,13 +46,31 @@ _FIELD = re.compile(
 )
 
 
+def _redact_opaque(match: re.Match) -> str:
+    token = match.group(0)
+    if _UUID.match(token):
+        return token
+    if len(token) in _HEX_ID_LENGTHS and _HEX.match(token):
+        return token
+    has_alpha = any(c.isalpha() for c in token)
+    has_digit = any(c.isdigit() for c in token)
+    if not (has_alpha and has_digit):
+        # Long plain words and long numbers are identifiers, not key material.
+        return token
+    if "/" in token and len(token) < 64 and not token.endswith("="):
+        # Filesystem-path shaped; base64 blobs containing slashes are either
+        # padded or far longer than any path segment run.
+        return token
+    return "***"
+
+
 def redact(text: str) -> str:
     """Return ``text`` with credential-looking substrings replaced by ``***``."""
     if not text:
         return text
     text = _FIELD.sub(lambda m: m.group(1) + "***", text)
     text = _JWT.sub("***", text)
-    text = _OPAQUE.sub("***", text)
+    text = _OPAQUE_CANDIDATE.sub(_redact_opaque, text)
     return text
 
 
