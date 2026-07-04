@@ -24,6 +24,11 @@ DEFAULT_CR_INSTANCE_NAME = "agentkit-platform-instance"
 DEFAULT_CR_NAMESPACE_NAME = "agenkit-platform-namespace"
 DEFAULT_CR_REPO_NAME = "agentkit-platform-repo"
 
+# Instance provisioning normally finishes within minutes; the deadline only
+# guards against an instance stuck in Creating/unknown status forever.
+CR_INSTANCE_CREATE_TIMEOUT_SECONDS = 1800
+CR_INSTANCE_POLL_INTERVAL_SECONDS = 30
+
 
 class VeCR:
     def __init__(
@@ -107,15 +112,21 @@ class VeCR:
                     f"Error create cr instance {instance_name}: {error_code} {error_message}"
                 )
 
+        deadline = time.monotonic() + CR_INSTANCE_CREATE_TIMEOUT_SECONDS
         while True:
             status = self._check_instance(instance_name)
             if status == "Running":
                 break
             elif status == "Failed":
                 raise ValueError(f"cr instance {instance_name} create failed")
+            elif time.monotonic() >= deadline:
+                raise ValueError(
+                    f"cr instance {instance_name} not Running after "
+                    f"{CR_INSTANCE_CREATE_TIMEOUT_SECONDS}s (last status: {status})"
+                )
             else:
                 logger.debug(f"cr instance status: {status}")
-                time.sleep(30)
+                time.sleep(CR_INSTANCE_POLL_INTERVAL_SECONDS)
 
         return instance_name
 

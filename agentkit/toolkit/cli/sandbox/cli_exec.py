@@ -158,6 +158,13 @@ def _write_output(data: object) -> None:
     sys.stdout.flush()
 
 
+# Handshake must not block forever; keepalive detects a silently dead server
+# (the app-level ping is server-initiated, so the client needs its own probe).
+WS_CONNECT_TIMEOUT_SECONDS = 30
+WS_PING_INTERVAL_SECONDS = 30
+WS_PING_TIMEOUT_SECONDS = 10
+
+
 def _connect_terminal(
     ws_url: str,
     initial_command: Optional[str],
@@ -170,6 +177,10 @@ def _connect_terminal(
             "websocket-client is required. "
             "Install with: pip install websocket-client"
         )
+
+    # run_forever applies getdefaulttimeout() to the connect handshake;
+    # process-global is acceptable for a one-shot CLI command.
+    websocket.setdefaulttimeout(WS_CONNECT_TIMEOUT_SECONDS)
 
     stop_event = threading.Event()
     initial_command_sent = {"value": False}
@@ -245,7 +256,10 @@ def _connect_terminal(
             err=True,
         )
         with _raw_terminal_mode():
-            websocket_app.run_forever()
+            websocket_app.run_forever(
+                ping_interval=WS_PING_INTERVAL_SECONDS,
+                ping_timeout=WS_PING_TIMEOUT_SECONDS,
+            )
     except KeyboardInterrupt:
         websocket_app.close()
     finally:

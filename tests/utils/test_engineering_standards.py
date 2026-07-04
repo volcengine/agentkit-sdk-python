@@ -38,6 +38,7 @@ import requests
 from agentkit.auth.errors import NetworkError
 from agentkit.utils import http_defaults, ve_sign
 from agentkit.utils.logging_config import RedactionFilter
+from agentkit.utils.redact import redact
 
 
 # --------------------------------------------------------------------------- #
@@ -52,14 +53,16 @@ def no_sleep(monkeypatch):
 
 
 def _count_request(monkeypatch, exc_factory):
-    """Patch ``requests.request`` to always raise; return an attempt counter."""
+    """Patch the shared session's ``request`` to always raise; return an
+    attempt counter. (``_signed_request`` goes through ``ve_sign._session``
+    for connection pooling, so that is the seam to patch.)"""
     counter = {"attempts": 0}
 
     def _fake_request(**_kwargs):
         counter["attempts"] += 1
         raise exc_factory()
 
-    monkeypatch.setattr(ve_sign.requests, "request", _fake_request)
+    monkeypatch.setattr(ve_sign._session, "request", _fake_request)
     return counter
 
 
@@ -107,6 +110,22 @@ def test_signed_request_retries_zero_means_single_attempt(monkeypatch, no_sleep)
         ve_sign._signed_request("POST", "https://example.invalid", {}, {}, "")
 
     assert counter["attempts"] == 1
+
+
+def test_retry_after_is_capped_and_sanitized():
+    """Server-provided Retry-After must be capped (a misconfigured/hostile
+    server saying 3600 must not stall the client for an hour) and invalid
+    values must be ignored."""
+
+    class _Resp:
+        def __init__(self, value):
+            self.headers = {} if value is None else {"Retry-After": value}
+
+    assert ve_sign._retry_after_seconds(_Resp("5")) == 5.0
+    assert ve_sign._retry_after_seconds(_Resp("3600")) == ve_sign._RETRY_AFTER_CAP
+    assert ve_sign._retry_after_seconds(_Resp("-1")) == 0.0
+    assert ve_sign._retry_after_seconds(_Resp("not-a-number")) is None
+    assert ve_sign._retry_after_seconds(_Resp(None)) is None
 
 
 # --------------------------------------------------------------------------- #
@@ -196,4 +215,26 @@ def test_redaction_filter_scrubs_opaque_token():
     RedactionFilter().filter(record)
     out = record.getMessage()
     assert opaque not in out
+    assert "***" in out
+
+
+def test_redaction_preserves_identifier_shapes():
+    # UUIDs, OTel trace ids, git shas, paths, long words and long numbers are
+    # what error logs are made of — scrubbing them makes logs undebuggable.
+    line = (
+        "request_id=550e8400-e29b-41d4-a716-446655440000 "
+        "trace_id=4bf92f3577b34da6a3ce929d0e0e4736 "
+        "commit=3f785ee19b9a44f2a2b1e2f4c0deadbeefcafe12 "
+        "path=/var/log/agentkit/agent-server-2026.log "
+        "word=internationalization_configuration id=123456789012345678901234"
+    )
+    assert redact(line) == line
+
+
+def test_redaction_still_scrubs_unlabeled_token_material():
+    # Mixed alpha+digit, 20+ chars, no identifier shape — and deliberately not
+    # in any real vendor key format (GitHub push protection scans fixtures).
+    token = "b64secretQWxhZGRpbjpvcGVuc2VzYW1lMjAyNg"
+    out = redact(f"request failed with {token}")
+    assert token not in out
     assert "***" in out

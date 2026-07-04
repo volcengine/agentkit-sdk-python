@@ -658,8 +658,14 @@ def test_invoke_stream_emits_error_frame_when_runner_raises():
     response = asyncio.run(invoke(request))
     chunks = asyncio.run(_drain(response))
 
-    # The generator catches the exception and yields a single error SSE frame.
-    assert chunks == ['data: {"error": "runner exploded"}\n\n']
+    # The generator catches the exception and yields a single error SSE frame
+    # carrying only the exception type — never the exception message, which
+    # may leak internal paths/backend detail (parity with /run_sse).
+    assert len(chunks) == 1
+    assert chunks[0].startswith("data: ") and chunks[0].endswith("\n\n")
+    frame = json.loads(chunks[0][len("data: ") :])
+    assert frame["error_type"] == "RuntimeError"
+    assert "runner exploded" not in chunks[0]
 
 
 def test_invoke_stream_error_path_traces_finish_with_the_exception():

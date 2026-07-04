@@ -15,6 +15,10 @@
 import requests
 
 import logging
+import os
+import shutil
+import tempfile
+from concurrent.futures import ThreadPoolExecutor
 
 from agentkit.utils.ve_sign import ve_request
 from agentkit.platform import (
@@ -849,6 +853,61 @@ class VeCodePipeline:
             successful_downloads = 0
             failed_downloads = 0
 
+            # Download all step logs concurrently (bounded pool) into temp
+            # files first — serially fetching sign-URI + log per step made
+            # export time grow linearly with pipeline size. Streaming to temp
+            # files keeps peak memory flat; stitching below preserves the
+            # original output order. (get_task_run_log_download_uri ->
+            # ve_request signs with per-call scope, so it is thread-safe.)
+            def _fetch_step_log(task_run_id, task_id, step_name):
+                log_url = self.get_task_run_log_download_uri(
+                    workspace_id=workspace_id,
+                    pipeline_id=pipeline_id,
+                    pipeline_run_id=pipeline_run_id,
+                    task_run_id=task_run_id,
+                    task_id=task_id,
+                    step_name=step_name,
+                )
+                tmp = tempfile.NamedTemporaryFile(
+                    mode="w", encoding="utf-8", suffix=".steplog", delete=False
+                )
+                try:
+                    with tmp, requests.get(
+                        log_url, timeout=30, stream=True
+                    ) as response:
+                        response.raise_for_status()
+                        response.encoding = response.encoding or "utf-8"
+                        last_chunk = ""
+                        for chunk in response.iter_content(
+                            chunk_size=65536, decode_unicode=True
+                        ):
+                            if chunk:
+                                tmp.write(chunk)
+                                last_chunk = chunk
+                        if not last_chunk.endswith("\n"):
+                            tmp.write("\n")
+                except Exception:
+                    try:
+                        os.unlink(tmp.name)
+                    except OSError:
+                        pass
+                    raise
+                return tmp.name
+
+            log_futures = {}
+            # Exiting the pool context blocks until all downloads finished;
+            # futures stay consumable afterwards.
+            with ThreadPoolExecutor(max_workers=4) as pool:
+                for s_i, stage in enumerate(stages):
+                    for t_i, task in enumerate(stage.get("Tasks", [])):
+                        for p_i, step in enumerate(task.get("Steps", [])):
+                            log_futures[(s_i, t_i, p_i)] = pool.submit(
+                                _fetch_step_log,
+                                task.get("TaskRunID", "unknown"),
+                                task.get("Id", "unknown"),
+                                step.get("Name", "unknown"),
+                            )
+
             for stage_idx, stage in enumerate(stages, 1):
                 stage_id = stage.get("Id", "unknown")
                 stage_name = stage.get("Name", "unknown")
@@ -902,27 +961,21 @@ class VeCodePipeline:
                         out_file.write(f"Finish Time: {step_finish_time}\n")
                         out_file.write(f"{'*' * 60}\n\n")
 
-                        # Try to download the step log
+                        # Stitch in the concurrently downloaded step log
                         try:
-                            # Get log download URI
-                            log_url = self.get_task_run_log_download_uri(
-                                workspace_id=workspace_id,
-                                pipeline_id=pipeline_id,
-                                pipeline_run_id=pipeline_run_id,
-                                task_run_id=task_run_id,
-                                task_id=task_id,
-                                step_name=step_name,
-                            )
-
-                            # Download the log content
-                            response = requests.get(log_url, timeout=30)
-                            response.raise_for_status()
-
-                            log_content = response.text
-                            out_file.write(log_content)
-
-                            if not log_content.endswith("\n"):
-                                out_file.write("\n")
+                            tmp_path = log_futures[
+                                (stage_idx - 1, task_idx - 1, step_idx - 1)
+                            ].result()
+                            try:
+                                with open(
+                                    tmp_path, "r", encoding="utf-8"
+                                ) as tmp_f:
+                                    shutil.copyfileobj(tmp_f, out_file, 65536)
+                            finally:
+                                try:
+                                    os.unlink(tmp_path)
+                                except OSError:
+                                    pass
 
                             successful_downloads += 1
                             logger.info(

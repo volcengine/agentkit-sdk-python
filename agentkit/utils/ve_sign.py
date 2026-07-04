@@ -41,12 +41,22 @@ from agentkit.utils.logging_config import get_logger
 logger = get_logger(__name__)
 
 
+# Legacy module-level defaults. ``ve_request``/``request`` now thread these
+# values through as function parameters (module globals were mutated per call,
+# which is not thread-safe: concurrent calls for different services/regions
+# could sign with each other's scope). Kept only as fallbacks for any direct
+# ``request()`` callers relying on the old behavior.
 Service = ""
 Version = ""
 Region = ""
 Host = ""
 ContentType = ""
 Scheme = "https"
+
+# Shared session so signed OpenAPI calls reuse pooled keep-alive connections
+# instead of re-doing a TCP+TLS handshake per request. ``Session.request`` is
+# thread-safe for concurrent use.
+_session = requests.Session()
 
 
 MAX_X_CUSTOM_SOURCE_LENGTH = 256
@@ -59,6 +69,10 @@ MAX_X_CUSTOM_SOURCE_LENGTH = 256
 # Tunable via env; AGENTKIT_HTTP_RETRIES=0 disables retries.
 _RETRYABLE_STATUS = frozenset({429, 503})
 
+# Cap server-provided Retry-After: without it a hostile/misconfigured server
+# saying "Retry-After: 3600" would stall the client for an hour per attempt.
+_RETRY_AFTER_CAP = 30.0
+
 
 def _backoff_seconds(attempt: int) -> float:
     return min(8.0, 0.5 * (2**attempt))
@@ -69,7 +83,7 @@ def _retry_after_seconds(resp: requests.Response) -> float | None:
     if not raw:
         return None
     try:
-        return max(0.0, float(raw))
+        return min(max(0.0, float(raw)), _RETRY_AFTER_CAP)
     except ValueError:
         return None
 
@@ -90,7 +104,7 @@ def _signed_request(method, url, headers, params, data) -> requests.Response:
     resp: requests.Response | None = None
     for attempt in range(retries + 1):
         try:
-            resp = requests.request(
+            resp = _session.request(
                 method=method,
                 url=url,
                 headers=headers,
@@ -224,25 +238,47 @@ def hash_sha256(content: str):
 
 
 # 第二步：签名请求函数
-def request(method, date, query, header, ak, sk, action, body):
+def request(
+    method,
+    date,
+    query,
+    header,
+    ak,
+    sk,
+    action,
+    body,
+    service=None,
+    version=None,
+    region=None,
+    host=None,
+    content_type=None,
+    scheme=None,
+):
+    # 签名 scope 参数直传（None 时回退到模块级默认，兼容旧直接调用方式）
+    service = Service if service is None else service
+    version = Version if version is None else version
+    region = Region if region is None else region
+    host = Host if host is None else host
+    content_type = ContentType if content_type is None else content_type
+    scheme = Scheme if scheme is None else scheme
     # 第三步：创建身份证明。其中的 Service 和 Region 字段是固定的。ak 和 sk 分别代表
     # AccessKeyID 和 SecretAccessKey。同时需要初始化签名结构体。一些签名计算时需要的属性也在这里处理。
     # 初始化身份证明结构体
     credential = {
         "access_key_id": ak,
         "secret_access_key": sk,
-        "service": Service,
-        "region": Region,
+        "service": service,
+        "region": region,
     }
     # 初始化签名结构体
     request_param = {
         "body": body,
-        "host": Host,
+        "host": host,
         "path": "/",
         "method": method,
-        "content_type": ContentType,
+        "content_type": content_type,
         "date": date,
-        "query": {"Action": action, "Version": Version, **query},
+        "query": {"Action": action, "Version": version, **query},
     }
     if body is None:
         request_param["body"] = ""
@@ -315,7 +351,7 @@ def request(method, date, query, header, ak, sk, action, body):
     # 第六步：将 Signature 签名写入 HTTP Header 中，并发送 HTTP 请求。
     r = _signed_request(
         method=method,
-        url=f"{Scheme}://{request_param['host']}{request_param['path']}",
+        url=f"{scheme}://{request_param['host']}{request_param['path']}",
         headers=header,
         params=request_param["query"],
         data=request_param["body"],
@@ -336,33 +372,29 @@ def ve_request(
     content_type: str = "application/json",
     scheme: str = "https",
 ):
-    # response_body = request("Get", datetime.datetime.utcnow(), {}, {}, AK, SK, "ListUsers", None)
-    # print(response_body)
-    # 以下参数视服务不同而不同，一个服务内通常是一致的
-    global Service
-    Service = service
-    global Version
-    Version = version
-    global Region
-    Region = region
-    global Host
-    Host = host
-    global ContentType
-    ContentType = content_type
-    global Scheme
-    Scheme = scheme or "https"
-
-    AK = ak
-    SK = sk
-
+    # 以下参数视服务不同而不同，一个服务内通常是一致的。
+    # 注意：签名 scope 以参数直传，不再写模块级全局（并发下不同 service/region
+    # 的调用互不串用）。
     now = datetime.datetime.utcnow()
 
     # Body的格式需要配合Content-Type，API使用的类型请阅读具体的官方文档，如:json格式需要json.dumps(obj)
-    # response_body = request("GET", now, {"Limit": "2"}, {}, AK, SK, "ListUsers", None)
     import json
 
     response_body = request(
-        "POST", now, {}, header or {}, AK, SK, action, json.dumps(request_body)
+        "POST",
+        now,
+        {},
+        header or {},
+        ak,
+        sk,
+        action,
+        json.dumps(request_body),
+        service=service,
+        version=version,
+        region=region,
+        host=host,
+        content_type=content_type,
+        scheme=scheme or "https",
     )
     check_error(response_body)
     return response_body

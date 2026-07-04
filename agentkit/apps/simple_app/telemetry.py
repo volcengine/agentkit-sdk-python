@@ -15,7 +15,6 @@
 
 import logging
 import time
-import traceback
 from typing import Callable
 
 from opentelemetry import trace
@@ -23,7 +22,11 @@ from opentelemetry.trace import get_tracer
 from opentelemetry.metrics import get_meter
 from opentelemetry.trace.span import Span
 
-from agentkit.apps.utils import safe_serialize_to_json_string
+from agentkit.apps.utils import (
+    SENSITIVE_HEADERS,
+    dont_throw,
+    redact_span_value,
+)
 
 _GEN_AI_CLIENT_OPERATION_DURATION_BUCKETS = [
     0.01,
@@ -46,26 +49,11 @@ _GEN_AI_CLIENT_OPERATION_DURATION_BUCKETS = [
 
 logger = logging.getLogger("agentkit." + __name__)
 
+_EXCLUDED_HEADERS = SENSITIVE_HEADERS
 
-def dont_throw(func):
-    """
-    A decorator that wraps the passed in function and logs exceptions instead of throwing them.
 
-    @param func: The function to wrap
-    @return: The wrapper function
-    """
-
-    def wrapper(*args, **kwargs):
-        try:
-            return func(*args, **kwargs)
-        except Exception:
-            logger.error(
-                "Agentkit failed to trace in %s, error: %s",
-                func.__name__,
-                traceback.format_exc(),
-            )
-
-    return wrapper
+def _redact_headers(headers: dict) -> dict:
+    return {k: v for k, v in headers.items() if k.lower() not in _EXCLUDED_HEADERS}
 
 
 class Telemetry:
@@ -105,7 +93,8 @@ class Telemetry:
         span.set_attribute(key="gen_ai.func_name", value=func.__name__)
 
         span.set_attribute(
-            key="gen_ai.request.headers", value=safe_serialize_to_json_string(headers)
+            key="gen_ai.request.headers",
+            value=redact_span_value(_redact_headers(headers)),
         )
         session_id = headers.get("session_id")
         if session_id:
@@ -115,7 +104,7 @@ class Telemetry:
             span.set_attribute(key="gen_ai.user.id", value=user_id)
 
         span.set_attribute(
-            key="gen_ai.input", value=safe_serialize_to_json_string(payload)
+            key="gen_ai.input", value=redact_span_value(payload)
         )
 
         span.set_attribute(key="gen_ai.span.kind", value="workflow")
@@ -131,7 +120,7 @@ class Telemetry:
         span = trace.get_current_span()
 
         if span and span.is_recording():
-            span.set_attribute(key="gen_ai.output", value=func_result)
+            span.set_attribute(key="gen_ai.output", value=redact_span_value(func_result))
             attributes = {
                 "gen_ai_operation_name": "invoke_agent",
                 "gen_ai_operation_type": "agent",

@@ -112,11 +112,22 @@ def retry(
     func: Callable[[], T],
     retries: int = 3,
     delay: float = 1.0,
+    max_delay: float = 10.0,
+    retry_on: tuple = (Exception,),
 ) -> T:
+    """Retry ``func`` with exponential backoff.
+
+    Only wrap idempotent operations (reads): a retried non-idempotent call
+    (Create*/Run*) would be re-executed on transient failure. Prefer passing
+    a narrow ``retry_on`` (connection/timeout error types) so non-retryable
+    failures such as auth or validation errors surface immediately instead of
+    burning the full retry budget.
+    """
     for attempt in range(retries):
         try:
             return func()
-        except Exception:  # noqa: BLE001
+        except retry_on:  # noqa: BLE001
             if attempt == retries - 1:
                 raise
-            time.sleep(delay)
+            time.sleep(min(delay * (2**attempt), max_delay))
+    raise RuntimeError("retry: retries must be >= 1")

@@ -50,6 +50,13 @@ def test_interactive_config_strategy_context_uses_resolved_provider(
     global_cfg = GlobalConfig()
     global_cfg.defaults.cloud_provider = "byteplus"
     monkeypatch.setattr(global_cfg_mod, "get_global_config", lambda: global_cfg)
+    # The resolver checks global_config_exists() before consulting
+    # get_global_config(), and env vars outrank global config — patch/clear
+    # both so the test is hermetic (it previously "passed" only when earlier
+    # tests leaked CLOUD_PROVIDER into the process environment).
+    monkeypatch.setattr(global_cfg_mod, "global_config_exists", lambda: True)
+    monkeypatch.delenv("AGENTKIT_CLOUD_PROVIDER", raising=False)
+    monkeypatch.delenv("CLOUD_PROVIDER", raising=False)
 
     def fake_create_common_config_interactively(existing_config):
         return CommonConfig.from_dict(existing_config or {})
@@ -107,6 +114,13 @@ def test_interactive_config_common_input_uses_raw_yaml_common(
     global_cfg = GlobalConfig()
     global_cfg.defaults.cloud_provider = "byteplus"
     monkeypatch.setattr(global_cfg_mod, "get_global_config", lambda: global_cfg)
+    # The resolver checks global_config_exists() before consulting
+    # get_global_config(), and env vars outrank global config — patch/clear
+    # both so the test is hermetic (it previously "passed" only when earlier
+    # tests leaked CLOUD_PROVIDER into the process environment).
+    monkeypatch.setattr(global_cfg_mod, "global_config_exists", lambda: True)
+    monkeypatch.delenv("AGENTKIT_CLOUD_PROVIDER", raising=False)
+    monkeypatch.delenv("CLOUD_PROVIDER", raising=False)
 
     def fake_create_common_config_interactively(existing_config):
         assert isinstance(existing_config, dict)

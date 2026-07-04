@@ -58,6 +58,7 @@ from agentkit.apps.agent_server_app.origin import (
 )
 from agentkit.apps.agent_server_app.telemetry import telemetry
 from agentkit.apps.base_app import BaseAgentkitApp
+from agentkit.apps.utils import SENSITIVE_HEADERS
 
 logger = logging.getLogger(__name__)
 
@@ -261,7 +262,19 @@ class AgentkitAgentServerApp(BaseAgentkitApp):
                     telemetry.trace_agent_server_finish(
                         path="/run_sse", func_result="", exception=e
                     )
-                    yield f"data: {json.dumps({'error': str(e)})}\n\n"
+                    # Do not echo internal exception details (paths, backend
+                    # errors) to the client; full detail stays in server logs.
+                    yield (
+                        "data: "
+                        + json.dumps(
+                            {
+                                "error": "internal error while running agent; "
+                                "see server logs",
+                                "error_type": type(e).__name__,
+                            }
+                        )
+                        + "\n\n"
+                    )
                 # Returns a streaming response with the proper media type for SSE
 
             return StreamingResponse(
@@ -280,78 +293,6 @@ class AgentkitAgentServerApp(BaseAgentkitApp):
                 routes.insert(0, routes.pop(i))
                 break
 
-        @self.app.post("/run_sse")
-        async def run_agent_sse(req: RunAgentRequest) -> StreamingResponse:
-            print("my run sse !!!")
-            # SSE endpoint
-            session = await self.server.session_service.get_session(
-                app_name=req.app_name,
-                user_id=req.user_id,
-                session_id=req.session_id,
-            )
-            if not session:
-                raise HTTPException(status_code=404, detail="Session not found")
-
-            # Convert the events to properly formatted SSE
-            async def event_generator():
-                try:
-                    stream_mode = (
-                        StreamingMode.SSE
-                        if req.streaming
-                        else StreamingMode.NONE
-                    )
-                    runner = await self.server.get_runner_async(req.app_name)
-                    async with Aclosing(
-                        runner.run_async(
-                            user_id=req.user_id,
-                            session_id=req.session_id,
-                            new_message=req.new_message,
-                            state_delta=req.state_delta,
-                            run_config=RunConfig(streaming_mode=stream_mode),
-                            invocation_id=req.invocation_id,
-                        )
-                    ) as agen:
-                        async for event in agen:
-                            # ADK Web renders artifacts from `actions.artifactDelta`
-                            # during part processing *and* during action processing
-                            # 1) the original event with `artifactDelta` cleared (content)
-                            # 2) a content-less "action-only" event carrying `artifactDelta`
-                            events_to_stream = [event]
-                            if (
-                                event.actions.artifact_delta
-                                and event.content
-                                and event.content.parts
-                            ):
-                                content_event = event.model_copy(deep=True)
-                                content_event.actions.artifact_delta = {}
-                                artifact_event = event.model_copy(deep=True)
-                                artifact_event.content = None
-                                events_to_stream = [
-                                    content_event,
-                                    artifact_event,
-                                ]
-
-                            for event_to_stream in events_to_stream:
-                                sse_event = event_to_stream.model_dump_json(
-                                    exclude_none=True,
-                                    by_alias=True,
-                                )
-                                logger.debug(
-                                    "Generated event in agent run streaming: %s",
-                                    sse_event,
-                                )
-                                yield f"data: {sse_event}\n\n"
-                except Exception as e:
-                    logger.exception("Error in event_generator: %s", e)
-                    yield f"data: {json.dumps({'error': str(e)})}\n\n"
-
-                # Returns a streaming response with the proper media type for SSE
-
-            return StreamingResponse(
-                event_generator(),
-                media_type="text/event-stream",
-            )
-
         # Attach ASGI middleware for unified telemetry across all routes
         self.app.add_middleware(AgentkitTelemetryHTTPMiddleware)
 
@@ -364,7 +305,7 @@ class AgentkitAgentServerApp(BaseAgentkitApp):
             telemetry_headers = {
                 k: v
                 for k, v in dict(headers).items()
-                if k.lower() not in {"authorization", "token"}
+                if k.lower() not in SENSITIVE_HEADERS
             }
             # trace request attributes on current span
             telemetry.trace_agent_server(
@@ -443,10 +384,23 @@ class AgentkitAgentServerApp(BaseAgentkitApp):
                     # finish span on successful end of stream handled by middleware
                     pass
                 except Exception as e:
+                    logger.exception("Error in /invoke event_generator: %s", e)
                     telemetry.trace_agent_server_finish(
                         path="/invoke", func_result="", exception=e
                     )
-                    yield f'data: {{"error": "{str(e)}"}}\n\n'
+                    # Do not echo internal exception details to the client;
+                    # keep parity with the /run_sse error frame above.
+                    yield (
+                        "data: "
+                        + json.dumps(
+                            {
+                                "error": "internal error while running agent; "
+                                "see server logs",
+                                "error_type": type(e).__name__,
+                            }
+                        )
+                        + "\n\n"
+                    )
 
             return StreamingResponse(
                 event_generator(),

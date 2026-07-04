@@ -903,22 +903,29 @@ class VeAgentkitRuntimeRunner(Runner):
         self.reporter.info("Downloading failure logs...")
 
         try:
-            log_response = requests.get(runtime.failed_log_file_url, timeout=30)
-            log_response.raise_for_status()
-
             # Create logs directory with timestamp-based filename for uniqueness
             log_dir = os.path.join(os.getcwd(), ".agentkit", "logs")
             os.makedirs(log_dir, exist_ok=True)
             log_filename = f"runtime_failed_{runtime_id}_{int(time.time())}.log"
             log_filepath = os.path.join(log_dir, log_filename)
 
-            # Save raw log content first
-            with open(log_filepath, "wb") as f:
-                f.write(log_response.content)
+            # Stream raw log content to disk so large logs don't spike memory
+            with requests.get(
+                runtime.failed_log_file_url, timeout=30, stream=True
+            ) as log_response:
+                log_response.raise_for_status()
+                with open(log_filepath, "wb") as f:
+                    for chunk in log_response.iter_content(chunk_size=65536):
+                        if chunk:
+                            f.write(chunk)
 
-            # Read back with error handling for encoding issues
+            # Read back only what gets displayed, with encoding error handling
+            lines = []
             with open(log_filepath, "r", encoding="utf-8", errors="ignore") as f:
-                lines = f.readlines()
+                for line in f:
+                    lines.append(line)
+                    if len(lines) >= 50:
+                        break
 
             self.reporter.show_logs(
                 title="Runtime Failure Logs (First 50 lines)", lines=lines, max_lines=50
@@ -992,6 +999,10 @@ class VeAgentkitRuntimeRunner(Runner):
         # Use reporter.long_task() for progress tracking
         client = self._get_runtime_client(region)
 
+        # Poll with mild backoff (3s -> 10s cap) to avoid hammering the
+        # control plane at a constant rate on long-running deploys.
+        poll_interval = 3.0
+
         with self.reporter.long_task(task_description, total=total_time) as task:
             while True:
                 runtime = retry(
@@ -1031,7 +1042,8 @@ class VeAgentkitRuntimeRunner(Runner):
                     )
                 )
 
-                time.sleep(3)
+                time.sleep(poll_interval)
+                poll_interval = min(poll_interval * 1.5, 10.0)
 
     def _needs_runtime_update(
         self, runtime: runtime_types.GetRuntimeResponse, config: VeAgentkitRunnerConfig

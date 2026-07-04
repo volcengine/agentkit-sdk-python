@@ -173,6 +173,16 @@ class _FakeResponse:
     def raise_for_status(self):
         pass
 
+    # The failure-log download streams via a context manager + iter_content.
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def iter_content(self, chunk_size=None):
+        yield self.content
+
 
 # ---------------------------------------------------------------------------
 # Shared fixtures
@@ -327,8 +337,8 @@ def test_create_new_runtime_init_failure_downloads_logs_and_cleans_up_when_confi
 
     get_calls = []
 
-    def _fake_get(url, timeout=None):
-        get_calls.append((url, timeout))
+    def _fake_get(url, timeout=None, stream=None):
+        get_calls.append((url, timeout, stream))
         return _FakeResponse()
 
     monkeypatch.setattr(mod.requests, "get", _fake_get)
@@ -341,8 +351,9 @@ def test_create_new_runtime_init_failure_downloads_logs_and_cleans_up_when_confi
     assert result.error_code == ErrorCode.RUNTIME_NOT_READY
     assert result.service_id == "rt-bad"
 
-    # Failure-log download was attempted against the failed_log_file_url.
-    assert get_calls == [("https://logs.example/failed.log", 30)]
+    # Failure-log download was attempted against the failed_log_file_url,
+    # streamed to disk (stream=True) with a bounded timeout.
+    assert get_calls == [("https://logs.example/failed.log", 30, True)]
     assert reporter.show_logs_calls  # logs were shown
     # A cleanup confirmation was requested, defaulting to False.
     assert reporter.confirm_calls and reporter.confirm_calls[0][1] is False

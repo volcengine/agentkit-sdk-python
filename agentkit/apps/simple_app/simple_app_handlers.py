@@ -182,7 +182,10 @@ class InvokeHandler(BaseHandler):
         if asyncio.iscoroutinefunction(self.func):
             return payload, headers, await self.func(*args)
         else:
-            return payload, headers, self.func(*args)
+            # Run sync entrypoints in a worker thread: executing them inline
+            # would block the event loop and stall all concurrent requests if
+            # the entrypoint does blocking IO or heavy computation.
+            return payload, headers, await asyncio.to_thread(self.func, *args)
 
     def _convert_to_sse(self, obj) -> bytes:
         """Convert object to Server-Sent Events format using safe serialization.

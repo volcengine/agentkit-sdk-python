@@ -40,6 +40,7 @@ import agentkit.apps.simple_app.telemetry as simple_tel
 import agentkit.apps.agent_server_app.telemetry as server_tel
 import agentkit.apps.mcp_app.telemetry as mcp_tel
 import agentkit.apps.a2a_app.telemetry as a2a_tel
+import agentkit.apps.utils as apps_utils
 
 
 # ---------------------------------------------------------------------------
@@ -169,6 +170,27 @@ def test_simple_trace_agent_sets_core_span_attributes():
     assert attrs["gen_ai.operation.type"] == "agent"
     assert attrs["gen_ai.request.headers"] == json.dumps(headers, ensure_ascii=False)
     assert attrs["gen_ai.input"] == json.dumps(payload, ensure_ascii=False)
+
+
+def test_simple_trace_agent_redacts_credentials_and_caps_span_payloads():
+    span = _FakeSpan()
+    func = _make_func("handle_run")
+    # Deliberately NOT in any real credential format (GitHub push protection
+    # scans test fixtures too); the field rule redacts by key name.
+    secret = "fake-credential-1234567890abcdef1234"
+    payload = {"prompt": "hi", "api_key": secret, "filler": "x" * 8192}
+    headers = {"content-type": "application/json"}
+
+    _simple_trace_agent(simple_tel.telemetry, func, span, payload, headers)
+
+    recorded = span.attributes["gen_ai.input"]
+    assert secret not in recorded
+    assert "***" in recorded
+    # Oversized payloads are capped so spans cannot ship unbounded data.
+    assert recorded.endswith("...[truncated]")
+    assert len(recorded) == apps_utils.SPAN_ATTR_VALUE_MAX_LEN + len(
+        "...[truncated]"
+    )
 
 
 def test_simple_trace_agent_sets_session_and_user_ids_only_when_in_headers():
@@ -461,7 +483,7 @@ def test_a2a_trace_a2a_agent_sets_attributes_and_derives_user_from_context_id():
     assert attrs["gen_ai.session.id"] == "ctx-42"
     # _get_user_id falls back to A2A_USER_<context_id> when no call_context user.
     assert attrs["gen_ai.user.id"] == "A2A_USER_ctx-42"
-    assert attrs["gen_ai.input"] == a2a_tel.safe_serialize_to_json_string(
+    assert attrs["gen_ai.input"] == apps_utils.safe_serialize_to_json_string(
         request.message.parts
     )
     assert len(fake_hist.records) == 1
