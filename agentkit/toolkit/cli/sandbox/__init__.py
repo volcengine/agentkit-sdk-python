@@ -15,6 +15,7 @@
 """Sandbox CLI command implementations."""
 
 from agentkit.toolkit.cli.sandbox.cli import sandbox_app
+from agentkit.toolkit.cli.sandbox.cli_build import build_command
 from agentkit.toolkit.cli.sandbox.cli_create import create_command
 from agentkit.toolkit.cli.sandbox.cli_exec import exec_command
 from agentkit.toolkit.cli.sandbox.cli_file import file_command
@@ -24,6 +25,7 @@ from agentkit.toolkit.cli.sandbox.cli_shell import shell_command
 from agentkit.toolkit.cli.sandbox.cli_web import web_command
 
 __all__ = [
+    "build_command",
     "create_command",
     "exec_command",
     "file_command",

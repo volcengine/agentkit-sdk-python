@@ -36,6 +36,34 @@ python3 -m pip show agentkit-sdk-python
 
 ## Commands
 
+### Build
+
+Build and push a custom sandbox image with Volcano Engine Code Pipeline and
+Container Registry. The command packages the project directory, uploads the
+archive to TOS, creates or reuses the sandbox image build pipeline, and pushes
+the resulting image to CR.
+
+```bash
+agentkit sandbox build \
+  --project-dir ./sandbox-image \
+  --dockerfile Dockerfile \
+  --image-name agentkit-custom-sandbox-image \
+  --namespace agentkit \
+  --tag "{{timestamp}}"
+```
+
+Options:
+
+- `--project-dir`: optional. Project directory to package as the Docker build
+  context; defaults to the current directory.
+- `--dockerfile`: optional. Dockerfile path relative to `--project-dir`;
+  defaults to `Dockerfile`.
+- `--image-name` / `--repo`: optional. Container Registry repository name;
+  defaults to `agentkit-custom-sandbox-image`.
+- `--namespace`: optional. Container Registry namespace; defaults to
+  `agentkit`.
+- `--tag`: optional. Container image tag; defaults to `{{timestamp}}`.
+
 ### Create
 
 Create an AgentKit Tool for sandbox sessions. This command builds a `CreateTool`

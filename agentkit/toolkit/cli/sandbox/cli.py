@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import typer
 
+from agentkit.toolkit.cli.sandbox.cli_build import build_command
 from agentkit.toolkit.cli.sandbox.cli_create import create_command
 from agentkit.toolkit.cli.sandbox.cli_exec import exec_command
 from agentkit.toolkit.cli.sandbox.cli_file import file_command
@@ -34,6 +35,7 @@ sandbox_app = typer.Typer(
     no_args_is_help=True,
 )
 
+sandbox_app.command(name="build")(build_command)
 sandbox_app.command(
     name="create",
     context_settings={"allow_extra_args": True, "ignore_unknown_options": True},

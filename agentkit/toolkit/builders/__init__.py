@@ -41,6 +41,14 @@ def __getattr__(name):
         from .ve_pipeline import VeCPCRBuilderConfig
 
         return VeCPCRBuilderConfig
+    elif name == "VeSandboxCPCRBuilder":
+        from .ve_sandbox_pipeline import VeSandboxCPCRBuilder
+
+        return VeSandboxCPCRBuilder
+    elif name == "VeSandboxCPCRBuilderConfig":
+        from .ve_sandbox_pipeline import VeSandboxCPCRBuilderConfig
+
+        return VeSandboxCPCRBuilderConfig
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
@@ -50,4 +58,6 @@ __all__ = [
     "LocalDockerBuilderConfig",
     "VeCPCRBuilder",
     "VeCPCRBuilderConfig",
+    "VeSandboxCPCRBuilder",
+    "VeSandboxCPCRBuilderConfig",
 ]
