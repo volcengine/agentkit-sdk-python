@@ -35,6 +35,7 @@ class VeCodePipeline:
         secret_key: str = "",
         region: str = "",
         provider: str | None = None,
+        session_token: str | None = None,
     ) -> None:
         # Use provided region or None to trigger auto-detection in VolcConfiguration
         config = VolcConfiguration(
@@ -49,6 +50,8 @@ class VeCodePipeline:
             creds = config.get_service_credentials("cp")
             self.volcengine_access_key = creds.access_key
             self.volcengine_secret_key = creds.secret_key
+            # STS credentials carry a session token that must be signed in.
+            self.session_token = creds.session_token
         elif not all([access_key, secret_key]):
             raise ValueError(
                 "Error create cp instance: missing access key or secret key",
@@ -56,6 +59,7 @@ class VeCodePipeline:
         else:
             self.volcengine_access_key = access_key
             self.volcengine_secret_key = secret_key
+            self.session_token = session_token
 
         endpoint = config.get_service_endpoint("cp")
 
@@ -73,6 +77,7 @@ class VeCodePipeline:
             action="GetDefaultWorkspaceInner",
             ak=self.volcengine_access_key,
             sk=self.volcengine_secret_key,
+            session_token=self.session_token,
             service=self.service,
             version=self.version,
             region=self.region,
@@ -143,6 +148,7 @@ class VeCodePipeline:
             action="CreateWorkspace",
             ak=self.volcengine_access_key,
             sk=self.volcengine_secret_key,
+            session_token=self.session_token,
             service=self.service,
             version=self.version,
             region=self.region,
@@ -215,6 +221,7 @@ class VeCodePipeline:
             action="ListWorkspaces",
             ak=self.volcengine_access_key,
             sk=self.volcengine_secret_key,
+            session_token=self.session_token,
             service=self.service,
             version=self.version,
             region=self.region,
@@ -315,6 +322,7 @@ class VeCodePipeline:
             action="CreatePipeline",
             ak=self.volcengine_access_key,
             sk=self.volcengine_secret_key,
+            session_token=self.session_token,
             service=self.service,
             version=self.version,
             region=self.region,
@@ -375,6 +383,7 @@ class VeCodePipeline:
             action="RunPipeline",
             ak=self.volcengine_access_key,
             sk=self.volcengine_secret_key,
+            session_token=self.session_token,
             service=self.service,
             version=self.version,
             region=self.region,
@@ -468,6 +477,7 @@ class VeCodePipeline:
             action="ListPipelineRuns",
             ak=self.volcengine_access_key,
             sk=self.volcengine_secret_key,
+            session_token=self.session_token,
             service=self.service,
             version=self.version,
             region=self.region,
@@ -578,6 +588,7 @@ class VeCodePipeline:
             action="ListPipelines",
             ak=self.volcengine_access_key,
             sk=self.volcengine_secret_key,
+            session_token=self.session_token,
             service=self.service,
             version=self.version,
             region=self.region,
@@ -693,6 +704,7 @@ class VeCodePipeline:
             action="ListPipelineRunStagesInner",
             ak=self.volcengine_access_key,
             sk=self.volcengine_secret_key,
+            session_token=self.session_token,
             service=self.service,
             version=self.version,
             region=self.region,
@@ -766,6 +778,7 @@ class VeCodePipeline:
             action="GetTaskRunLogDownloadURI",
             ak=self.volcengine_access_key,
             sk=self.volcengine_secret_key,
+            session_token=self.session_token,
             service=self.service,
             version=self.version,
             region=self.region,

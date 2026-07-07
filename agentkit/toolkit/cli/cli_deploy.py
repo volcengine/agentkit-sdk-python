@@ -183,8 +183,13 @@ def _deploy_harness(
         console.print(f"[green]Runtime id: {meta['runtime_id']}[/green]")
     console.print(f"[green]Endpoint: {endpoint or '(see AgentKit console)'}[/green]")
     if meta.get("runtime_apikey"):
-        console.print(f"[green]API key: {meta['runtime_apikey']}[/green]")
+        from agentkit.utils.redact import mask
+
+        # Avoid leaking the full key into terminal scrollback / CI logs; the
+        # complete value is persisted (0600) in harness.json below.
+        console.print(f"[green]API key: {mask(meta['runtime_apikey'])}[/green]")
     if endpoint:
         console.print(
-            f"[green]Recorded in {(Path.cwd() / 'harness.json')}[/green]"
+            f"[green]Recorded in {(Path.cwd() / 'harness.json')} "
+            "(contains the API key — do not commit)[/green]"
         )

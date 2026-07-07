@@ -1611,8 +1611,10 @@ class VeCPCRBuilder(Builder):
             self.reporter.success(f"Pipeline triggered successfully, run ID: {run_id}")
             self.reporter.info("Waiting for build completion...")
 
-            # Wait for build completion using reporter's long task interface
-            max_wait_time = 900  # 15 minutes
+            # Wait for build completion using reporter's long task interface.
+            # Honor the configured build_timeout (default 3600s); large images
+            # (heavy deps, multi-stage Go builds) routinely exceed 15 minutes.
+            max_wait_time = config.build_timeout or 900
             check_interval = 3  # Check every 3 seconds
             expected_time = (
                 30  # Controls progress curve speed (smaller = faster initial progress)

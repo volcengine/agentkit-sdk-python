@@ -137,7 +137,14 @@ def _record_harness(
         }
     else:
         data[name] = {"url": url, "key": key or "", "runtime_id": runtime_id}
-    path.write_text(json.dumps(data, indent=2, ensure_ascii=False))
+    payload = json.dumps(data, indent=2, ensure_ascii=False)
+    # harness.json stores the runtime API key in plaintext, so keep it private
+    # (0600). os.open applies the mode only when creating the file; chmod after
+    # covers the case where an older, world-readable harness.json already exists.
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write(payload)
+    os.chmod(path, 0o600)
     return path
 
 

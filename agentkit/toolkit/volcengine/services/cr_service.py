@@ -209,6 +209,7 @@ class CRService:
                 secret_key=creds.secret_key,
                 region=endpoint.region,
                 provider=self.provider,
+                session_token=creds.session_token,
             )
             # Expose the actual region resolved by VolcConfiguration
             self.actual_region = endpoint.region

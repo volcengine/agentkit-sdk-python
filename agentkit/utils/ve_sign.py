@@ -253,6 +253,7 @@ def request(
     host=None,
     content_type=None,
     scheme=None,
+    session_token=None,
 ):
     # 签名 scope 参数直传（None 时回退到模块级默认，兼容旧直接调用方式）
     service = Service if service is None else service
@@ -294,23 +295,29 @@ def request(
         "Content-Type": request_param["content_type"],
     }
     # 第五步：计算 Signature 签名。
-    signed_headers_str = ";".join(
-        ["content-type", "host", "x-content-sha256", "x-date"]
+    # STS credentials require X-Security-Token to be part of the signed headers
+    # (mirrors agentkit/auth/_sigv4.py); static ak/sk callers pass no token and
+    # keep the original four-header canonical form.
+    signed_header_pairs = [
+        ("content-type", request_param["content_type"]),
+        ("host", request_param["host"]),
+        ("x-content-sha256", x_content_sha256),
+        ("x-date", x_date),
+    ]
+    if session_token:
+        signed_header_pairs.append(("x-security-token", session_token))
+    # Canonical headers must be sorted by lowercase header name.
+    signed_header_pairs.sort(key=lambda kv: kv[0])
+    signed_headers_str = ";".join(name for name, _ in signed_header_pairs)
+    canonical_headers_str = "\n".join(
+        f"{name}:{value}" for name, value in signed_header_pairs
     )
-    # signed_headers_str = signed_headers_str + ";x-security-token"
     canonical_request_str = "\n".join(
         [
             request_param["method"].upper(),
             request_param["path"],
             norm_query(request_param["query"]),
-            "\n".join(
-                [
-                    "content-type:" + request_param["content_type"],
-                    "host:" + request_param["host"],
-                    "x-content-sha256:" + x_content_sha256,
-                    "x-date:" + x_date,
-                ]
-            ),
+            canonical_headers_str,
             "",
             signed_headers_str,
             x_content_sha256,
@@ -347,7 +354,8 @@ def request(
     )
     header = ensure_x_custom_source_header(header)
     header = {**header, **sign_result}
-    # header = {**header, **{"X-Security-Token": SessionToken}}
+    if session_token:
+        header["X-Security-Token"] = session_token
     # 第六步：将 Signature 签名写入 HTTP Header 中，并发送 HTTP 请求。
     r = _signed_request(
         method=method,
@@ -371,6 +379,7 @@ def ve_request(
     header: dict | None = None,
     content_type: str = "application/json",
     scheme: str = "https",
+    session_token: str | None = None,
 ):
     # 以下参数视服务不同而不同，一个服务内通常是一致的。
     # 注意：签名 scope 以参数直传，不再写模块级全局（并发下不同 service/region
@@ -395,6 +404,7 @@ def ve_request(
         host=host,
         content_type=content_type,
         scheme=scheme or "https",
+        session_token=session_token,
     )
     check_error(response_body)
     return response_body

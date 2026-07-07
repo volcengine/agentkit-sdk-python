@@ -121,6 +121,41 @@ def test_request_produces_golden_authorization_header(capture_signed_request):
     }
 
 
+def test_request_signs_sts_security_token(capture_signed_request):
+    """STS credentials must fold X-Security-Token into the signed headers."""
+    ve_sign.request(
+        "POST",
+        FIXED_DATE,
+        {"Limit": "2"},
+        {},
+        "AKTEST",
+        "SKTEST",
+        "ListFoo",
+        json.dumps({"a": 1}),
+        session_token="STS-abc-123",
+        **SCOPE,
+    )
+    headers = capture_signed_request["headers"]
+
+    # The token is sent AND covered by the signature (sorted last).
+    assert headers["X-Security-Token"] == "STS-abc-123"
+    assert headers["Authorization"] == (
+        "HMAC-SHA256 Credential=AKTEST/20260102/cn-test/test-svc/request, "
+        "SignedHeaders=content-type;host;x-content-sha256;x-date;x-security-token, "
+        "Signature=a60cb3db3fea2df93ddb8a0cc149bee51d9a50c30a7d35a53c3b9d2c511f9c57"
+    )
+
+
+def test_request_without_token_omits_security_token(capture_signed_request):
+    """Static ak/sk callers keep the original four-header canonical form."""
+    ve_sign.request(
+        "POST", FIXED_DATE, {}, {}, "AK", "SK", "ActA", "", **SCOPE
+    )
+    headers = capture_signed_request["headers"]
+    assert "X-Security-Token" not in headers
+    assert "x-security-token" not in headers["Authorization"]
+
+
 def test_request_scope_is_per_call_not_global(capture_signed_request):
     """Two calls with different scopes must not bleed into each other."""
     ve_sign.request(
