@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import inspect
+import logging
 import os
 import re
 from collections.abc import Callable
@@ -20,6 +21,8 @@ from typing import Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+logger = logging.getLogger(__name__)
 
 _REGEX_PREFIX = "regex:"
 
@@ -114,11 +117,22 @@ def add_cors_compat_middleware(app: FastAPI, allow_origins: list[str]) -> None:
     """Add CORS middleware for ADK versions that cannot parse regex origins."""
 
     literal_origins, allow_origin_regex = split_allow_origins(allow_origins)
+    # A wildcard origin combined with allow_credentials=True is unsafe: Starlette
+    # then echoes the caller's Origin back with Access-Control-Allow-Credentials,
+    # which lets *any* site make credentialed cross-origin calls. Only enable
+    # credentials when the origin set is an explicit allowlist.
+    allow_credentials = "*" not in literal_origins
+    if not allow_credentials:
+        logger.warning(
+            "CORS allow_origins includes '*'; disabling allow_credentials. Set "
+            "AGENTKIT_ALLOW_ORIGINS (or allow_origins=) to an explicit allowlist "
+            "to permit credentialed cross-origin requests."
+        )
     app.add_middleware(
         CORSMiddleware,
         allow_origins=literal_origins,
         allow_origin_regex=allow_origin_regex,
-        allow_credentials=True,
+        allow_credentials=allow_credentials,
         allow_methods=["*"],
         allow_headers=["*"],
     )

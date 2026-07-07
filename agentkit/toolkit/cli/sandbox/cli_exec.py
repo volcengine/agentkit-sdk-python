@@ -23,10 +23,17 @@ import shlex
 import shutil
 import signal
 import sys
-import termios
 import threading
-import tty
 from contextlib import contextmanager
+
+try:
+    # POSIX-only terminal APIs; absent on Windows. Import lazily so that merely
+    # importing the CLI (e.g. `agentkit --help`) does not crash on Windows.
+    import termios
+    import tty
+except ImportError:  # pragma: no cover - exercised only on Windows
+    termios = None  # type: ignore[assignment]
+    tty = None  # type: ignore[assignment]
 from pathlib import Path
 from typing import Iterator, Optional
 
@@ -77,6 +84,14 @@ def _terminal_size() -> dict[str, int]:
 
 @contextmanager
 def _raw_terminal_mode() -> Iterator[None]:
+    if termios is None or tty is None:
+        typer.echo(
+            "Interactive sandbox exec/shell requires a POSIX terminal "
+            "(termios/tty) and is not supported on this platform.",
+            err=True,
+        )
+        raise typer.Exit(1)
+
     if not sys.stdin.isatty():
         yield
         return

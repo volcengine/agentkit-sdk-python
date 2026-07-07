@@ -171,9 +171,64 @@ def test_delete_credential_resolves_name_to_id(monkeypatch):
 
     monkeypatch.setattr(client_mod, "AgentkitIdentityClient", _FakeClient)
 
+    result = runner.invoke(app, ["delete", "credential", "key-b", "--force"])
+    assert result.exit_code == 0, result.output
+    assert deleted == ["iac-2"]
+
+
+def _single_key_b_client(deleted):
+    class _FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def list_inbound_auth_configs(self, request):
+            return it.ListInboundAuthConfigsResponse.model_validate(
+                {
+                    "InboundAuthConfigs": [
+                        _config("iac-2", "key-b").model_dump(by_alias=True),
+                    ],
+                    "NextToken": "",
+                }
+            )
+
+        def delete_inbound_auth_config(self, request):
+            deleted.append(request.inbound_auth_config_id)
+            return it.DeleteInboundAuthConfigResponse.model_validate(
+                {"InboundAuthConfigId": request.inbound_auth_config_id}
+            )
+
+    return _FakeClient
+
+
+def test_delete_credential_non_interactive_proceeds_without_prompt(monkeypatch):
+    # No TTY (CI / pipe) and no --force: must keep the historical behavior of
+    # deleting without a prompt, i.e. adding the guard is not a breaking change.
+    import agentkit.toolkit.cli.cli_delete as cli_delete
+
+    monkeypatch.setattr(cli_delete, "_stdin_is_interactive", lambda: False)
+    deleted = []
+    monkeypatch.setattr(
+        client_mod, "AgentkitIdentityClient", _single_key_b_client(deleted)
+    )
+
     result = runner.invoke(app, ["delete", "credential", "key-b"])
     assert result.exit_code == 0, result.output
     assert deleted == ["iac-2"]
+
+
+def test_delete_credential_interactive_decline_aborts(monkeypatch):
+    # With a TTY, declining the prompt must abort before any delete happens.
+    import agentkit.toolkit.cli.cli_delete as cli_delete
+
+    monkeypatch.setattr(cli_delete, "_stdin_is_interactive", lambda: True)
+    deleted = []
+    monkeypatch.setattr(
+        client_mod, "AgentkitIdentityClient", _single_key_b_client(deleted)
+    )
+
+    result = runner.invoke(app, ["delete", "credential", "key-b"], input="n\n")
+    assert result.exit_code != 0
+    assert deleted == []
 
 
 def test_delete_credential_not_found(monkeypatch):

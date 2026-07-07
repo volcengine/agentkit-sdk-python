@@ -37,9 +37,11 @@ class VeCR:
         secret_key: str,
         region: str | None = None,
         provider: str | None = None,
+        session_token: str | None = None,
     ):
         self.ak = access_key
         self.sk = secret_key
+        self.session_token = session_token
 
         config = VolcConfiguration(region=region or None, provider=provider or None)
         ep = resolve_endpoint(
@@ -90,6 +92,7 @@ class VeCR:
             action="CreateRegistry",
             ak=self.ak,
             sk=self.sk,
+            session_token=self.session_token,
             service="cr",
             version=self.version,
             region=self.region,
@@ -149,6 +152,7 @@ class VeCR:
             action="ListRegistries",
             ak=self.ak,
             sk=self.sk,
+            session_token=self.session_token,
             service="cr",
             version=self.version,
             region=self.region,
@@ -187,6 +191,7 @@ class VeCR:
             action="CreateNamespace",
             ak=self.ak,
             sk=self.sk,
+            session_token=self.session_token,
             service="cr",
             version=self.version,
             region=self.region,
@@ -239,6 +244,7 @@ class VeCR:
             action="CreateRepository",
             ak=self.ak,
             sk=self.sk,
+            session_token=self.session_token,
             service="cr",
             version=self.version,
             region=self.region,
@@ -273,6 +279,7 @@ class VeCR:
             action="GetAuthorizationToken",
             ak=self.ak,
             sk=self.sk,
+            session_token=self.session_token,
             service="cr",
             version=self.version,
             region=self.region,
@@ -309,6 +316,7 @@ class VeCR:
             action="GetPublicEndpoint",
             ak=self.ak,
             sk=self.sk,
+            session_token=self.session_token,
             service="cr",
             version=self.version,
             region=self.region,
@@ -337,6 +345,7 @@ class VeCR:
             action="UpdatePublicEndpoint",
             ak=self.ak,
             sk=self.sk,
+            session_token=self.session_token,
             service="cr",
             version=self.version,
             region=self.region,
@@ -375,6 +384,7 @@ class VeCR:
             action="CreateEndpointAclPolicies",
             ak=self.ak,
             sk=self.sk,
+            session_token=self.session_token,
             service="cr",
             version=self.version,
             region=self.region,
@@ -405,6 +415,7 @@ class VeCR:
             action="ListDomains",
             ak=self.ak,
             sk=self.sk,
+            session_token=self.session_token,
             service="cr",
             version=self.version,
             region=self.region,

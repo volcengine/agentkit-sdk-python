@@ -146,3 +146,25 @@ def test_add_cors_compat_middleware_splits_literal_and_regex():
     assert options["allow_origin_regex"] == "https://.*\\.example\\.com"
     assert options["allow_methods"] == ["*"]
     assert options["allow_headers"] == ["*"]
+
+
+def _cors_options(app: FastAPI) -> dict:
+    [middleware] = app.user_middleware
+    return getattr(middleware, "options", None) or getattr(middleware, "kwargs", {})
+
+
+def test_add_cors_compat_middleware_disables_credentials_for_wildcard():
+    # A wildcard origin must not be paired with allow_credentials=True, or any
+    # site could make credentialed cross-origin calls.
+    app = FastAPI()
+    add_cors_compat_middleware(app, ["*"])
+    assert _cors_options(app)["allow_credentials"] is False
+
+
+def test_add_cors_compat_middleware_keeps_credentials_for_explicit_allowlist():
+    app = FastAPI()
+    add_cors_compat_middleware(
+        app,
+        ["https://console.volcengine.com", "regex:https://.*\\.volcengine\\.com"],
+    )
+    assert _cors_options(app)["allow_credentials"] is True

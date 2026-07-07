@@ -24,12 +24,21 @@ from agentkit.platform import (
 from agentkit.toolkit.errors import ApiError
 
 
-def requires_api_key(*, provider_name: str, into: str = "api_key"):
+def requires_api_key(
+    *,
+    provider_name: str,
+    into: str = "api_key",
+    identity_token: str | None = None,
+):
     """Decorator that fetches an API key before calling the decorated function.
 
     Args:
         provider_name: The credential provider name
         into: Parameter name to inject the API key into
+        identity_token: Workload identity token forwarded to ``GetResourceApiKey``
+            as ``IdentityToken``. Supply this when the provider validates it;
+            when omitted the field is not sent (previously a hard-coded
+            ``"identity_token"`` placeholder was sent, which never validated).
 
     Returns:
         Decorator function
@@ -41,17 +50,20 @@ def requires_api_key(*, provider_name: str, into: str = "api_key"):
             endpoint = resolve_endpoint("identity")
             access_key = creds.access_key
             secret_key = creds.secret_key
-            session_token = ""
+            # Forward the STS session token so signing works under temporary
+            # credentials (ve_request signs X-Security-Token when present).
+            session_token = creds.session_token or None
+
+            request_body: dict[str, str] = {"ProviderName": provider_name}
+            if identity_token:
+                request_body["IdentityToken"] = identity_token
 
             response = ve_request(
-                request_body={
-                    "ProviderName": provider_name,
-                    "IdentityToken": "identity_token",
-                },
+                request_body=request_body,
                 action="GetResourceApiKey",
-                header={"X-Security-Token": session_token} if session_token else {},
                 ak=access_key,
                 sk=secret_key,
+                session_token=session_token,
                 version=endpoint.api_version,
                 service=endpoint.service,
                 host=endpoint.host,

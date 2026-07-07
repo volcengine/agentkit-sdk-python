@@ -19,6 +19,7 @@ config is addressed by ``InboundAuthConfigId``, so the name is first resolved
 to its id via ``ListInboundAuthConfigs``.
 """
 
+import sys
 from typing import Optional
 
 import typer
@@ -33,6 +34,27 @@ delete_app = typer.Typer(
 )
 
 
+def _stdin_is_interactive() -> bool:
+    """Whether a human is at the keyboard (as opposed to CI / a pipe)."""
+    try:
+        return sys.stdin.isatty()
+    except (AttributeError, ValueError):
+        return False
+
+
+def _confirm_deletion(message: str, *, force: bool) -> None:
+    """Guard a destructive delete with a confirmation prompt.
+
+    Only prompts in an interactive terminal: non-interactive callers (CI,
+    scripts, pipes) keep the historical behavior of deleting without a prompt,
+    so adding this guard is not a breaking change for automation. Pass
+    ``--force`` to skip the prompt interactively too.
+    """
+    if force or not _stdin_is_interactive():
+        return
+    typer.confirm(message, abort=True)
+
+
 @delete_app.command("credential")
 def delete_credential_command(
     name: str = typer.Argument(..., help="Credential name to delete."),
@@ -43,6 +65,9 @@ def delete_credential_command(
             "Region override for this command (e.g. cn-beijing, cn-shanghai). "
             "Defaults to VOLCENGINE_AGENTKIT_REGION/VOLCENGINE_REGION/global config."
         ),
+    ),
+    force: bool = typer.Option(
+        False, "--force", "-f", help="Skip the confirmation prompt."
     ),
 ):
     """Delete a credential (inbound auth config) by name."""
@@ -73,6 +98,20 @@ def delete_credential_command(
         console.print(f"[red]Error: credential '{name}' not found.[/red]")
         raise typer.Exit(1)
 
+    if len(matches) > 1:
+        console.print(
+            f"[yellow]{len(matches)} credentials named '{name}' will be deleted:"
+            "[/yellow]"
+        )
+        for config in matches:
+            console.print(f"  - {config.inbound_auth_config_id}")
+
+    _confirm_deletion(
+        f"Delete credential '{name}' ({len(matches)} config(s))? "
+        "This cannot be undone.",
+        force=force,
+    )
+
     for config in matches:
         config_id = config.inbound_auth_config_id
         if not config_id:
@@ -97,6 +136,9 @@ def delete_harness_command(
     ),
     timeout: int = typer.Option(
         300, "--timeout", help="Max seconds to wait for the async deletion to finish."
+    ),
+    force: bool = typer.Option(
+        False, "--force", "-f", help="Skip the confirmation prompt."
     ),
 ):
     """Delete a harness runtime by name.
@@ -150,6 +192,12 @@ def delete_harness_command(
             "Refusing to delete.[/red]"
         )
         raise typer.Exit(1)
+
+    _confirm_deletion(
+        f"Delete harness '{name}' ({len(harness_matches)} runtime(s))? "
+        "This cannot be undone.",
+        force=force,
+    )
 
     for runtime in harness_matches:
         runtime_id = runtime.runtime_id
