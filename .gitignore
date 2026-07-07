@@ -174,6 +174,8 @@ docs/node_modules/
 test-agents/*
 tos_doc_example
 agentkit*.yaml
+# harness deploy registry — contains the runtime API key in plaintext
+harness.json
 Dockerfile
 Dockerfile-base
 local_build.py

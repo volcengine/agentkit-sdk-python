@@ -37,10 +37,13 @@ _HEX = re.compile(r"[0-9a-fA-F]+\Z")
 # OTel trace_id (32), git sha (40), sha256 digest (64). Labeled hex secrets
 # are still caught by _FIELD regardless of shape.
 _HEX_ID_LENGTHS = frozenset({32, 40, 64})
-# Explicit secret-bearing query/JSON/header fields.
+# Explicit secret-bearing query/JSON/header fields. secret_access_key is listed
+# before secret_key so the longer name wins at a shared position; signature
+# covers presigned-URL HMACs whose 64-hex value _redact_opaque otherwise spares.
 _FIELD = re.compile(
     r"(?i)(\"?(?:access_token|refresh_token|id_token|client_secret|secret_access_key"
-    r"|secretkey|accesskeyid|accesskey|sessiontoken|session_token|authorization"
+    r"|secret_key|secretkey|accesskeyid|accesskey|sessiontoken|session_token"
+    r"|security_token|signature|authorization"
     r"|apikey|api_key|token|password)\"?\s*[:=]\s*\"?(?:bearer\s+)?)"
     r"([^\"&\s,}]+)"
 )
