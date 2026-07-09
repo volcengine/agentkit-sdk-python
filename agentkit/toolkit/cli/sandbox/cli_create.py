@@ -627,7 +627,7 @@ def create_command(
     tool_type: Optional[str] = typer.Option(
         None,
         "--tool-type",
-        help="Tool type. Defaults to CodeEnv.",
+        help="Tool type. Defaults to sandbox.yaml (from sandbox build) or CodeEnv.",
     ),
     tool_name: Optional[str] = typer.Option(
         None,
@@ -694,7 +694,7 @@ def create_command(
     image_url: Optional[str] = typer.Option(
         None,
         "--image-url",
-        help="Custom image URL. Required when --tool-type Private.",
+        help="Custom image URL. Defaults to sandbox.yaml (from sandbox build). Required for Private tools.",
     ),
     network_config: Optional[str] = typer.Option(
         None,
