@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any, NoReturn, Optional
 
 import typer
+import yaml
 
 from agentkit.platform import VolcConfiguration
 from agentkit.sdk.tools.client import AgentkitToolsClient
@@ -48,6 +49,7 @@ from agentkit.toolkit.cli.sandbox.tos_config import (
     build_create_tool_tos_mount_config,
 )
 from agentkit.toolkit.cli.sandbox.sandbox_client import error
+from agentkit.toolkit.cli.sandbox.sandbox_client import SANDBOX_YAML_PATH
 from agentkit.toolkit.volcengine.services.tos_service import (
     TOSService,
     TOSServiceConfig,
@@ -72,6 +74,55 @@ NETWORK_CONFIG_FIELDS = (
     "subnet_ids",
     "enable_shared_internet_access",
 )
+
+
+def _get_sandbox_yaml_path() -> Path:
+    return Path.cwd() / SANDBOX_YAML_PATH
+
+
+def _load_sandbox_yaml_defaults() -> tuple[str, str] | None:
+    path = _get_sandbox_yaml_path()
+    if not path.exists():
+        return None
+
+    try:
+        payload = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError as exc:
+        error(f"Invalid {SANDBOX_YAML_PATH}: {exc}")
+    except OSError as exc:
+        error(f"Failed to read {SANDBOX_YAML_PATH}: {exc}")
+
+    if not isinstance(payload, dict):
+        error(f"Invalid {SANDBOX_YAML_PATH}: expected a YAML mapping")
+
+    raw_tool_type = payload.get("tool_type")
+    raw_image_url = payload.get("image_url")
+    if not isinstance(raw_tool_type, str) or not raw_tool_type.strip():
+        error(f"Invalid {SANDBOX_YAML_PATH}: tool_type must be a non-empty string")
+    if not isinstance(raw_image_url, str) or not raw_image_url.strip():
+        error(f"Invalid {SANDBOX_YAML_PATH}: image_url must be a non-empty string")
+
+    tool_type = _validate_tool_type(raw_tool_type)
+    image_url = raw_image_url.strip()
+    if tool_type == PRIVATE_TOOL_TYPE and not image_url:
+        error(f"Invalid {SANDBOX_YAML_PATH}: image_url is required for Private tools")
+
+    return tool_type, image_url
+
+
+def _resolve_create_tool_image_defaults(
+    *,
+    tool_type: Optional[str],
+    image_url: Optional[str],
+) -> tuple[str, Optional[str]]:
+    if tool_type is not None or image_url is not None:
+        return tool_type or DEFAULT_CREATE_TOOL_TYPE, image_url
+
+    defaults = _load_sandbox_yaml_defaults()
+    if defaults is None:
+        return DEFAULT_CREATE_TOOL_TYPE, image_url
+
+    return defaults
 
 
 def _resolve_region(env_var_name: str, service_key: str) -> str:
@@ -573,8 +624,8 @@ def create_tool(
 
 def create_command(
     ctx: typer.Context,
-    tool_type: str = typer.Option(
-        DEFAULT_CREATE_TOOL_TYPE,
+    tool_type: Optional[str] = typer.Option(
+        None,
         "--tool-type",
         help="Tool type. Defaults to CodeEnv.",
     ),
@@ -664,6 +715,10 @@ def create_command(
     result = None
     try:
         skill_role_name, skill_role_name_provided = _resolve_create_extra_args(ctx)
+        tool_type, image_url = _resolve_create_tool_image_defaults(
+            tool_type=tool_type,
+            image_url=image_url,
+        )
         if tos_mount is not None and not (tos_bucket or "").strip():
             error("--tos-mount requires --tos-bucket")
         result = create_tool(

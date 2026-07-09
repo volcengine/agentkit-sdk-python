@@ -177,11 +177,16 @@ def _reset_fake_tools_client():
 
 
 @pytest.fixture(autouse=True)
-def _use_platform_config(monkeypatch):
+def _use_platform_config(monkeypatch, tmp_path):
     from agentkit.toolkit.cli.sandbox import cli_create
 
     _reset_fake_tools_client()
     monkeypatch.setattr(cli_create, "VolcConfiguration", _FakePlatformConfig)
+    monkeypatch.setattr(
+        cli_create,
+        "_get_sandbox_yaml_path",
+        lambda: tmp_path / ".agentkit" / "sandbox" / "sandbox.yaml",
+    )
 
 
 def test_create_command_skips_tos_mount_by_default(
@@ -850,6 +855,109 @@ def test_create_command_adds_private_defaults_and_caches_private_type(
         "ToolType": "Private",
         "ModelProvider": "model_square",
     }
+
+
+def test_create_command_uses_sandbox_yaml_when_image_options_are_omitted(
+    monkeypatch,
+):
+    from agentkit.toolkit.cli.cli import app
+    from agentkit.toolkit.cli.sandbox import cli_create
+
+    _reset_fake_tools_client()
+    monkeypatch.setattr(cli_create, "AgentkitToolsClient", _FakeToolsClient)
+    monkeypatch.setattr(cli_create, "TOSService", _FakeTOSService)
+    monkeypatch.setattr(
+        cli_create,
+        "_wait_for_tool_ready",
+        lambda _client, _tool_id: SimpleNamespace(
+            tool_type="Private",
+            name="demo-tool",
+            status="Ready",
+        ),
+    )
+    sandbox_yaml_path = cli_create._get_sandbox_yaml_path()
+    sandbox_yaml_path.parent.mkdir(parents=True, exist_ok=True)
+    sandbox_yaml_path.write_text(
+        "tool_type: Private\n"
+        "image_url: registry.example.com/custom-image:from-yaml\n",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(app, ["sandbox", "create", "--tool-name", "demo-tool"])
+
+    assert result.exit_code == 0
+    request = _FakeToolsClient.last_request
+    assert request.tool_type == "Private"
+    assert request.image_url == "registry.example.com/custom-image:from-yaml"
+    assert request.command == "/opt/gem/run.sh"
+    assert request.port == 8080
+
+
+def test_create_command_cli_tool_type_disables_sandbox_yaml_defaults(
+    monkeypatch,
+):
+    from agentkit.toolkit.cli.cli import app
+    from agentkit.toolkit.cli.sandbox import cli_create
+
+    _reset_fake_tools_client()
+    monkeypatch.setattr(cli_create, "AgentkitToolsClient", _FakeToolsClient)
+    monkeypatch.setattr(cli_create, "TOSService", _FakeTOSService)
+    sandbox_yaml_path = cli_create._get_sandbox_yaml_path()
+    sandbox_yaml_path.parent.mkdir(parents=True, exist_ok=True)
+    sandbox_yaml_path.write_text(
+        "tool_type: Private\n"
+        "image_url: registry.example.com/custom-image:from-yaml\n",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        app,
+        ["sandbox", "create", "--tool-name", "demo-tool", "--tool-type", "CodeEnv"],
+    )
+
+    assert result.exit_code == 0
+    request = _FakeToolsClient.last_request
+    assert request.tool_type == "CodeEnv"
+    assert request.image_url is None
+    assert request.command is None
+    assert request.port is None
+
+
+def test_create_command_cli_image_url_disables_sandbox_yaml_defaults(
+    monkeypatch,
+):
+    from agentkit.toolkit.cli.cli import app
+    from agentkit.toolkit.cli.sandbox import cli_create
+
+    _reset_fake_tools_client()
+    monkeypatch.setattr(cli_create, "AgentkitToolsClient", _FakeToolsClient)
+    monkeypatch.setattr(cli_create, "TOSService", _FakeTOSService)
+    sandbox_yaml_path = cli_create._get_sandbox_yaml_path()
+    sandbox_yaml_path.parent.mkdir(parents=True, exist_ok=True)
+    sandbox_yaml_path.write_text(
+        "tool_type: Private\n"
+        "image_url: registry.example.com/custom-image:from-yaml\n",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "sandbox",
+            "create",
+            "--tool-name",
+            "demo-tool",
+            "--image-url",
+            "registry.example.com/custom-image:from-cli",
+        ],
+    )
+
+    assert result.exit_code == 0
+    request = _FakeToolsClient.last_request
+    assert request.tool_type == "CodeEnv"
+    assert request.image_url == "registry.example.com/custom-image:from-cli"
+    assert request.command is None
+    assert request.port is None
 
 
 def test_build_create_tool_request_adds_model_envs(monkeypatch):
