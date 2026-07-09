@@ -37,6 +37,7 @@ from agentkit.frameworks._common import (
 
 
 LANGGRAPH_PENDING_INTERRUPT_STATE_KEY = "agentkit:langgraph:pending_interrupt"
+_OUTPUT_FIELD_KEYS = ("answer", "output", "final", "response", "text", "messages")
 
 
 def _method_kwargs(method: Any, kwargs: dict[str, Any]) -> dict[str, Any]:
@@ -96,7 +97,7 @@ def _update_output_text(data: Any) -> str:
     if not isinstance(data, dict):
         return chunk_to_text(data)
 
-    for key in ("answer", "output", "text", "content", "messages"):
+    for key in _OUTPUT_FIELD_KEYS:
         if key in data:
             text = chunk_to_text(data[key])
             if text:
@@ -106,7 +107,7 @@ def _update_output_text(data: Any) -> str:
     for value in data.values():
         if not isinstance(value, dict):
             continue
-        for key in ("answer", "output", "text", "content", "messages"):
+        for key in _OUTPUT_FIELD_KEYS:
             if key in value:
                 text = chunk_to_text(value[key])
                 if text:
@@ -325,6 +326,8 @@ class LangGraphAgentkitBridge(BaseAgent):
             elif isinstance(item, dict) and isinstance(item.get("type"), str):
                 mode = item["type"]
                 data = item.get("data")
+            elif isinstance(item, dict):
+                mode = "updates"
 
             if mode == "messages":
                 message = data[0] if isinstance(data, tuple) and data else data

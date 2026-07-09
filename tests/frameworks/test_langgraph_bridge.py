@@ -154,6 +154,128 @@ def test_v2_stream_parts_are_supported():
     ]
 
 
+def test_raw_state_updates_do_not_leak_intermediate_fields():
+    class RawUpdateGraph:
+        async def astream(self, payload, stream_mode=None, version=None):
+            assert stream_mode == ["messages", "updates"]
+            assert version == "v2"
+            yield {
+                "classify_intent": {
+                    "intent": "general",
+                    "needs_compliance": False,
+                    "audience_hint": "",
+                }
+            }
+            yield {"finalize": {"final": "hello", "messages": [SimpleNamespace(content="hello")]}}
+
+    events = _collect_events(
+        LangGraphAgentkitBridge(RawUpdateGraph(), name="lg_raw_updates"),
+    )
+
+    assert _visible(events) == [
+        {"partial": True, "text": "hello"},
+        {"partial": False, "text": "hello"},
+    ]
+
+
+def test_raw_internal_state_update_without_output_fields_emits_nothing():
+    class InternalOnlyGraph:
+        async def astream(self, payload, stream_mode=None, version=None):
+            del payload, stream_mode, version
+            yield {
+                "classify_intent": {
+                    "intent": "general",
+                    "needs_compliance": False,
+                    "audience_hint": "",
+                }
+            }
+
+    events = _collect_events(
+        LangGraphAgentkitBridge(InternalOnlyGraph(), name="lg_internal_only"),
+    )
+
+    assert _visible(events) == []
+
+
+def test_internal_content_field_does_not_leak_as_output():
+    class InternalContentGraph:
+        async def astream(self, payload, stream_mode=None, version=None):
+            del payload, stream_mode, version
+            yield {"retrieve": {"content": "internal document text"}}
+            yield {"finalize": {"final": "public answer"}}
+
+    events = _collect_events(
+        LangGraphAgentkitBridge(InternalContentGraph(), name="lg_internal_content"),
+    )
+
+    assert _visible(events) == [
+        {"partial": True, "text": "public answer"},
+        {"partial": False, "text": "public answer"},
+    ]
+
+
+def test_raw_state_update_with_messages_reducer_outputs_latest_message():
+    class RawMessagesGraph:
+        async def astream(self, payload, stream_mode=None, version=None):
+            del payload, stream_mode, version
+            yield {"agent": {"messages": [SimpleNamespace(content="latest answer")]}}
+
+    events = _collect_events(
+        LangGraphAgentkitBridge(RawMessagesGraph(), name="lg_raw_messages"),
+    )
+
+    assert _visible(events) == [
+        {"partial": True, "text": "latest answer"},
+        {"partial": False, "text": "latest answer"},
+    ]
+
+
+def test_update_stream_supports_final_output_field():
+    class FinalFieldGraph:
+        async def astream(self, payload, stream_mode=None, version=None):
+            del payload, stream_mode, version
+            yield ("updates", {"finalize": {"final": "final field answer"}})
+
+    events = _collect_events(
+        LangGraphAgentkitBridge(FinalFieldGraph(), name="lg_final_field"),
+    )
+
+    assert _visible(events) == [
+        {"partial": True, "text": "final field answer"},
+        {"partial": False, "text": "final field answer"},
+    ]
+
+
+def test_raw_langgraph_interrupt_update_is_exposed_as_explicit_event():
+    class RawInterruptingGraph:
+        async def astream(self, payload, config=None, stream_mode=None, version=None):
+            del payload, config, stream_mode, version
+            yield {
+                "__interrupt__": (
+                    SimpleNamespace(id="interrupt-raw", value={"prompt": "continue?"}),
+                )
+            }
+
+    events = _collect_events(
+        LangGraphAgentkitBridge(RawInterruptingGraph(), name="lg_raw_interrupt"),
+    )
+
+    assert events == [
+        {
+            "partial": None,
+            "text": "",
+            "error_code": "LANGGRAPH_INTERRUPT",
+            "interrupted": True,
+            "metadata": {
+                "langgraph_interrupt": [
+                    {"id": "interrupt-raw", "value": {"prompt": "continue?"}},
+                ]
+            },
+            "state_delta": {},
+        }
+    ]
+
+
 def test_custom_input_key_supports_non_message_workflow_state():
     class WorkflowGraph:
         async def astream(self, payload, stream_mode=None, version=None):
