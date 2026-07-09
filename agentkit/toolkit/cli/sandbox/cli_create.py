@@ -627,7 +627,7 @@ def create_command(
     tool_type: Optional[str] = typer.Option(
         None,
         "--tool-type",
-        help="Tool type. Defaults to sandbox.yaml (from sandbox build) or CodeEnv.",
+        help="Tool type. Defaults to Private if sandbox.yaml exists (from sandbox build) or CodeEnv.",
     ),
     tool_name: Optional[str] = typer.Option(
         None,
