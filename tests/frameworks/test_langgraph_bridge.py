@@ -116,6 +116,40 @@ def test_stream_nodes_emit_matching_message_chunks_as_deltas():
     ]
 
 
+def test_stream_nodes_emit_native_langgraph_token_deltas():
+    class DeltaGraph:
+        async def astream(self, payload, stream_mode=None, version=None):
+            del payload
+            assert stream_mode == ["messages", "updates"]
+            assert version == "v2"
+            yield (
+                "messages",
+                (SimpleNamespace(content="hel"), {"langgraph_node": "chatbot"}),
+            )
+            yield (
+                "messages",
+                (SimpleNamespace(content="lo"), {"langgraph_node": "chatbot"}),
+            )
+            yield (
+                "messages",
+                (SimpleNamespace(content=""), {"langgraph_node": "chatbot"}),
+            )
+
+    events = _collect_events(
+        LangGraphAgentkitBridge(
+            DeltaGraph(),
+            name="lg_delta",
+            stream_nodes=("chatbot",),
+        ),
+    )
+
+    assert _visible(events) == [
+        {"partial": True, "text": "hel"},
+        {"partial": True, "text": "lo"},
+        {"partial": False, "text": "hello"},
+    ]
+
+
 def test_stream_nodes_ignore_message_chunks_without_matching_metadata():
     class MetadataGraph:
         async def astream(self, payload, stream_mode=None, version=None):
