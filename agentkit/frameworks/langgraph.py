@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Iterable
 import hashlib
 import inspect
 import json
@@ -89,10 +89,10 @@ def _resume_value(text_input: str) -> Any:
 def _update_output_text(data: Any) -> str:
     """Extract user-facing output from LangGraph update payloads.
 
-    LangGraph ``stream_mode=["messages", "updates"]`` can emit internal LLM
-    message chunks as well as node state updates. Generic recursive extraction
-    is too broad for updates such as ``{"classify": {"route": "x"}}``; only
-    explicit output-like fields should override streamed message text.
+    LangGraph updates can contain internal node state such as routing decisions,
+    tool outputs, and classifier payloads. Generic recursive extraction is too
+    broad for updates such as ``{"classify": {"route": "x"}}``; only explicit
+    output-like fields are treated as user-facing text.
     """
     if not isinstance(data, dict):
         return chunk_to_text(data)
@@ -120,6 +120,7 @@ class LangGraphAgentkitBridge(BaseAgent):
 
     _graph: Any = PrivateAttr()
     _input_key: str | None = PrivateAttr(default=None)
+    _stream_nodes: frozenset[str] = PrivateAttr(default_factory=frozenset)
 
     def __init__(
         self,
@@ -128,10 +129,16 @@ class LangGraphAgentkitBridge(BaseAgent):
         name: str = "langgraph_agent",
         description: str = "LangGraph agent adapted for AgentKit runtime",
         input_key: str | None = None,
+        stream_nodes: Iterable[str] | str | None = None,
     ) -> None:
         super().__init__(name=name, description=description)
         self._graph = graph
         self._input_key = input_key
+        if isinstance(stream_nodes, str):
+            nodes = (stream_nodes,)
+        else:
+            nodes = tuple(stream_nodes or ())
+        self._stream_nodes = frozenset(node for node in nodes if node)
 
     def _input_payload(self, text_input: str) -> dict[str, Any]:
         if self._input_key:
@@ -224,19 +231,25 @@ class LangGraphAgentkitBridge(BaseAgent):
             "astream, stream, ainvoke, or invoke."
         )
 
+    def _stream_mode(self) -> str | list[str]:
+        if self._stream_nodes:
+            return ["messages", "updates"]
+        return "updates"
+
     def _sync_stream(self, payload: Any, config: dict[str, Any] | None):
         stream_fn = getattr(self._graph, "stream", None)
         if not callable(stream_fn):
             return None
+        stream_mode = self._stream_mode()
         attempts = [
             {
                 "config": config,
-                "stream_mode": ["messages", "updates"],
+                "stream_mode": stream_mode,
                 "version": "v2",
             },
             {
                 "config": config,
-                "stream_mode": ["messages", "updates"],
+                "stream_mode": stream_mode,
             },
             {"config": config},
         ]
@@ -270,15 +283,16 @@ class LangGraphAgentkitBridge(BaseAgent):
 
         astream = getattr(self._graph, "astream", None)
         if callable(astream):
+            stream_mode = self._stream_mode()
             attempts = [
                 {
                     "config": config,
-                    "stream_mode": ["messages", "updates"],
+                    "stream_mode": stream_mode,
                     "version": "v2",
                 },
                 {
                     "config": config,
-                    "stream_mode": ["messages", "updates"],
+                    "stream_mode": stream_mode,
                 },
                 {"config": config},
             ]
@@ -303,6 +317,19 @@ class LangGraphAgentkitBridge(BaseAgent):
             for item in stream:
                 yield item
 
+    def _message_stream_allowed(self, data: Any) -> bool:
+        if not self._stream_nodes:
+            return False
+        metadata = None
+        if isinstance(data, tuple) and len(data) > 1:
+            metadata = data[1]
+        elif isinstance(data, dict):
+            metadata = data.get("metadata")
+        if not isinstance(metadata, dict):
+            return False
+        node = metadata.get("langgraph_node")
+        return isinstance(node, str) and node in self._stream_nodes
+
     async def _run_async_impl(
         self,
         ctx: InvocationContext,
@@ -311,10 +338,8 @@ class LangGraphAgentkitBridge(BaseAgent):
         resume_pending = self._pending_interrupt(ctx) is not None
         payload = self._run_payload(ctx)
         accumulated_text = ""
-        has_output = False
         last_update: Any = None
         pending_update_text = ""
-        saw_messages = False
         streamed = False
 
         async for item in self._stream_graph(payload, config, prefer_sync=resume_pending):
@@ -330,6 +355,8 @@ class LangGraphAgentkitBridge(BaseAgent):
                 mode = "updates"
 
             if mode == "messages":
+                if not self._message_stream_allowed(data):
+                    continue
                 message = data[0] if isinstance(data, tuple) and data else data
                 text = chunk_to_text(message)
                 if not text:
@@ -337,9 +364,7 @@ class LangGraphAgentkitBridge(BaseAgent):
                 delta = chunk_delta(accumulated_text, text)
                 if not delta:
                     continue
-                saw_messages = True
                 accumulated_text += delta
-                has_output = True
                 yield adk_event(ctx, self.name, delta, partial=True)
                 continue
 
@@ -369,22 +394,13 @@ class LangGraphAgentkitBridge(BaseAgent):
 
             text = chunk_to_text(data)
             if text:
-                delta = chunk_delta(accumulated_text, text)
-                if delta:
-                    accumulated_text += delta
-                    has_output = True
-                    yield adk_event(ctx, self.name, delta, partial=True)
+                pending_update_text = text
 
         if streamed:
             update_text = pending_update_text or _update_output_text(last_update)
-            if saw_messages or has_output:
-                final_text = update_text or accumulated_text
-            else:
-                final_text = update_text
-                if final_text:
-                    yield adk_event(ctx, self.name, final_text, partial=True)
+            final_text = update_text or accumulated_text
         else:
-            final_text = chunk_to_text(await self._call_once(payload, config))
+            final_text = _update_output_text(await self._call_once(payload, config))
 
         if final_text:
             yield self._final_event(ctx, final_text, clear_pending_interrupt=resume_pending)

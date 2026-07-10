@@ -63,27 +63,24 @@ def _visible(events):
     return [{"partial": event["partial"], "text": event["text"]} for event in events]
 
 
-def test_message_stream_ignores_non_output_state_updates():
+def test_default_stream_uses_final_updates_without_partial_tokens():
     class FakeGraph:
         async def astream(self, payload, stream_mode=None):
-            assert stream_mode == ["messages", "updates"]
+            assert stream_mode == "updates"
             yield ("updates", {"classify": {"route": "handoff"}})
-            yield ("messages", (SimpleNamespace(content="final answer"), {}))
+            yield ("updates", {"finalize": {"final": "final answer"}})
 
     events = _collect_events(
-        LangGraphAgentkitBridge(FakeGraph(), name="lg_messages"),
+        LangGraphAgentkitBridge(FakeGraph(), name="lg_updates"),
     )
 
-    assert _visible(events) == [
-        {"partial": True, "text": "final answer"},
-        {"partial": False, "text": "final answer"},
-    ]
+    assert _visible(events) == [{"partial": False, "text": "final answer"}]
 
 
-def test_final_output_update_overrides_internal_message_stream_for_final_event():
+def test_default_message_stream_does_not_leak_internal_llm_tokens():
     class FakeGraph:
         async def astream(self, payload, stream_mode=None):
-            assert stream_mode == ["messages", "updates"]
+            assert stream_mode == "updates"
             yield ("messages", (SimpleNamespace(content="internal llm token"), {}))
             yield ("updates", {"answer": {"answer": "LG_PROD_OK\nfinal graph answer"}})
 
@@ -91,21 +88,25 @@ def test_final_output_update_overrides_internal_message_stream_for_final_event()
         LangGraphAgentkitBridge(FakeGraph(), name="lg_final_update"),
     )
 
-    assert _visible(events) == [
-        {"partial": True, "text": "internal llm token"},
-        {"partial": False, "text": "LG_PROD_OK\nfinal graph answer"},
-    ]
+    assert _visible(events) == [{"partial": False, "text": "LG_PROD_OK\nfinal graph answer"}]
 
 
-def test_message_stream_cumulative_chunks_are_emitted_as_deltas():
+def test_stream_nodes_emit_matching_message_chunks_as_deltas():
     class CumulativeGraph:
-        async def astream(self, payload, stream_mode=None):
-            del payload, stream_mode
-            yield ("messages", (SimpleNamespace(content="a"), {}))
-            yield ("messages", (SimpleNamespace(content="ab"), {}))
+        async def astream(self, payload, stream_mode=None, version=None):
+            del payload
+            assert stream_mode == ["messages", "updates"]
+            assert version == "v2"
+            yield ("messages", (SimpleNamespace(content="ignore"), {"langgraph_node": "classify"}))
+            yield ("messages", (SimpleNamespace(content="a"), {"langgraph_node": "final_answer"}))
+            yield ("messages", (SimpleNamespace(content="ab"), {"langgraph_node": "final_answer"}))
 
     events = _collect_events(
-        LangGraphAgentkitBridge(CumulativeGraph(), name="lg_cumulative"),
+        LangGraphAgentkitBridge(
+            CumulativeGraph(),
+            name="lg_cumulative",
+            stream_nodes=("final_answer",),
+        ),
     )
 
     assert _visible(events) == [
@@ -115,49 +116,64 @@ def test_message_stream_cumulative_chunks_are_emitted_as_deltas():
     ]
 
 
+def test_stream_nodes_ignore_message_chunks_without_matching_metadata():
+    class MetadataGraph:
+        async def astream(self, payload, stream_mode=None, version=None):
+            del payload, version
+            assert stream_mode == ["messages", "updates"]
+            yield ("messages", (SimpleNamespace(content="no metadata"), {}))
+            yield ("messages", (SimpleNamespace(content="wrong node"), {"langgraph_node": "classify"}))
+            yield ("updates", {"finalize": {"final": "safe final"}})
+
+    events = _collect_events(
+        LangGraphAgentkitBridge(
+            MetadataGraph(),
+            name="lg_filtered",
+            stream_nodes=("final_answer",),
+        ),
+    )
+
+    assert _visible(events) == [{"partial": False, "text": "safe final"}]
+
+
 def test_update_stream_is_used_when_graph_emits_no_messages():
     class UpdateOnlyGraph:
         async def astream(self, payload, stream_mode=None):
+            assert stream_mode == "updates"
             yield ("updates", {"result": {"answer": "fallback answer"}})
 
     events = _collect_events(
         LangGraphAgentkitBridge(UpdateOnlyGraph(), name="lg_updates"),
     )
 
-    assert _visible(events) == [
-        {"partial": True, "text": "fallback answer"},
-        {"partial": False, "text": "fallback answer"},
-    ]
+    assert _visible(events) == [{"partial": False, "text": "fallback answer"}]
 
 
 def test_v2_stream_parts_are_supported():
     class V2Graph:
         async def astream(self, payload, stream_mode=None, version=None):
-            assert stream_mode == ["messages", "updates"]
+            assert stream_mode == "updates"
             assert version == "v2"
             yield {
                 "type": "updates",
                 "data": {"classify": {"route": "self_serve"}},
             }
             yield {
-                "type": "messages",
-                "data": (SimpleNamespace(content="v2 answer"), {}),
+                "type": "updates",
+                "data": {"finalize": {"final": "v2 answer"}},
             }
 
     events = _collect_events(
         LangGraphAgentkitBridge(V2Graph(), name="lg_v2"),
     )
 
-    assert _visible(events) == [
-        {"partial": True, "text": "v2 answer"},
-        {"partial": False, "text": "v2 answer"},
-    ]
+    assert _visible(events) == [{"partial": False, "text": "v2 answer"}]
 
 
 def test_raw_state_updates_do_not_leak_intermediate_fields():
     class RawUpdateGraph:
         async def astream(self, payload, stream_mode=None, version=None):
-            assert stream_mode == ["messages", "updates"]
+            assert stream_mode == "updates"
             assert version == "v2"
             yield {
                 "classify_intent": {
@@ -172,10 +188,7 @@ def test_raw_state_updates_do_not_leak_intermediate_fields():
         LangGraphAgentkitBridge(RawUpdateGraph(), name="lg_raw_updates"),
     )
 
-    assert _visible(events) == [
-        {"partial": True, "text": "hello"},
-        {"partial": False, "text": "hello"},
-    ]
+    assert _visible(events) == [{"partial": False, "text": "hello"}]
 
 
 def test_raw_internal_state_update_without_output_fields_emits_nothing():
@@ -208,10 +221,7 @@ def test_internal_content_field_does_not_leak_as_output():
         LangGraphAgentkitBridge(InternalContentGraph(), name="lg_internal_content"),
     )
 
-    assert _visible(events) == [
-        {"partial": True, "text": "public answer"},
-        {"partial": False, "text": "public answer"},
-    ]
+    assert _visible(events) == [{"partial": False, "text": "public answer"}]
 
 
 def test_raw_state_update_with_messages_reducer_outputs_latest_message():
@@ -224,10 +234,7 @@ def test_raw_state_update_with_messages_reducer_outputs_latest_message():
         LangGraphAgentkitBridge(RawMessagesGraph(), name="lg_raw_messages"),
     )
 
-    assert _visible(events) == [
-        {"partial": True, "text": "latest answer"},
-        {"partial": False, "text": "latest answer"},
-    ]
+    assert _visible(events) == [{"partial": False, "text": "latest answer"}]
 
 
 def test_update_stream_supports_final_output_field():
@@ -240,10 +247,7 @@ def test_update_stream_supports_final_output_field():
         LangGraphAgentkitBridge(FinalFieldGraph(), name="lg_final_field"),
     )
 
-    assert _visible(events) == [
-        {"partial": True, "text": "final field answer"},
-        {"partial": False, "text": "final field answer"},
-    ]
+    assert _visible(events) == [{"partial": False, "text": "final field answer"}]
 
 
 def test_raw_langgraph_interrupt_update_is_exposed_as_explicit_event():
@@ -280,7 +284,7 @@ def test_custom_input_key_supports_non_message_workflow_state():
     class WorkflowGraph:
         async def astream(self, payload, stream_mode=None, version=None):
             assert payload == {"question": "hi"}
-            assert stream_mode == ["messages", "updates"]
+            assert stream_mode == "updates"
             assert version == "v2"
             yield {
                 "type": "updates",
@@ -295,18 +299,15 @@ def test_custom_input_key_supports_non_message_workflow_state():
         ),
     )
 
-    assert _visible(events) == [
-        {"partial": True, "text": "workflow:hi"},
-        {"partial": False, "text": "workflow:hi"},
-    ]
+    assert _visible(events) == [{"partial": False, "text": "workflow:hi"}]
 
 
-def test_session_id_is_passed_as_langgraph_thread_id_for_streaming():
+def test_session_id_is_passed_as_langgraph_thread_id_for_update_streaming():
     class ThreadAwareGraph:
         async def astream(self, payload, config=None, stream_mode=None, version=None):
             assert payload == {"question": "hi"}
             assert config == {"configurable": {"thread_id": "session-123"}}
-            assert stream_mode == ["messages", "updates"]
+            assert stream_mode == "updates"
             assert version == "v2"
             yield {"type": "updates", "data": {"answer": config["configurable"]["thread_id"]}}
 
@@ -319,10 +320,7 @@ def test_session_id_is_passed_as_langgraph_thread_id_for_streaming():
         _ctx(session_id="session-123"),
     )
 
-    assert _visible(events) == [
-        {"partial": True, "text": "session-123"},
-        {"partial": False, "text": "session-123"},
-    ]
+    assert _visible(events) == [{"partial": False, "text": "session-123"}]
 
 
 def test_session_id_is_passed_as_langgraph_thread_id_for_invoke_fallback():
@@ -427,7 +425,7 @@ def test_pending_interrupt_resumes_with_text_input_and_clears_state():
             assert isinstance(payload, Command)
             assert payload.resume == "approved"
             assert config == {"configurable": {"thread_id": "session-1"}}
-            assert stream_mode == ["messages", "updates"]
+            assert stream_mode == "updates"
             assert version == "v2"
             yield {"type": "updates", "data": {"answer": f"resumed:{payload.resume}"}}
 
@@ -444,10 +442,7 @@ def test_pending_interrupt_resumes_with_text_input_and_clears_state():
         _ctx("approved", session_id="session-1", state=state),
     )
 
-    assert _visible(events) == [
-        {"partial": True, "text": "resumed:approved"},
-        {"partial": False, "text": "resumed:approved"},
-    ]
+    assert _visible(events) == [{"partial": False, "text": "resumed:approved"}]
     assert events[-1]["state_delta"] == {LANGGRAPH_PENDING_INTERRUPT_STATE_KEY: None}
 
 
@@ -474,10 +469,7 @@ def test_pending_interrupt_resumes_with_json_input():
         _ctx('{"decision":"yes"}', session_id="session-1", state=state),
     )
 
-    assert _visible(events) == [
-        {"partial": True, "text": "yes"},
-        {"partial": False, "text": "yes"},
-    ]
+    assert _visible(events) == [{"partial": False, "text": "yes"}]
     assert events[-1]["state_delta"] == {LANGGRAPH_PENDING_INTERRUPT_STATE_KEY: None}
 
 
@@ -519,10 +511,7 @@ def test_real_interrupt_resume_from_compiled_graph_is_supported():
         _ctx('{"decision":"yes"}', session_id="thread-1", state=session_state),
     )
 
-    assert _visible(second) == [
-        {"partial": True, "text": "approved:yes:deploy"},
-        {"partial": False, "text": "approved:yes:deploy"},
-    ]
+    assert _visible(second) == [{"partial": False, "text": "approved:yes:deploy"}]
     assert second[-1]["state_delta"] == {LANGGRAPH_PENDING_INTERRUPT_STATE_KEY: None}
 
 
@@ -630,10 +619,7 @@ def test_real_command_updates_from_compiled_graph_are_supported():
         ),
     )
 
-    assert _visible(events) == [
-        {"partial": True, "text": "command:hi:done"},
-        {"partial": False, "text": "command:hi:done"},
-    ]
+    assert _visible(events) == [{"partial": False, "text": "command:hi:done"}]
 
 
 def test_ainvoke_is_used_when_streaming_is_not_available():
@@ -666,18 +652,15 @@ def test_sync_stream_is_used_when_async_streaming_is_not_available():
     class SyncStreamGraph:
         def stream(self, payload, stream_mode=None, version=None):
             assert "messages" in payload
-            assert stream_mode == ["messages", "updates"]
+            assert stream_mode == "updates"
             assert version == "v2"
-            yield {"type": "messages", "data": (SimpleNamespace(content="sync graph"), {})}
+            yield {"type": "updates", "data": {"answer": "sync graph"}}
 
     events = _collect_events(
         LangGraphAgentkitBridge(SyncStreamGraph(), name="lg_sync_stream"),
     )
 
-    assert _visible(events) == [
-        {"partial": True, "text": "sync graph"},
-        {"partial": False, "text": "sync graph"},
-    ]
+    assert _visible(events) == [{"partial": False, "text": "sync graph"}]
 
 
 def test_stream_mode_fallback_only_handles_call_signature_errors():
@@ -689,10 +672,7 @@ def test_stream_mode_fallback_only_handles_call_signature_errors():
         LangGraphAgentkitBridge(LegacyGraph(), name="lg_legacy"),
     )
 
-    assert _visible(events) == [
-        {"partial": True, "text": "legacy stream"},
-        {"partial": False, "text": "legacy stream"},
-    ]
+    assert _visible(events) == [{"partial": False, "text": "legacy stream"}]
 
 
 def test_stream_runtime_type_errors_are_not_retried_as_legacy_signature():
