@@ -13,6 +13,7 @@ __all__ = [
     "FrameworkBridgeError",
     "LangChainAgentkitBridge",
     "LangGraphAgentkitBridge",
+    "StrandsAgentkitBridge",
     "UnsupportedFrameworkAgentError",
     "load_entry_object",
 ]
@@ -27,6 +28,10 @@ def __getattr__(name: str) -> Any:
         from agentkit.frameworks.langgraph import LangGraphAgentkitBridge
 
         return LangGraphAgentkitBridge
+    if name == "StrandsAgentkitBridge":
+        from agentkit.frameworks.strands import StrandsAgentkitBridge
+
+        return StrandsAgentkitBridge
     if name == "load_entry_object":
         from agentkit.frameworks.migration import load_entry_object
 

@@ -79,7 +79,8 @@ toolkit = []
 dev = []
 langchain = ["langchain"]
 langgraph = ["langgraph"]
-frameworks = ["langchain", "langgraph"]
+strands = ["strands-agents"]
+frameworks = ["langchain", "langgraph", "strands-agents"]
 
 [tool.ruff.lint]
 
