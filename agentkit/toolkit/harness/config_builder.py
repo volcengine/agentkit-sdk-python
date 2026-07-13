@@ -23,6 +23,7 @@ def build_agentkit_config(
     envs: Dict[str, str],
     auth: Optional[Dict[str, Any]] = None,
     runtime_id: str = "Auto",
+    runtime_network: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Build the cloud AgentKit launch config dict (auto-provision).
 
@@ -38,6 +39,9 @@ def build_agentkit_config(
     When ``auth`` (a normalized ``{discovery_url, allowed_ids}`` block) is given,
     the runtime is gated by OAuth2/JWT (``custom_jwt``); otherwise it keeps the
     default API-key auth (``key_auth``).
+
+    ``runtime_network`` is forwarded to the cloud runner for ``CreateRuntime``.
+    The runner converts it into the platform's public/private network fields.
     """
     cloud: Dict[str, Any] = {
         "region": region,
@@ -64,6 +68,8 @@ def build_agentkit_config(
         cloud["runtime_apikey_name"] = "Auto"
         cloud["runtime_apikey"] = "Auto"
         cloud["runtime_jwt_allowed_clients"] = []
+    if runtime_network:
+        cloud["runtime_network"] = runtime_network
     return {
         "common": {
             "agent_name": runtime_name,
