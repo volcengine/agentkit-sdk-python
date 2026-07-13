@@ -11,6 +11,7 @@ from agentkit.frameworks._common import (
 
 __all__ = [
     "FrameworkBridgeError",
+    "BedrockAgentCoreAgentkitBridge",
     "LangChainAgentkitBridge",
     "LangGraphAgentkitBridge",
     "StrandsAgentkitBridge",
@@ -20,6 +21,10 @@ __all__ = [
 
 
 def __getattr__(name: str) -> Any:
+    if name == "BedrockAgentCoreAgentkitBridge":
+        from agentkit.frameworks.agentcore import BedrockAgentCoreAgentkitBridge
+
+        return BedrockAgentCoreAgentkitBridge
     if name == "LangChainAgentkitBridge":
         from agentkit.frameworks.langchain import LangChainAgentkitBridge
 

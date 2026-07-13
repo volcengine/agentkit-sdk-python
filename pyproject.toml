@@ -80,7 +80,8 @@ dev = []
 langchain = ["langchain"]
 langgraph = ["langgraph"]
 strands = ["strands-agents"]
-frameworks = ["langchain", "langgraph", "strands-agents"]
+agentcore = ["bedrock-agentcore"]
+frameworks = ["langchain", "langgraph", "strands-agents", "bedrock-agentcore"]
 
 [tool.ruff.lint]
 
