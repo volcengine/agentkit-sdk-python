@@ -34,7 +34,7 @@ from agentkit.toolkit.cli.sandbox.session_sync import sync_remote_sessions
 from agentkit.toolkit.cli.sandbox.sandbox_client import (
     echo_json,
     error,
-    find_session_result,
+    find_session_result_any_tool,
 )
 
 SANDBOX_DISCOVERY_PATH = Path(".agentkit") / "sandbox" / "agentkit-cli"
@@ -180,7 +180,7 @@ def _session_tool_id(session: dict[str, object], session_id: str) -> str:
 
 
 def _resolve_session_tool_id(session_id: str) -> str:
-    session = find_session_result(session_id)
+    session = find_session_result_any_tool(session_id)
     resolved_tool_id: str | None = None
     if session is None:
         resolved_tool_id = sync_remote_sessions(
@@ -190,7 +190,7 @@ def _resolve_session_tool_id(session_id: str) -> str:
             client=AgentkitToolsClient(),
             env_var_name=SANDBOX_TOOL_ID_ENV,
         )
-        session = find_session_result(session_id)
+        session = find_session_result_any_tool(session_id)
 
     if session is None:
         echo_json(

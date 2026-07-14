@@ -25,7 +25,6 @@ from agentkit.toolkit.cli.sandbox.tool_resolve import (
     resolve_existing_sandbox_tool_id,
 )
 from agentkit.toolkit.cli.sandbox.sandbox_client import (
-    find_session_result,
     replace_tool_session_results,
 )
 
@@ -85,11 +84,9 @@ def sync_remote_sessions(
     client: AgentkitToolsClient,
     env_var_name: str,
 ) -> str | None:
-    existing = find_session_result(session_id) if session_id else None
     resolved_tool_id = resolve_existing_sandbox_tool_id(
         tool_id=tool_id,
         tool_type=tool_type,
-        default_tool_id=existing.get("tool_id") if existing else None,
         client=client,
         env_var_name=env_var_name,
     )

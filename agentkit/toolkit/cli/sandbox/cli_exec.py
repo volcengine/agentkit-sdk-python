@@ -66,7 +66,6 @@ from agentkit.toolkit.cli.sandbox.sandbox_client import (
     build_bash_exec_url,
     build_terminal_ws_url,
     error,
-    find_session_result,
     remove_session_terminal_shell_id,
 )
 
@@ -440,16 +439,10 @@ def _resolve_exec_model_tool_id(
     tool_id: Optional[str],
     model_name: Optional[str],
 ) -> str | None:
+    del session_id
     if not (model_name or "").strip():
         return None
     resolved_tool_id = (tool_id or "").strip()
-    if not resolved_tool_id and session_id:
-        existing = find_session_result(session_id)
-        if existing:
-            existing_tool_id = existing.get("tool_id")
-            if isinstance(existing_tool_id, str):
-                resolved_tool_id = existing_tool_id.strip()
-
     return resolved_tool_id or None
 
 
@@ -746,7 +739,10 @@ def exec_command(
     )
 
     def on_shell_id(remote_shell_id: str) -> None:
-        add_session_terminal_shell_id(session_id, remote_shell_id)
+        tool_id = session.get("tool_id")
+        if not isinstance(tool_id, str) or not tool_id.strip():
+            error("Sandbox session missing tool_id")
+        add_session_terminal_shell_id(tool_id.strip(), session_id, remote_shell_id)
         remember_cleanup_shell_id(remote_shell_id)
         typer.echo(f"Shell ID: {remote_shell_id}", err=True)
 
@@ -760,4 +756,11 @@ def exec_command(
         with cleanup_shell_ids_lock:
             shell_ids_to_cleanup = list(cleanup_shell_ids)
         for cleanup_shell_id in shell_ids_to_cleanup:
-            remove_session_terminal_shell_id(session_id, cleanup_shell_id)
+            tool_id = session.get("tool_id")
+            if not isinstance(tool_id, str) or not tool_id.strip():
+                error("Sandbox session missing tool_id")
+            remove_session_terminal_shell_id(
+                tool_id.strip(),
+                session_id,
+                cleanup_shell_id,
+            )

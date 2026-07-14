@@ -75,7 +75,11 @@ def get_command(
             client=AgentkitToolsClient(),
             env_var_name=SANDBOX_TOOL_ID_ENV,
         )
-        result = find_session_result(session_id) if session_id else None
+        result = (
+            find_session_result(resolved_tool_id, session_id)
+            if session_id and resolved_tool_id
+            else None
+        )
         if not session_id:
             result = get_all_session_results()
     except typer.Exit:

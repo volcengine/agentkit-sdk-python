@@ -373,7 +373,6 @@ def ensure_sandbox_session_with_status(
     include_tos_mount_points: bool = True,
 ) -> tuple[dict[str, object], bool]:
     resolved_session_id = session_id or str(uuid.uuid4())
-    existing = find_session_result(resolved_session_id) if session_id else None
     client = AgentkitToolsClient()
     ttl_seconds = _resolve_ttl(ttl)
 
@@ -381,7 +380,6 @@ def ensure_sandbox_session_with_status(
         resolved_tool_id = resolve_sandbox_tool_id(
             tool_id=tool_id,
             tool_type=tool_type,
-            default_tool_id=existing.get("tool_id") if existing else None,
             client=client,
             env_var_name=SANDBOX_TOOL_ID_ENV,
         )
@@ -389,6 +387,13 @@ def ensure_sandbox_session_with_status(
         resolved_tool_id = (tool_id or "").strip()
         if not resolved_tool_id:
             error("Sandbox tool ID is required")
+
+    existing = (
+        find_session_result(resolved_tool_id, resolved_session_id)
+        if session_id
+        else None
+    )
+    synced_sessions = False
 
     snapshot_enabled = bool(session_id) and is_tool_snapshot_enabled(
         tool_id=resolved_tool_id,
@@ -438,8 +443,9 @@ def ensure_sandbox_session_with_status(
                 env_var_name=SANDBOX_TOOL_ID_ENV,
             )
             if synced_tool_id:
+                synced_sessions = True
                 resolved_tool_id = synced_tool_id
-            existing = find_session_result(resolved_session_id)
+            existing = find_session_result(resolved_tool_id, resolved_session_id)
             if existing:
                 result = _get_existing_remote_session(
                     client,
@@ -451,7 +457,7 @@ def ensure_sandbox_session_with_status(
                     save_session_result(result)
                     return result, False
 
-    if resolve_tool and session_id and not existing:
+    if resolve_tool and session_id and not existing and not synced_sessions:
         existing = _get_remote_session_by_user_session_id(
             client,
             session_id=resolved_session_id,

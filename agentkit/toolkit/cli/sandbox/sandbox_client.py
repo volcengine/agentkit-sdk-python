@@ -73,9 +73,7 @@ def save_sandbox_yaml(image_url: str, tool_type: str = "Private") -> Path:
         sort_keys=False,
         allow_unicode=True,
     )
-    tmp_path = path.with_name(
-        f".{path.name}.{os.getpid()}.{threading.get_ident()}.tmp"
-    )
+    tmp_path = path.with_name(f".{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
     try:
         tmp_path.write_text(text, encoding="utf-8")
         tmp_path.replace(path)
@@ -131,19 +129,117 @@ def _normalize_session_record(record: dict[str, object]) -> dict[str, object]:
     return result
 
 
+def _is_session_record(value: object) -> bool:
+    if not isinstance(value, dict):
+        return False
+    return any(
+        key in value
+        for key in (
+            "session_id",
+            "SessionId",
+            "instance_id",
+            "endpoint",
+            "tool_id",
+            "ToolId",
+            TERMINAL_SHELL_ID_KEY,
+        )
+    )
+
+
+def _session_record_session_id(record: dict[str, object]) -> str | None:
+    for key in ("session_id", "SessionId", "user_session_id", "UserSessionId"):
+        value = record.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
+def _session_record_tool_id(record: dict[str, object], default: str = "") -> str:
+    for key in ("tool_id", "ToolId"):
+        value = record.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return default.strip()
+
+
 def _normalize_session_store(data: dict[str, object]) -> dict[str, object]:
-    return {
-        key: _normalize_session_record(value) if isinstance(value, dict) else value
-        for key, value in data.items()
-    }
+    result: dict[str, object] = {}
+    for top_key, value in data.items():
+        if _is_session_record(value):
+            record = _normalize_session_record(value)
+            session_id = _session_record_session_id(record) or top_key
+            tool_id = _session_record_tool_id(record)
+            if not tool_id:
+                continue
+            record["session_id"] = session_id
+            record["tool_id"] = tool_id
+            tool_sessions = result.setdefault(tool_id, {})
+            if isinstance(tool_sessions, dict):
+                tool_sessions[session_id] = record
+            continue
+
+        if not isinstance(value, dict):
+            continue
+
+        tool_id = top_key.strip()
+        if not tool_id:
+            continue
+        tool_sessions: dict[str, object] = {}
+        for session_key, session_value in value.items():
+            if not isinstance(session_value, dict):
+                continue
+            record = _normalize_session_record(session_value)
+            session_id = _session_record_session_id(record) or session_key
+            record["session_id"] = session_id
+            record["tool_id"] = tool_id
+            tool_sessions[session_id] = record
+        if tool_sessions:
+            result[tool_id] = tool_sessions
+    return result
+
+
+def _tool_sessions(data: dict[str, object], tool_id: str) -> dict[str, object]:
+    value = data.get(tool_id)
+    if isinstance(value, dict):
+        return value
+    return {}
+
+
+def _get_session_record(
+    data: dict[str, object],
+    *,
+    tool_id: str,
+    session_id: str,
+) -> dict[str, object] | None:
+    result = _tool_sessions(data, tool_id).get(session_id)
+    if result is None:
+        return None
+    if not isinstance(result, dict):
+        error(f"Invalid sandbox session record: {tool_id}/{session_id}")
+    return _normalize_session_record(result)
+
+
+def _find_session_record_any_tool(
+    data: dict[str, object],
+    *,
+    session_id: str,
+) -> dict[str, object] | None:
+    for tool_id, tool_sessions in data.items():
+        if not isinstance(tool_sessions, dict):
+            continue
+        result = tool_sessions.get(session_id)
+        if result is None:
+            continue
+        if not isinstance(result, dict):
+            error(f"Invalid sandbox session record: {tool_id}/{session_id}")
+        return _normalize_session_record(result)
+    return None
 
 
 def _write_session_store(path: Path, data: dict[str, object]) -> None:
     normalized = _normalize_session_store(data)
     text = json.dumps(normalized, indent=2, ensure_ascii=False) + "\n"
-    tmp_path = path.with_name(
-        f".{path.name}.{os.getpid()}.{threading.get_ident()}.tmp"
-    )
+    tmp_path = path.with_name(f".{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
     try:
         tmp_path.write_text(text, encoding="utf-8")
         tmp_path.replace(path)
@@ -164,13 +260,17 @@ def load_session_store(path: Path) -> dict[str, object]:
     if not isinstance(data, dict):
         error(f"Invalid sandbox session store {path}: expected JSON object")
 
-    return data
+    return _normalize_session_store(data)
 
 
 def save_session_result(result: dict[str, object]) -> None:
     session_id = result.get("session_id")
     if not isinstance(session_id, str) or not session_id:
         error("CreateSession response missing session_id")
+    tool_id = result.get("tool_id")
+    if not isinstance(tool_id, str) or not tool_id.strip():
+        error("CreateSession response missing tool_id")
+    tool_id = tool_id.strip()
 
     path = _get_session_store_path()
     with _locked_session_store(path):
@@ -179,11 +279,13 @@ def save_session_result(result: dict[str, object]) -> None:
         else:
             data = {}
 
-        existing = data.get(session_id)
+        tool_sessions = _tool_sessions(data, tool_id)
+        existing = tool_sessions.get(session_id)
         if isinstance(existing, dict):
-            data[session_id] = {**existing, **result}
+            tool_sessions[session_id] = {**existing, **result}
         else:
-            data[session_id] = result
+            tool_sessions[session_id] = result
+        data[tool_id] = tool_sessions
 
         _write_session_store(path, data)
 
@@ -199,27 +301,29 @@ def replace_tool_session_results(
         else:
             data = {}
 
-        old_data = data
-        data = {
-            key: value
-            for key, value in old_data.items()
-            if not (isinstance(value, dict) and value.get("tool_id") == tool_id)
-        }
+        old_tool_sessions = dict(_tool_sessions(data, tool_id))
+        if tool_id in data:
+            data.pop(tool_id)
+
+        new_tool_sessions: dict[str, object] = {}
 
         for result in results:
             session_id = result.get("session_id")
             if not isinstance(session_id, str) or not session_id:
                 continue
-            existing = old_data.get(session_id)
+            existing = old_tool_sessions.get(session_id)
             if isinstance(existing, dict):
-                data[session_id] = {**existing, **result}
+                new_tool_sessions[session_id] = {**existing, **result}
             else:
-                data[session_id] = result
+                new_tool_sessions[session_id] = result
+        if new_tool_sessions:
+            data[tool_id] = new_tool_sessions
 
         _write_session_store(path, data)
 
 
 def update_session_result(
+    tool_id: str,
     session_id: str,
     updates: dict[str, object],
 ) -> dict[str, object]:
@@ -227,20 +331,21 @@ def update_session_result(
     with _locked_session_store(path):
         data = load_session_store(path)
 
-        result = data.get(session_id)
+        result = _get_session_record(data, tool_id=tool_id, session_id=session_id)
         if result is None:
             error(f"Sandbox session not found: {session_id}")
-        if not isinstance(result, dict):
-            error(f"Invalid sandbox session record: {session_id}")
 
         result.update(updates)
         result = _normalize_session_record(result)
-        data[session_id] = result
+        tool_sessions = _tool_sessions(data, tool_id)
+        tool_sessions[session_id] = result
+        data[tool_id] = tool_sessions
         _write_session_store(path, data)
         return result
 
 
 def remove_session_result_key(
+    tool_id: str,
     session_id: str,
     key: str,
     expected_value: object | None = None,
@@ -249,11 +354,9 @@ def remove_session_result_key(
     with _locked_session_store(path):
         data = load_session_store(path)
 
-        result = data.get(session_id)
+        result = _get_session_record(data, tool_id=tool_id, session_id=session_id)
         if result is None:
             error(f"Sandbox session not found: {session_id}")
-        if not isinstance(result, dict):
-            error(f"Invalid sandbox session record: {session_id}")
 
         if expected_value is not None and result.get(key) != expected_value:
             return result
@@ -262,12 +365,15 @@ def remove_session_result_key(
 
         result.pop(key)
         result = _normalize_session_record(result)
-        data[session_id] = result
+        tool_sessions = _tool_sessions(data, tool_id)
+        tool_sessions[session_id] = result
+        data[tool_id] = tool_sessions
         _write_session_store(path, data)
         return result
 
 
 def add_session_terminal_shell_id(
+    tool_id: str,
     session_id: str,
     shell_id: str,
 ) -> dict[str, object]:
@@ -278,25 +384,24 @@ def add_session_terminal_shell_id(
     path = _get_session_store_path()
     with _locked_session_store(path):
         data = load_session_store(path)
-        result = data.get(session_id)
+        result = _get_session_record(data, tool_id=tool_id, session_id=session_id)
         if result is None:
             error(f"Sandbox session not found: {session_id}")
-        if not isinstance(result, dict):
-            error(f"Invalid sandbox session record: {session_id}")
 
-        shell_ids = _terminal_shell_ids_from_value(
-            result.get(TERMINAL_SHELL_ID_KEY)
-        )
+        shell_ids = _terminal_shell_ids_from_value(result.get(TERMINAL_SHELL_ID_KEY))
         if resolved_shell_id not in shell_ids:
             shell_ids.append(resolved_shell_id)
         result[TERMINAL_SHELL_ID_KEY] = shell_ids
         result = _normalize_session_record(result)
-        data[session_id] = result
+        tool_sessions = _tool_sessions(data, tool_id)
+        tool_sessions[session_id] = result
+        data[tool_id] = tool_sessions
         _write_session_store(path, data)
         return result
 
 
 def remove_session_terminal_shell_id(
+    tool_id: str,
     session_id: str,
     shell_id: str,
 ) -> dict[str, object]:
@@ -307,11 +412,9 @@ def remove_session_terminal_shell_id(
     path = _get_session_store_path()
     with _locked_session_store(path):
         data = load_session_store(path)
-        result = data.get(session_id)
+        result = _get_session_record(data, tool_id=tool_id, session_id=session_id)
         if result is None:
             error(f"Sandbox session not found: {session_id}")
-        if not isinstance(result, dict):
-            error(f"Invalid sandbox session record: {session_id}")
 
         shell_ids = [
             item
@@ -325,23 +428,23 @@ def remove_session_terminal_shell_id(
         else:
             result.pop(TERMINAL_SHELL_ID_KEY, None)
         result = _normalize_session_record(result)
-        data[session_id] = result
+        tool_sessions = _tool_sessions(data, tool_id)
+        tool_sessions[session_id] = result
+        data[tool_id] = tool_sessions
         _write_session_store(path, data)
         return result
 
 
-def get_session_result(session_id: str) -> dict[str, object]:
+def get_session_result(tool_id: str, session_id: str) -> dict[str, object]:
     path = _get_session_store_path()
     with _locked_session_store(path):
         data = load_session_store(path)
 
-        result = data.get(session_id)
+        result = _get_session_record(data, tool_id=tool_id, session_id=session_id)
         if result is None:
             error(f"Sandbox session not found: {session_id}")
-        if not isinstance(result, dict):
-            error(f"Invalid sandbox session record: {session_id}")
 
-        return _normalize_session_record(result)
+        return result
 
 
 def get_all_session_results() -> dict[str, object]:
@@ -353,7 +456,7 @@ def get_all_session_results() -> dict[str, object]:
         return _normalize_session_store(data)
 
 
-def find_session_result(session_id: str) -> dict[str, object] | None:
+def find_session_result(tool_id: str, session_id: str) -> dict[str, object] | None:
     path = _get_session_store_path()
     if not path.exists():
         return None
@@ -362,13 +465,19 @@ def find_session_result(session_id: str) -> dict[str, object] | None:
         if not path.exists():
             return None
         data = load_session_store(path)
-        result = data.get(session_id)
-        if result is None:
-            return None
-        if not isinstance(result, dict):
-            error(f"Invalid sandbox session record: {session_id}")
+        return _get_session_record(data, tool_id=tool_id, session_id=session_id)
 
-        return _normalize_session_record(result)
+
+def find_session_result_any_tool(session_id: str) -> dict[str, object] | None:
+    path = _get_session_store_path()
+    if not path.exists():
+        return None
+
+    with _locked_session_store(path):
+        if not path.exists():
+            return None
+        data = load_session_store(path)
+        return _find_session_record_any_tool(data, session_id=session_id)
 
 
 def build_exec_url(endpoint: object) -> str:
@@ -389,9 +498,7 @@ def build_bash_exec_url(endpoint: object) -> str:
 
     parts = urlsplit(endpoint.strip())
     path = parts.path.rstrip("/")
-    exec_path = (
-        f"{path}{SANDBOX_BASH_EXEC_ROUTE}" if path else SANDBOX_BASH_EXEC_ROUTE
-    )
+    exec_path = f"{path}{SANDBOX_BASH_EXEC_ROUTE}" if path else SANDBOX_BASH_EXEC_ROUTE
     return urlunsplit(
         (parts.scheme, parts.netloc, exec_path, parts.query, parts.fragment)
     )
@@ -442,9 +549,7 @@ def build_web_url(endpoint: object) -> str:
     web_query_keys = {key for key, _value in SANDBOX_WEB_QUERY_PARAMS}
     web_query_keys.add("path")
     query_items = [
-        (key, value)
-        for key, value in original_query_items
-        if key not in web_query_keys
+        (key, value) for key, value in original_query_items if key not in web_query_keys
     ]
     websockify_items = [
         (expected_key, value)
@@ -457,9 +562,7 @@ def build_web_url(endpoint: object) -> str:
         path_items = [("path", f"websockify?{urlencode(websockify_items)}")]
 
     query = urlencode([*SANDBOX_WEB_QUERY_PARAMS, *query_items, *path_items])
-    return urlunsplit(
-        (parts.scheme, parts.netloc, web_path, query, parts.fragment)
-    )
+    return urlunsplit((parts.scheme, parts.netloc, web_path, query, parts.fragment))
 
 
 def rename_exec_session_id(payload: object) -> object:

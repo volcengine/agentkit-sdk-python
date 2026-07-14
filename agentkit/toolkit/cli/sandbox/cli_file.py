@@ -177,7 +177,9 @@ def _resolve_existing_session(
         client=client,
         env_var_name=SANDBOX_TOOL_ID_ENV,
     )
-    result = get_session_result(session_id)
+    if not resolved_tool_id:
+        error(f"Sandbox session not found: {session_id}")
+    result = get_session_result(resolved_tool_id, session_id)
     if resolved_tool_id and result.get("tool_id") != resolved_tool_id:
         error(f"Sandbox session not found: {session_id}")
     return result
