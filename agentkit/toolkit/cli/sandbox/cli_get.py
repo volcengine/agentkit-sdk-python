@@ -21,6 +21,12 @@ from typing import Optional
 import typer
 
 from agentkit.toolkit.cli.sandbox.agentkit_client import AgentkitToolsClient
+from agentkit.toolkit.cli.sandbox.config_store import (
+    SandboxConfigError,
+    config_default_str,
+    configured_sandbox_config,
+    param_was_provided,
+)
 from agentkit.toolkit.cli.sandbox.session_create import SANDBOX_TOOL_ID_ENV
 from agentkit.toolkit.cli.sandbox.session_sync import sync_remote_sessions
 from agentkit.toolkit.cli.sandbox.tool_resolve import SandboxToolType
@@ -45,6 +51,7 @@ def _session_not_found_result(
 
 
 def get_command(
+    ctx: typer.Context,
     session_id: Optional[str] = typer.Option(
         None,
         "--session-id",
@@ -68,6 +75,20 @@ def get_command(
 ) -> None:
     """Get a sandbox session after syncing remote sessions for the current tool."""
     try:
+        config_defaults = configured_sandbox_config()
+        if not param_was_provided(ctx, "session_id"):
+            session_id = (
+                config_default_str("session-id", data=config_defaults) or session_id
+            )
+        if not param_was_provided(ctx, "tool_id"):
+            tool_id = config_default_str("tool-id", data=config_defaults) or tool_id
+        if not param_was_provided(ctx, "tool_type"):
+            configured_tool_type = config_default_str(
+                "tool-type",
+                data=config_defaults,
+            )
+            if configured_tool_type:
+                tool_type = SandboxToolType(configured_tool_type)
         resolved_tool_id = sync_remote_sessions(
             session_id=session_id,
             tool_id=tool_id,
@@ -84,6 +105,8 @@ def get_command(
             result = get_all_session_results()
     except typer.Exit:
         raise
+    except (SandboxConfigError, ValueError) as exc:
+        error(str(exc))
     except Exception as exc:
         error(str(exc))
 

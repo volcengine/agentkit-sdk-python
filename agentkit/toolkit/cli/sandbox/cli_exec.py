@@ -34,6 +34,11 @@ import requests
 import typer
 
 from agentkit.toolkit.cli.sandbox.agentkit_client import AgentkitToolsClient
+from agentkit.toolkit.cli.sandbox.config_store import (
+    SandboxConfigError,
+    config_default_str,
+    configured_sandbox_config,
+)
 from agentkit.toolkit.cli.sandbox.cli_file import (
     _build_remote_extract_command,
     _create_sources_upload_archive,
@@ -626,8 +631,51 @@ def exec_command(
     ),
 ) -> None:
     """Open a streaming sandbox exec session. Press Ctrl-] or type exit/exit()."""
-    exec_mode = _normalize_exec_mode(mode)
     try:
+        config_defaults = configured_sandbox_config()
+        if not _param_was_provided(ctx, "session_id"):
+            session_id = (
+                config_default_str("session-id", data=config_defaults) or session_id
+            )
+        if not _param_was_provided(ctx, "tool_id"):
+            tool_id = config_default_str("tool-id", data=config_defaults) or tool_id
+        if not _param_was_provided(ctx, "tool_type"):
+            configured_tool_type = config_default_str(
+                "tool-type",
+                data=config_defaults,
+            )
+            if configured_tool_type:
+                tool_type = SandboxToolType(configured_tool_type)
+        if not _param_was_provided(ctx, "workspace"):
+            workspace = (
+                config_default_str("workspace", data=config_defaults) or workspace
+            )
+        if not _param_was_provided(ctx, "dst_dir"):
+            dst_dir = config_default_str("dst-dir", data=config_defaults) or dst_dir
+        if not _param_was_provided(ctx, "git_config"):
+            git_config = (
+                config_default_str("git-config", data=config_defaults) or git_config
+            )
+        if not _param_was_provided(ctx, "model_name"):
+            model_name = (
+                config_default_str("model-name", data=config_defaults) or model_name
+            )
+        if not _param_was_provided(ctx, "model_api_key"):
+            model_api_key = (
+                config_default_str("model-api-key", data=config_defaults)
+                or model_api_key
+            )
+        if not _param_was_provided(ctx, "model_provider"):
+            model_provider = (
+                config_default_str("model-provider", data=config_defaults)
+                or model_provider
+            )
+        if not _param_was_provided(ctx, "model_base_url"):
+            model_base_url = (
+                config_default_str("model-base-url", data=config_defaults)
+                or model_base_url
+            )
+        exec_mode = _normalize_exec_mode(mode)
         model_api_key_was_provided = _param_was_provided(ctx, "model_api_key")
         model_name_was_provided = _param_was_provided(ctx, "model_name")
         model_base_url_was_provided = _param_was_provided(ctx, "model_base_url")
@@ -692,6 +740,8 @@ def exec_command(
             )
     except typer.Exit:
         raise
+    except (SandboxConfigError, ValueError) as exc:
+        error(str(exc))
     except Exception as exc:
         error(str(exc))
 

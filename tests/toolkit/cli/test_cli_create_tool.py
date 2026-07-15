@@ -19,6 +19,7 @@ from types import SimpleNamespace
 
 import pytest
 from typer.testing import CliRunner
+import yaml
 
 runner = CliRunner()
 _PLACEHOLDER_A = "example-value-a"
@@ -39,8 +40,23 @@ def tool_store_path(monkeypatch, tmp_path):
     return store_path
 
 
+@pytest.fixture
+def sandbox_config_path(monkeypatch, tmp_path):
+    import agentkit.toolkit.cli.sandbox.config_store as config_store
+
+    config_path = tmp_path / ".agentkit" / "sandbox.yaml"
+    legacy_path = tmp_path / ".agentkit" / "sandbox" / "sandbox.yaml"
+    monkeypatch.setattr(config_store, "get_sandbox_config_path", lambda: config_path)
+    monkeypatch.setattr(
+        config_store,
+        "get_legacy_sandbox_config_path",
+        lambda: legacy_path,
+    )
+    return config_path
+
+
 @pytest.fixture(autouse=True)
-def _use_tool_store_path(tool_store_path):
+def _use_local_sandbox_paths(tool_store_path, sandbox_config_path):
     pass
 
 
@@ -192,6 +208,7 @@ def _use_platform_config(monkeypatch, tmp_path):
 def test_create_command_skips_tos_mount_by_default(
     monkeypatch,
     tool_store_path,
+    sandbox_config_path,
 ):
     from agentkit.toolkit.cli.cli import app
     from agentkit.toolkit.cli.sandbox import cli_create
@@ -231,6 +248,10 @@ def test_create_command_skips_tos_mount_by_default(
             "ModelProvider": "model_square",
         }
     }
+    sandbox_config = yaml.safe_load(sandbox_config_path.read_text(encoding="utf-8"))
+    assert sandbox_config["tool"]["id"] == "t-created"
+    assert sandbox_config["tool"]["name"] == "demo-tool"
+    assert sandbox_config["tool"]["type"] == "SkillEnv"
 
 
 def test_create_command_passes_network_options(monkeypatch):

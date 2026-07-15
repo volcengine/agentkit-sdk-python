@@ -29,6 +29,12 @@ import typer
 from agentkit.utils.http_defaults import http_timeout
 from agentkit.sdk.tools import types as tools_types
 from agentkit.toolkit.cli.sandbox.agentkit_client import AgentkitToolsClient
+from agentkit.toolkit.cli.sandbox.config_store import (
+    SandboxConfigError,
+    config_default_str,
+    configured_sandbox_config,
+    param_was_provided,
+)
 from agentkit.toolkit.cli.sandbox.session_create import SANDBOX_TOOL_ID_ENV
 from agentkit.toolkit.cli.sandbox.session_sync import sync_remote_sessions
 from agentkit.toolkit.cli.sandbox.sandbox_client import (
@@ -299,8 +305,9 @@ def _open_tosbrowser(command: str) -> None:
 
 
 def mount_command(
-    session_id: str = typer.Option(
-        ...,
+    ctx: typer.Context,
+    session_id: Optional[str] = typer.Option(
+        None,
         "--session-id",
         "--sid",
         "-s",
@@ -317,6 +324,13 @@ def mount_command(
 ) -> None:
     """Open the sandbox session TOS path in TOS Browser."""
     try:
+        config_defaults = configured_sandbox_config()
+        if not param_was_provided(ctx, "session_id"):
+            session_id = (
+                config_default_str("session-id", data=config_defaults) or session_id
+            )
+        if not session_id:
+            error("--session-id is required")
         resolved_session_id = _resolve_required(session_id, "--session-id")
         resolved_oauth_url = _resolve_oauth_url(oauth_url)
         resolved_tool_id = _resolve_session_tool_id(resolved_session_id)
@@ -350,6 +364,8 @@ def mount_command(
         raise typer.Exit(1)
     except typer.Exit:
         raise
+    except SandboxConfigError as exc:
+        error(str(exc))
     except Exception as exc:
         error(str(exc))
 

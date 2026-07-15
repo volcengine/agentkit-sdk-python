@@ -21,6 +21,12 @@ from typing import Optional
 
 import typer
 
+from agentkit.toolkit.cli.sandbox.config_store import (
+    SandboxConfigError,
+    config_default_str,
+    configured_sandbox_config,
+    param_was_provided,
+)
 from agentkit.toolkit.cli.sandbox.session_create import (
     SANDBOX_TOOL_ID_ENV,
     ensure_sandbox_session_with_status,
@@ -46,8 +52,9 @@ def _resolve_web_session(
 
 
 def web_command(
-    session_id: str = typer.Option(
-        ...,
+    ctx: typer.Context,
+    session_id: Optional[str] = typer.Option(
+        None,
         "--session-id",
         "--sid",
         "-s",
@@ -62,6 +69,15 @@ def web_command(
 ) -> None:
     """Return the browser URL for a sandbox session."""
     try:
+        config_defaults = configured_sandbox_config()
+        if not param_was_provided(ctx, "session_id"):
+            session_id = (
+                config_default_str("session-id", data=config_defaults) or session_id
+            )
+        if not param_was_provided(ctx, "tool_id"):
+            tool_id = config_default_str("tool-id", data=config_defaults) or tool_id
+        if not session_id:
+            error("Missing option '--session-id'.")
         session, is_new = _resolve_web_session(
             session_id=session_id,
             tool_id=tool_id,
@@ -71,6 +87,8 @@ def web_command(
             error("Failed to open browser")
     except typer.Exit:
         raise
+    except SandboxConfigError as exc:
+        error(str(exc))
     except Exception as exc:
         error(str(exc))
 

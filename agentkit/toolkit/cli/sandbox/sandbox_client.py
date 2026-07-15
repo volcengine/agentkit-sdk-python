@@ -25,7 +25,6 @@ from typing import NoReturn
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import typer
-import yaml
 
 try:
     import fcntl
@@ -66,20 +65,19 @@ def _get_session_store_path() -> Path:
 
 
 def save_sandbox_yaml(image_url: str, tool_type: str = "Private") -> Path:
-    path = Path.cwd() / SANDBOX_YAML_PATH
-    path.parent.mkdir(parents=True, exist_ok=True)
-    text = yaml.safe_dump(
-        {"tool_type": tool_type, "image_url": image_url},
-        sort_keys=False,
-        allow_unicode=True,
+    from agentkit.toolkit.cli.sandbox.config_store import (
+        ensure_sandbox_config_initialized,
+        write_sandbox_config,
     )
-    tmp_path = path.with_name(f".{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
-    try:
-        tmp_path.write_text(text, encoding="utf-8")
-        tmp_path.replace(path)
-    finally:
-        if tmp_path.exists():
-            tmp_path.unlink()
+
+    path, data, _created = ensure_sandbox_config_initialized()
+    tool = data.setdefault("tool", {})
+    if not isinstance(tool, dict):
+        tool = {}
+        data["tool"] = tool
+    tool["type"] = tool_type
+    tool["image_url"] = image_url
+    write_sandbox_config(data, path)
     return path
 
 

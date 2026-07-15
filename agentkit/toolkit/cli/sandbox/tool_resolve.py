@@ -442,9 +442,38 @@ def _list_first_tool(
 
 
 def _create_tool(tool_type: str) -> str:
+    from agentkit.toolkit.cli.sandbox.config_store import (
+        config_default_bool,
+        config_default_int,
+        config_default_str,
+        configured_network_payload,
+        configured_sandbox_config,
+    )
     from agentkit.toolkit.cli.sandbox.cli_create import create_tool
 
-    result = create_tool(tool_type=tool_type)
+    config_defaults = configured_sandbox_config()
+    role_name = config_default_str("role-name", data=config_defaults)
+    network_payload = configured_network_payload(data=config_defaults)
+    result = create_tool(
+        tool_type=tool_type,
+        tool_name=config_default_str("tool-name", data=config_defaults),
+        cpu=config_default_int("cpu", data=config_defaults) or 4,
+        model_name=config_default_str("model-name", data=config_defaults),
+        model_api_key=config_default_str("model-api-key", data=config_defaults),
+        model_provider=config_default_str("model-provider", data=config_defaults),
+        model_base_url=config_default_str("model-base-url", data=config_defaults),
+        skill_role_name=role_name,
+        skill_role_name_provided=bool(role_name),
+        websearch_apikey=config_default_str(
+            "websearch-apikey",
+            data=config_defaults,
+        ),
+        image_url=config_default_str("image-url", data=config_defaults),
+        enable_snapshot=bool(
+            config_default_bool("enable-snapshot", data=config_defaults)
+        ),
+        network_config=json.dumps(network_payload) if network_payload else None,
+    )
     save_tool_result(tool_type, result)
     tool_id = _get_string_value(result, "ToolId", "tool_id")
     if not tool_id:

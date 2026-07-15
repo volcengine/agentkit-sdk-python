@@ -33,6 +33,13 @@ from agentkit.toolkit.cli.sandbox.a2a_client import (
     task_result_text,
     task_state,
 )
+from agentkit.toolkit.cli.sandbox.config_store import (
+    SandboxConfigError,
+    config_default_int,
+    config_default_str,
+    configured_sandbox_config,
+    param_was_provided,
+)
 from agentkit.toolkit.cli.sandbox.env_config import (
     MODEL_AGENT_ENV_KEYS as _MODEL_AGENT_ENV_KEYS,
     build_invoke_session_envs as build_invoke_model_agent_envs,
@@ -287,24 +294,59 @@ def invoke_command(
     ),
 ) -> None:
     """Invoke a sandbox A2A agent."""
-    resolved_task_id = (task_id or "").strip()
-    resolved_prompt = (prompt or "").strip()
-    resolved_async_mode = _resolve_async_mode(ctx, async_mode)
-    if not resolved_task_id and not resolved_prompt:
-        error("--prompt is required unless --task-id is provided")
-    if ttl is not None and ttl <= 0:
-        error("--ttl must be greater than 0")
-    if history_length < 0:
-        error("--history-length must be non-negative")
-
-    resolved_timeout = _normalize_timeout(timeout)
-    resolved_interval = _normalize_interval(interval)
-    resolved_tool_id = _resolve_invoke_tool_id(
-        tool_id=tool_id,
-        tool_type=tool_type,
-    )
-
     try:
+        config_defaults = configured_sandbox_config()
+        if not param_was_provided(ctx, "session_id"):
+            session_id = (
+                config_default_str("session-id", data=config_defaults) or session_id
+            )
+        if not param_was_provided(ctx, "tool_id"):
+            tool_id = config_default_str("tool-id", data=config_defaults) or tool_id
+        if not param_was_provided(ctx, "tool_type"):
+            configured_tool_type = config_default_str(
+                "tool-type",
+                data=config_defaults,
+            )
+            if configured_tool_type:
+                tool_type = SandboxToolType(configured_tool_type)
+        if not param_was_provided(ctx, "ttl"):
+            ttl = config_default_int("ttl", data=config_defaults) or ttl
+        if not param_was_provided(ctx, "model_name"):
+            model_name = (
+                config_default_str("model-name", data=config_defaults) or model_name
+            )
+        if not param_was_provided(ctx, "model_provider"):
+            model_provider = (
+                config_default_str("model-provider", data=config_defaults)
+                or model_provider
+            )
+        if not param_was_provided(ctx, "model_base_url"):
+            model_base_url = (
+                config_default_str("model-base-url", data=config_defaults)
+                or model_base_url
+            )
+        if not param_was_provided(ctx, "model_api_key"):
+            model_api_key = (
+                config_default_str("model-api-key", data=config_defaults)
+                or model_api_key
+            )
+
+        resolved_task_id = (task_id or "").strip()
+        resolved_prompt = (prompt or "").strip()
+        resolved_async_mode = _resolve_async_mode(ctx, async_mode)
+        if not resolved_task_id and not resolved_prompt:
+            error("--prompt is required unless --task-id is provided")
+        if ttl is not None and ttl <= 0:
+            error("--ttl must be greater than 0")
+        if history_length < 0:
+            error("--history-length must be non-negative")
+
+        resolved_timeout = _normalize_timeout(timeout)
+        resolved_interval = _normalize_interval(interval)
+        resolved_tool_id = _resolve_invoke_tool_id(
+            tool_id=tool_id,
+            tool_type=tool_type,
+        )
         session = ensure_sandbox_session(
             session_id=session_id,
             tool_id=resolved_tool_id,
@@ -321,6 +363,8 @@ def invoke_command(
         )
     except typer.Exit:
         raise
+    except (SandboxConfigError, ValueError) as exc:
+        error(str(exc))
     except Exception as exc:
         error(str(exc))
 
