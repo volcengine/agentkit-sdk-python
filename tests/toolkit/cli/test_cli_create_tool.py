@@ -233,25 +233,13 @@ def test_create_command_skips_tos_mount_by_default(
     }
 
 
-def test_create_command_passes_network_config_file(monkeypatch, tmp_path):
+def test_create_command_passes_network_options(monkeypatch):
     from agentkit.toolkit.cli.cli import app
     from agentkit.toolkit.cli.sandbox import cli_create
 
     _reset_fake_tools_client()
     monkeypatch.setattr(cli_create, "AgentkitToolsClient", _FakeToolsClient)
     monkeypatch.setattr(cli_create, "TOSService", _FakeTOSService)
-    config_path = tmp_path / "network.json"
-    config_path.write_text(
-        json.dumps(
-            {
-                "private_access": True,
-                "public_access": True,
-                "vpc_id": "vpc-123",
-                "subnet_ids": ["subnet-a"],
-            }
-        ),
-        encoding="utf-8",
-    )
 
     result = runner.invoke(
         app,
@@ -260,8 +248,13 @@ def test_create_command_passes_network_config_file(monkeypatch, tmp_path):
             "create",
             "--tool-name",
             "demo-tool",
-            "--network-config",
-            str(config_path),
+            "--no-network-enable-public",
+            "--network-enable-private",
+            "--network-enable-shared-internet",
+            "--network-vpc-id",
+            "vpc-123",
+            "--network-subnet-ids",
+            "subnet-a, subnet-b",
         ],
     )
 
@@ -269,10 +262,11 @@ def test_create_command_passes_network_config_file(monkeypatch, tmp_path):
     network = _FakeToolsClient.last_request.network_configuration
     assert network is not None
     assert network.enable_private_network is True
-    assert network.enable_public_network is True
+    assert network.enable_public_network is False
     assert network.vpc_configuration is not None
     assert network.vpc_configuration.vpc_id == "vpc-123"
-    assert network.vpc_configuration.subnet_ids == ["subnet-a"]
+    assert network.vpc_configuration.subnet_ids == ["subnet-a", "subnet-b"]
+    assert network.vpc_configuration.enable_shared_internet_access is True
 
 
 def test_create_command_uses_region_envs(monkeypatch):
@@ -659,7 +653,7 @@ def test_build_create_tool_request_skips_tos_mount_without_bucket(monkeypatch):
     assert request.tos_mount_config is None
 
 
-def test_build_create_tool_request_uses_inline_network_config(monkeypatch):
+def test_build_create_tool_request_uses_network_options(monkeypatch):
     from agentkit.toolkit.cli.sandbox import cli_create
 
     _reset_fake_tools_client()
@@ -670,15 +664,10 @@ def test_build_create_tool_request_uses_inline_network_config(monkeypatch):
         name="demo-tool",
         tos_bucket=None,
         tos_region="cn-beijing",
-        network_config=json.dumps(
-            {
-                "private_access": True,
-                "public_access": True,
-                "vpc_id": " vpc-123 ",
-                "subnet_ids": [" subnet-a ", "subnet-b"],
-                "enable_shared_internet_access": True,
-            }
-        ),
+        network_enable_private=True,
+        network_enable_shared_internet=True,
+        network_vpc_id=" vpc-123 ",
+        network_subnet_ids=" subnet-a , subnet-b ",
     )
 
     network = request.network_configuration
@@ -692,30 +681,21 @@ def test_build_create_tool_request_uses_inline_network_config(monkeypatch):
     assert vpc.enable_shared_internet_access is True
 
 
-def test_build_create_tool_request_uses_network_config_file(monkeypatch, tmp_path):
+def test_build_create_tool_request_can_disable_public_network(monkeypatch):
     from agentkit.toolkit.cli.sandbox import cli_create
 
     _reset_fake_tools_client()
     monkeypatch.setattr(cli_create, "TOSService", _FakeTOSService)
-    config_path = tmp_path / "network.json"
-    config_path.write_text(
-        json.dumps(
-            {
-                "private_access": True,
-                "public_access": False,
-                "vpc_id": "vpc-123",
-                "subnet_ids": "subnet-a, subnet-b",
-            }
-        ),
-        encoding="utf-8",
-    )
 
     request = cli_create._build_create_tool_request(
         tool_type="CodeEnv",
         name="demo-tool",
         tos_bucket=None,
         tos_region="cn-beijing",
-        network_config=str(config_path),
+        network_enable_public=False,
+        network_enable_private=True,
+        network_vpc_id="vpc-123",
+        network_subnet_ids="subnet-a, subnet-b",
     )
 
     network = request.network_configuration
@@ -729,38 +709,44 @@ def test_build_create_tool_request_uses_network_config_file(monkeypatch, tmp_pat
 
 
 @pytest.mark.parametrize(
-    ("network_config", "message"),
+    ("kwargs", "message"),
     [
-        ("[]", "expected a JSON object"),
-        ('{"private_access":"yes"}', "private_access must be a boolean"),
         (
-            '{"private_access":true}',
-            "vpc_id is required when private_access is true",
+            {"network_enable_private": True},
+            "--network-vpc-id is required when --network-enable-private is true",
         ),
         (
-            '{"vpc_id":"vpc-123"}',
-            "vpc_id, subnet_ids, and enable_shared_internet_access require "
-            "private_access=true",
+            {"network_enable_public": False, "network_enable_private": False},
+            "--network-enable-private and --network-enable-public cannot both be false",
         ),
-        ('{"private_access":true,"vpc_id":"vpc-123","foo":true}', "foo"),
         (
-            '{"private_access":true,"vpc_id":"vpc-123","subnet_ids":[1]}',
-            "subnet_ids[0] must be a string",
+            {"network_vpc_id": "vpc-123"},
+            "--network-vpc-id, --network-subnet-ids, and "
+            "--network-enable-shared-internet require --network-enable-private",
+        ),
+        (
+            {"network_enable_shared_internet": True},
+            "--network-vpc-id, --network-subnet-ids, and "
+            "--network-enable-shared-internet require --network-enable-private",
+        ),
+        (
+            {"network_subnet_ids": " , "},
+            "--network-subnet-ids must contain at least one value",
         ),
     ],
 )
 def test_build_network_configuration_reports_field_errors(
-    network_config,
+    kwargs,
     message,
     capsys,
 ):
     from agentkit.toolkit.cli.sandbox import cli_create
 
     with pytest.raises(cli_create.typer.Exit):
-        cli_create._build_network_configuration(network_config)
+        cli_create._build_network_configuration(**kwargs)
 
     captured = capsys.readouterr()
-    assert "Invalid --network-config" in captured.err
+    assert "Invalid network configuration" in captured.err
     assert message in captured.err
 
 

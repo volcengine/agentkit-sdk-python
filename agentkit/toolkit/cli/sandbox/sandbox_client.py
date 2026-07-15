@@ -468,6 +468,28 @@ def find_session_result(tool_id: str, session_id: str) -> dict[str, object] | No
         return _get_session_record(data, tool_id=tool_id, session_id=session_id)
 
 
+def delete_session_result(tool_id: str, session_id: str) -> bool:
+    path = _get_session_store_path()
+    if not path.exists():
+        return False
+
+    with _locked_session_store(path):
+        if not path.exists():
+            return False
+        data = load_session_store(path)
+        tool_sessions = _tool_sessions(data, tool_id)
+        if session_id not in tool_sessions:
+            return False
+
+        tool_sessions.pop(session_id, None)
+        if tool_sessions:
+            data[tool_id] = tool_sessions
+        else:
+            data.pop(tool_id, None)
+        _write_session_store(path, data)
+        return True
+
+
 def find_session_result_any_tool(session_id: str) -> dict[str, object] | None:
     path = _get_session_store_path()
     if not path.exists():
