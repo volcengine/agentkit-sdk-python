@@ -21,7 +21,7 @@ import typer
 from agentkit.toolkit.cli.sandbox.cli_build import build_command
 from agentkit.toolkit.cli.sandbox.cli_create import create_command
 from agentkit.toolkit.cli.sandbox.cli_exec import exec_command
-from agentkit.toolkit.cli.sandbox.cli_file import file_command
+from agentkit.toolkit.cli.sandbox.cli_file import scp_command
 from agentkit.toolkit.cli.sandbox.cli_get import get_command
 from agentkit.toolkit.cli.sandbox.cli_invoke import invoke_command
 from agentkit.toolkit.cli.sandbox.cli_init_dockerfile import init_dockerfile_command
@@ -61,4 +61,4 @@ sandbox_app.command(
 sandbox_app.command(name="web")(web_command)
 sandbox_app.command(name="codex-login")(codex_login_command)
 sandbox_app.command(name="model-login")(codex_login_command)  # provider-agnostic alias
-sandbox_app.add_typer(file_command, name="file")
+sandbox_app.command(name="scp")(scp_command)

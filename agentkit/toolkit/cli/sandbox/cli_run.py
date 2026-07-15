@@ -37,8 +37,7 @@ _EXEC_CONFIG_KEYS = ("exec", "execs", "tabs", "commands")
 _IGNORED_ENTRY_KEYS = {"name", "title"}
 _ENTRY_CWD_KEYS = ("cwd", "workdir")
 _RAW_ARG_KEYS = ("args", "argv")
-_SOURCE_KEYS = ("sources", "extra_sources")
-_EXTRA_ARG_KEYS = ("extra_args", "positional_args")
+_COPY_KEYS = ("copy", "copies")
 
 _OPTION_FIELDS = {
     "session_id": "--session-id",
@@ -48,8 +47,6 @@ _OPTION_FIELDS = {
     "command": "--command",
     "mode": "--mode",
     "shell_id": "--shell-id",
-    "workspace": "--workspace",
-    "dst_dir": "--dst-dir",
     "git_config": "--git-config",
     "model_name": "--model-name",
     "model_api_key": "--model-api-key",
@@ -137,6 +134,27 @@ def _entry_cwd(entry: dict[str, Any]) -> Path:
     return Path.cwd()
 
 
+def _copy_pairs(value: Any, field_name: str) -> list[tuple[str, str]]:
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        error(f"{field_name} must be a source/destination pair or list of pairs")
+    if len(value) == 2 and all(isinstance(item, (str, int, float)) for item in value):
+        value = [value]
+
+    pairs = []
+    for index, pair in enumerate(value, start=1):
+        if not isinstance(pair, list) or len(pair) != 2:
+            error(f"{field_name}[{index}] must contain SOURCE and DESTINATION")
+        source, destination = pair
+        if not isinstance(source, (str, int, float)) or not isinstance(
+            destination, (str, int, float)
+        ):
+            error(f"{field_name}[{index}] values must be strings")
+        pairs.append((str(source), str(destination)))
+    return pairs
+
+
 def _build_exec_args(entry: dict[str, Any], *, entry_index: int) -> list[str]:
     args = ["agentkit", "sandbox", "exec"]
 
@@ -151,9 +169,7 @@ def _build_exec_args(entry: dict[str, Any], *, entry_index: int) -> list[str]:
 
     consumed_keys = (
         set(_OPTION_FIELDS)
-        | {"src_dir", "src_dirs"}
-        | set(_SOURCE_KEYS)
-        | set(_EXTRA_ARG_KEYS)
+        | set(_COPY_KEYS)
         | set(_ENTRY_CWD_KEYS)
         | _IGNORED_ENTRY_KEYS
     )
@@ -166,22 +182,15 @@ def _build_exec_args(entry: dict[str, Any], *, entry_index: int) -> list[str]:
             continue
         _append_option(args, option_name, entry.get(field_name))
 
-    src_dirs = _string_list(
-        entry.get("src_dirs", entry.get("src_dir")),
-        f"exec[{entry_index}].src_dir",
-    )
-    if src_dirs:
-        args.extend(["--src-dir", src_dirs[0]])
-        args.extend(src_dirs[1:])
-
-    for source_key in _SOURCE_KEYS:
-        args.extend(
-            _string_list(entry.get(source_key), f"exec[{entry_index}].{source_key}")
-        )
-    for extra_key in _EXTRA_ARG_KEYS:
-        args.extend(
-            _string_list(entry.get(extra_key), f"exec[{entry_index}].{extra_key}")
-        )
+    for copy_key in _COPY_KEYS:
+        if copy_key not in entry:
+            continue
+        for source, destination in _copy_pairs(
+            entry[copy_key],
+            f"exec[{entry_index}].{copy_key}",
+        ):
+            args.extend(["--copy", source, destination])
+        break
 
     _append_option(args, "--command", entry.get("command"))
 

@@ -36,7 +36,6 @@ from agentkit.toolkit.cli.sandbox.tool_resolve import SandboxToolType
 from agentkit.toolkit.cli.sandbox.sandbox_client import (
     SANDBOX_EXEC_TIMEOUT_SECONDS,
     SANDBOX_FILE_DOWNLOAD_ROUTE,
-    SANDBOX_FILE_LIST_ROUTE,
     SANDBOX_FILE_UPLOAD_ROUTE,
     build_exec_url,
     build_file_url,
@@ -47,29 +46,8 @@ from agentkit.toolkit.cli.sandbox.sandbox_client import (
 
 SANDBOX_FILE_TIMEOUT_SECONDS = 300
 SANDBOX_REMOTE_TMP_DIR = "/tmp"
-SANDBOX_FILE_SORT_KEYS = {"name", "size", "modified", "type"}
-
-
-file_command = typer.Typer(
-    name="file",
-    help="Upload, download, and list files in sandbox sessions.",
-    no_args_is_help=True,
-)
-
-
-def _normalize_workspace(workspace: Optional[str]) -> str | None:
-    resolved = (workspace or "").strip()
-    if not resolved:
-        return None
-    return _normalize_absolute_sandbox_path(resolved, "--workspace")
-
-
-def _normalize_absolute_sandbox_path(path: str, option_name: str) -> str:
-    if "\x00" in path:
-        error(f"{option_name} must not contain NUL bytes")
-    if not path.startswith("/"):
-        error(f"{option_name} must be an absolute sandbox path")
-    return posixpath.normpath(path)
+SANDBOX_OPERAND_PREFIX = "sandbox:"
+DEFAULT_SANDBOX_PATH_ROOT = "/home/gem"
 
 
 def _is_path_inside(path: str, root: str) -> bool:
@@ -79,34 +57,40 @@ def _is_path_inside(path: str, root: str) -> bool:
     return path == normalized_root or path.startswith(f"{normalized_root}/")
 
 
-def _resolve_sandbox_path(
-    value: Optional[str],
-    *,
-    workspace: str | None,
-    option_name: str,
-    default_without_workspace: str | None = None,
-) -> str:
-    raw = (value or "").strip()
+def _resolve_sandbox_operand(value: str) -> str:
+    if not value.startswith(SANDBOX_OPERAND_PREFIX):
+        error(f"Sandbox path must start with {SANDBOX_OPERAND_PREFIX}")
+
+    raw = value[len(SANDBOX_OPERAND_PREFIX) :].strip()
     if not raw:
-        if workspace:
-            return workspace
-        if default_without_workspace:
-            return default_without_workspace
-        error(f"{option_name} is required")
+        error("Sandbox path must not be empty")
+    if "\x00" in raw:
+        error("Sandbox path must not contain NUL bytes")
 
     if raw.startswith("/"):
-        resolved = _normalize_absolute_sandbox_path(raw, option_name)
-    else:
-        if not workspace:
-            error(f"{option_name} must be absolute when --workspace is omitted")
-        resolved = _normalize_absolute_sandbox_path(
-            posixpath.join(workspace, raw),
-            option_name,
+        return posixpath.normpath(raw)
+
+    resolved = posixpath.normpath(posixpath.join(DEFAULT_SANDBOX_PATH_ROOT, raw))
+    if not _is_path_inside(resolved, DEFAULT_SANDBOX_PATH_ROOT):
+        error(f"Relative sandbox path must stay inside {DEFAULT_SANDBOX_PATH_ROOT}")
+    return resolved
+
+
+def _resolve_scp_operands(
+    source: str,
+    destination: str,
+) -> tuple[str, Path | str, Path | str]:
+    source_is_sandbox = source.startswith(SANDBOX_OPERAND_PREFIX)
+    destination_is_sandbox = destination.startswith(SANDBOX_OPERAND_PREFIX)
+    if source_is_sandbox == destination_is_sandbox:
+        error(
+            "Exactly one of SOURCE and DESTINATION must start with "
+            f"{SANDBOX_OPERAND_PREFIX}"
         )
 
-    if workspace and not _is_path_inside(resolved, workspace):
-        error(f"{option_name} must be inside --workspace")
-    return resolved
+    if source_is_sandbox:
+        return "download", _resolve_sandbox_operand(source), Path(destination)
+    return "upload", Path(source), _resolve_sandbox_operand(destination)
 
 
 def _new_remote_archive_path(prefix: str) -> str:
@@ -277,87 +261,6 @@ def _download_remote_file(
                 file_obj.write(chunk)
 
 
-def _list_remote_path(
-    session: dict[str, object],
-    *,
-    path: str,
-    recursive: bool,
-    show_hidden: bool,
-    max_depth: Optional[int],
-    include_size: bool,
-    include_permissions: bool,
-    sort_by: str,
-    sort_desc: bool,
-) -> dict[str, object]:
-    response = requests.post(
-        build_file_url(session.get("endpoint"), SANDBOX_FILE_LIST_ROUTE),
-        json={
-            "path": path,
-            "recursive": recursive,
-            "show_hidden": show_hidden,
-            "max_depth": max_depth,
-            "include_size": include_size,
-            "include_permissions": include_permissions,
-            "sort_by": sort_by,
-            "sort_desc": sort_desc,
-        },
-        timeout=SANDBOX_FILE_TIMEOUT_SECONDS,
-    )
-    return _json_response(response, "file list")
-
-
-def _paths_or_empty(paths: Optional[list[Path]]) -> list[Path]:
-    return list(paths or [])
-
-
-def _strings_or_empty(values: Optional[list[str]]) -> list[str]:
-    return list(values or [])
-
-
-def _validate_upload_inputs(
-    upload_dir: Optional[list[Path]],
-    upload_files: Optional[list[Path]],
-) -> tuple[Path | None, list[Path]]:
-    dirs = _paths_or_empty(upload_dir)
-    files = _paths_or_empty(upload_files)
-    if dirs and files:
-        error("Use either --src-dir or FILE..., not both")
-    if not dirs and not files:
-        error("Provide --src-dir or one or more FILE arguments")
-    if len(dirs) > 1:
-        error("--src-dir accepts one directory")
-
-    if dirs:
-        directory = dirs[0]
-        if not directory.exists():
-            error(f"Source directory not found: {directory}")
-        if not directory.is_dir():
-            error(f"Source path is not a directory: {directory}")
-        return directory, []
-
-    seen_names: set[str] = set()
-    resolved_files = []
-    for file_path in files:
-        if not file_path.exists():
-            error(f"Source file not found: {file_path}")
-        if not file_path.is_file():
-            error(f"Source path is not a file: {file_path}")
-        if file_path.name in seen_names:
-            error(f"Duplicate source file name: {file_path.name}")
-        seen_names.add(file_path.name)
-        resolved_files.append(file_path)
-    return None, resolved_files
-
-
-def _add_directory_contents(tar: tarfile.TarFile, directory: Path) -> None:
-    for path in sorted(directory.rglob("*")):
-        tar.add(
-            path,
-            arcname=path.relative_to(directory).as_posix(),
-            recursive=False,
-        )
-
-
 def _archive_source_name(source: Path) -> str:
     return source.name or source.resolve().name
 
@@ -391,143 +294,63 @@ def _create_sources_upload_archive(sources: list[Path]) -> Path:
     return archive_path
 
 
-def _create_upload_archive(
+def _validate_scp_local_source(source: Path) -> Path:
+    if not source.exists():
+        error(f"Source path not found: {source}")
+    if not source.is_file() and not source.is_dir():
+        error(f"Source path is not a file or directory: {source}")
+    if not _archive_source_name(source):
+        error(f"Source path must have a file or directory name: {source}")
+    return source
+
+
+def _build_remote_scp_upload_command(
     *,
-    upload_dir: Path | None,
-    upload_files: list[Path],
-) -> Path:
-    fd, name = tempfile.mkstemp(prefix="agentkit-sandbox-upload-", suffix=".tar")
-    os.close(fd)
-    archive_path = Path(name)
+    archive_path: str,
+    source_name: str,
+    destination: str,
+) -> str:
+    stage_dir = f"{archive_path}.d"
+    cleanup = f"rm -rf {shlex.quote(stage_dir)}; rm -f {shlex.quote(archive_path)}"
+    staged_source = posixpath.join(stage_dir, source_name)
+    return (
+        f"trap {shlex.quote(cleanup)} EXIT; "
+        f"mkdir -p {shlex.quote(stage_dir)} && "
+        f"tar -xf {shlex.quote(archive_path)} -C {shlex.quote(stage_dir)} && "
+        f"cp -R -- {shlex.quote(staged_source)} {shlex.quote(destination)}"
+    )
+
+
+def _upload_scp_source(
+    session: dict[str, object],
+    *,
+    source: Path,
+    destination: str,
+) -> None:
+    resolved_source = _validate_scp_local_source(source)
+    archive_path = _create_sources_upload_archive([resolved_source])
+    remote_archive_path = _new_remote_archive_path("agentkit-upload")
     try:
-        with tarfile.open(archive_path, "w") as tar:
-            if upload_dir:
-                _add_directory_contents(tar, upload_dir)
-            else:
-                for file_path in upload_files:
-                    tar.add(file_path, arcname=file_path.name, recursive=False)
+        _upload_remote_file(
+            session,
+            local_path=archive_path,
+            remote_path=remote_archive_path,
+        )
+        _exec_shell_command(
+            session,
+            _build_remote_scp_upload_command(
+                archive_path=remote_archive_path,
+                source_name=_archive_source_name(resolved_source),
+                destination=destination,
+            ),
+        )
     except Exception:
-        archive_path.unlink(missing_ok=True)
+        # Upload failures are ambiguous: the remote API may have persisted the
+        # archive before the client observed a transport error.
+        _cleanup_remote_file(session, remote_archive_path)
         raise
-    return archive_path
-
-
-def _build_remote_extract_command(
-    *,
-    archive_path: str,
-    dst_dir: str,
-) -> str:
-    quoted_archive = shlex.quote(archive_path)
-    quoted_dst = shlex.quote(dst_dir)
-    return (
-        f"mkdir -p {quoted_dst} && tar -xf {quoted_archive} -C {quoted_dst}; "
-        f"status=$?; rm -f {quoted_archive}; [ $status -eq 0 ]"
-    )
-
-
-def _validate_download_inputs(
-    sandbox_dir: Optional[str],
-    sandbox_files: Optional[list[str]],
-    *,
-    workspace: str | None,
-) -> tuple[str, list[str]]:
-    files = _strings_or_empty(sandbox_files)
-    has_dir = bool((sandbox_dir or "").strip())
-    if has_dir and files:
-        error("Use either --src-dir or FILE..., not both")
-    if not has_dir and not files:
-        error("Provide --src-dir or one or more FILE arguments")
-
-    if has_dir:
-        return (
-            "directory",
-            [
-                _resolve_sandbox_path(
-                    sandbox_dir,
-                    workspace=workspace,
-                    option_name="--src-dir",
-                )
-            ],
-        )
-
-    resolved_files = [
-        _resolve_sandbox_path(
-            file_path,
-            workspace=workspace,
-            option_name="FILE",
-        )
-        for file_path in files
-    ]
-    seen_names: set[str] = set()
-    for file_path in resolved_files:
-        name = posixpath.basename(file_path)
-        if not name:
-            error(f"Invalid FILE path: {file_path}")
-        if name in seen_names:
-            error(f"Duplicate source file name: {name}")
-        seen_names.add(name)
-    return "files", resolved_files
-
-
-def _build_remote_archive_command(
-    *,
-    archive_path: str,
-    source_mode: str,
-    sources: list[str],
-) -> str:
-    quoted_archive = shlex.quote(archive_path)
-    if source_mode == "directory":
-        quoted_source = shlex.quote(sources[0])
-        return (
-            f"tar -cf {quoted_archive} -C {quoted_source} .; "
-            f"status=$?; [ $status -eq 0 ] || rm -f {quoted_archive}; "
-            f"[ $status -eq 0 ]"
-        )
-
-    command = f"tar -cf {quoted_archive}"
-    for source in sources:
-        directory = posixpath.dirname(source) or "/"
-        name = posixpath.basename(source)
-        command += f" -C {shlex.quote(directory)} {shlex.quote(name)}"
-    return (
-        f"{command}; "
-        f"status=$?; [ $status -eq 0 ] || rm -f {quoted_archive}; "
-        f"[ $status -eq 0 ]"
-    )
-
-
-def _build_remote_source_validation_command(
-    *,
-    source_mode: str,
-    sources: list[str],
-) -> str:
-    commands = []
-    for source in sources:
-        quoted_source = shlex.quote(source)
-        if source_mode == "directory":
-            commands.append(
-                f"if ! test -e {quoted_source}; then "
-                f"echo {shlex.quote(f'Source directory not found: {source}')}; "
-                f"false; elif ! test -d {quoted_source}; then "
-                f"echo {shlex.quote(f'Source path is not a directory: {source}')}; "
-                "false; else true; fi"
-            )
-        else:
-            commands.append(
-                f"if ! test -e {quoted_source}; then "
-                f"echo {shlex.quote(f'Source file not found: {source}')}; "
-                f"false; elif ! test -f {quoted_source}; then "
-                f"echo {shlex.quote(f'Source path is not a file: {source}')}; "
-                "false; else true; fi"
-            )
-    return " && ".join(commands)
-
-
-def _validate_local_download_dir(download_dir: Path) -> Path:
-    if download_dir.exists() and not download_dir.is_dir():
-        error(f"Download path is not a directory: {download_dir}")
-    download_dir.mkdir(parents=True, exist_ok=True)
-    return download_dir
+    finally:
+        archive_path.unlink(missing_ok=True)
 
 
 def _safe_members(
@@ -545,6 +368,8 @@ def _safe_members(
             error(f"Unsafe archive member path: {name}")
         if member.issym() or member.islnk():
             error(f"Archive member links are not supported: {name}")
+        if not member.isdir() and not member.isfile():
+            error(f"Unsupported archive member type: {name}")
         if normalized in {"", "."}:
             continue
 
@@ -590,286 +415,129 @@ def _extract_archive(
         error(f"Invalid sandbox download archive: {exc}")
 
 
-def file_upload_command(
-    session_id: str = typer.Option(
-        ...,
-        "--session-id",
-        "--sid",
-        "-s",
-        help="Sandbox session ID to upload into.",
-    ),
-    workspace: Optional[str] = typer.Option(
-        None,
-        "--workspace",
-        help=(
-            "Optional sandbox workspace root. Relative --dst-dir values are "
-            "resolved inside this directory."
-        ),
-    ),
-    upload_dir: Optional[list[Path]] = typer.Option(
-        None,
-        "--src-dir",
-        help=(
-            "Local directory whose contents are uploaded. May be used once. "
-            "Use FILE... for single or multiple files."
-        ),
-    ),
-    files: Optional[list[Path]] = typer.Argument(
-        None,
-        metavar="FILE...",
-        help="Local files to upload.",
-    ),
-    dst_dir: str = typer.Option(
-        ...,
-        "--dst-dir",
-        help=(
-            "Sandbox destination directory. Relative paths require --workspace. "
-            "The directory is created when it does not exist."
-        ),
-    ),
-    tool_id: Optional[str] = typer.Option(
-        None,
-        "--tool-id",
-        help=f"Sandbox tool ID. Defaults to {SANDBOX_TOOL_ID_ENV}.",
-    ),
-    tool_type: SandboxToolType = typer.Option(
-        SandboxToolType.CODE_ENV,
-        "--tool-type",
-        help="Sandbox tool type to resolve when --tool-id is omitted.",
-    ),
-) -> None:
-    """Upload a local directory or one or more files into a sandbox session."""
-    try:
-        resolved_workspace = _normalize_workspace(workspace)
-        resolved_dst_dir = _resolve_sandbox_path(
-            dst_dir,
-            workspace=resolved_workspace,
-            option_name="--dst-dir",
-        )
-        resolved_upload_dir, resolved_upload_files = _validate_upload_inputs(
-            upload_dir,
-            files,
-        )
-        session = _resolve_existing_session(
-            session_id=session_id,
-            tool_id=tool_id,
-            tool_type=tool_type,
-        )
-        archive_path = _create_upload_archive(
-            upload_dir=resolved_upload_dir,
-            upload_files=resolved_upload_files,
-        )
-        remote_archive_path = _new_remote_archive_path("agentkit-upload")
-        try:
-            _upload_remote_file(
-                session,
-                local_path=archive_path,
-                remote_path=remote_archive_path,
-            )
-            _exec_shell_command(
-                session,
-                _build_remote_extract_command(
-                    archive_path=remote_archive_path,
-                    dst_dir=resolved_dst_dir,
-                ),
-            )
-        finally:
-            archive_path.unlink(missing_ok=True)
-    except typer.Exit:
-        raise
-    except requests.RequestException as exc:
-        error(str(exc))
-    except Exception as exc:
-        error(str(exc))
+def _shell_output(payload: dict[str, object]) -> str:
+    data = payload.get("data")
+    if not isinstance(data, dict):
+        return ""
+    output = data.get("output")
+    return output.strip() if isinstance(output, str) else ""
 
-    sources: list[str]
-    if resolved_upload_dir:
-        sources = [str(resolved_upload_dir)]
+
+def _remote_source_type(session: dict[str, object], source: str) -> str:
+    quoted_source = shlex.quote(source)
+    payload = _exec_shell_command(
+        session,
+        "if test -f {source}; then printf 'file'; "
+        "elif test -d {source}; then printf 'directory'; "
+        "else printf 'missing'; fi".format(
+            source=quoted_source,
+        ),
+    )
+    source_type = _shell_output(payload)
+    if source_type == "missing":
+        error(f"Source path not found: {source}")
+    if source_type not in {"file", "directory"}:
+        error(f"Unable to determine sandbox source type: {source}")
+    return source_type
+
+
+def _remote_source_name(source: str) -> str | None:
+    return posixpath.basename(source.rstrip("/")) or None
+
+
+def _build_remote_scp_archive_command(
+    *,
+    archive_path: str,
+    source: str,
+) -> str:
+    quoted_archive = shlex.quote(archive_path)
+    source_name = _remote_source_name(source)
+    if source_name is None:
+        tar_command = f"tar -cf {quoted_archive} -C / ."
     else:
-        sources = [str(file_path) for file_path in resolved_upload_files]
-    echo_json(
-        {
-            "session_id": session_id,
-            "workspace": resolved_workspace,
-            "dst_dir": resolved_dst_dir,
-            "sources": sources,
-        }
+        source_dir = posixpath.dirname(source) or "/"
+        tar_command = (
+            f"tar -cf {quoted_archive} -C {shlex.quote(source_dir)} "
+            f"{shlex.quote(source_name)}"
+        )
+    return (
+        f"{tar_command}; status=$?; "
+        f"[ $status -eq 0 ] || rm -f {quoted_archive}; [ $status -eq 0 ]"
     )
 
 
-def file_download_command(
-    session_id: str = typer.Option(
-        ...,
-        "--session-id",
-        "--sid",
-        "-s",
-        help="Sandbox session ID to download from.",
-    ),
-    workspace: Optional[str] = typer.Option(
-        None,
-        "--workspace",
-        help=(
-            "Optional sandbox workspace root. Relative --src-dir and FILE "
-            "values are resolved inside this directory."
-        ),
-    ),
-    sandbox_dir: Optional[str] = typer.Option(
-        None,
-        "--src-dir",
-        help="Sandbox directory whose contents are downloaded.",
-    ),
-    files: Optional[list[str]] = typer.Argument(
-        None,
-        metavar="FILE...",
-        help="Sandbox files to download.",
-    ),
-    dst_dir: Path = typer.Option(
-        ...,
-        "--dst-dir",
-        help="Local directory where downloaded contents are extracted.",
-    ),
-    overwrite: bool = typer.Option(
-        False,
-        "--overwrite",
-        help="Overwrite existing local files while extracting the download archive.",
-    ),
-    tool_id: Optional[str] = typer.Option(
-        None,
-        "--tool-id",
-        help=f"Sandbox tool ID. Defaults to {SANDBOX_TOOL_ID_ENV}.",
-    ),
-    tool_type: SandboxToolType = typer.Option(
-        SandboxToolType.CODE_ENV,
-        "--tool-type",
-        help="Sandbox tool type to resolve when --tool-id is omitted.",
-    ),
-) -> None:
-    """Download a sandbox directory or one or more files."""
-    local_archive_path: Path | None = None
-    try:
-        resolved_workspace = _normalize_workspace(workspace)
-        source_mode, sources = _validate_download_inputs(
-            sandbox_dir,
-            files,
-            workspace=resolved_workspace,
-        )
-        resolved_download_dir = _validate_local_download_dir(dst_dir)
-        session = _resolve_existing_session(
-            session_id=session_id,
-            tool_id=tool_id,
-            tool_type=tool_type,
-        )
-        _exec_shell_command(
-            session,
-            _build_remote_source_validation_command(
-                source_mode=source_mode,
-                sources=sources,
-            ),
-        )
-        remote_archive_path = _new_remote_archive_path("agentkit-download")
-        _exec_shell_command(
-            session,
-            _build_remote_archive_command(
-                archive_path=remote_archive_path,
-                source_mode=source_mode,
-                sources=sources,
-            ),
-        )
+def _copy_downloaded_source(
+    source: Path,
+    destination: Path,
+    *,
+    source_name: str | None = None,
+) -> Path:
+    name = source.name if source_name is None else source_name
+    target = destination / name if destination.is_dir() and name else destination
+    if not target.parent.is_dir():
+        error(f"Destination parent directory not found: {target.parent}")
 
-        fd, name = tempfile.mkstemp(
-            prefix="agentkit-sandbox-download-",
-            suffix=".tar",
+    if source.is_dir():
+        if target.exists() and not target.is_dir():
+            error(f"Cannot overwrite file with directory: {target}")
+        shutil.copytree(source, target, dirs_exist_ok=True, copy_function=shutil.copy2)
+        return target
+
+    if not source.is_file():
+        error(f"Downloaded source is not a file or directory: {source}")
+    if target.exists() and target.is_dir():
+        error(f"Cannot overwrite directory with file: {target}")
+    shutil.copy2(source, target)
+    return target
+
+
+def _download_scp_source(
+    session: dict[str, object],
+    *,
+    source: str,
+    destination: Path,
+) -> Path:
+    _remote_source_type(session, source)
+    source_name = _remote_source_name(source)
+    remote_archive_path = _new_remote_archive_path("agentkit-download")
+    try:
+        _exec_shell_command(
+            session,
+            _build_remote_scp_archive_command(
+                archive_path=remote_archive_path,
+                source=source,
+            ),
         )
-        os.close(fd)
-        local_archive_path = Path(name)
-        try:
+        with tempfile.TemporaryDirectory(prefix="agentkit-sandbox-download-") as name:
+            temp_dir = Path(name)
+            archive_path = temp_dir / "download.tar"
+            stage_dir = temp_dir / "stage"
+            stage_dir.mkdir()
             _download_remote_file(
                 session,
                 remote_path=remote_archive_path,
-                local_path=local_archive_path,
+                local_path=archive_path,
             )
-            _extract_archive(
-                local_archive_path,
-                download_dir=resolved_download_dir,
-                overwrite=overwrite,
+            _extract_archive(archive_path, download_dir=stage_dir, overwrite=True)
+            staged_source = stage_dir / source_name if source_name else stage_dir
+            return _copy_downloaded_source(
+                staged_source,
+                destination,
+                source_name=source_name or "",
             )
-        finally:
-            _cleanup_remote_file(session, remote_archive_path)
-    except typer.Exit:
-        raise
-    except requests.RequestException as exc:
-        error(str(exc))
-    except Exception as exc:
-        error(str(exc))
     finally:
-        if local_archive_path:
-            local_archive_path.unlink(missing_ok=True)
-
-    echo_json(
-        {
-            "session_id": session_id,
-            "workspace": resolved_workspace,
-            "dst_dir": str(resolved_download_dir),
-            "sources": sources,
-        }
-    )
+        _cleanup_remote_file(session, remote_archive_path)
 
 
-def file_list_command(
+def scp_command(
+    source: str = typer.Argument(..., metavar="SOURCE"),
+    destination: str = typer.Argument(..., metavar="DESTINATION"),
     session_id: str = typer.Option(
         ...,
         "--session-id",
         "--sid",
         "-s",
-        help="Sandbox session ID to list files from.",
-    ),
-    workspace: Optional[str] = typer.Option(
-        None,
-        "--workspace",
-        help=(
-            "Optional sandbox workspace root. Relative PATH values are "
-            "resolved inside it."
-        ),
-    ),
-    path: str = typer.Argument(
-        ...,
-        metavar="PATH",
-        help="Sandbox path to list. Relative paths require --workspace.",
-    ),
-    recursive: bool = typer.Option(
-        False,
-        "--recursive/--no-recursive",
-        help="List files recursively.",
-    ),
-    show_hidden: bool = typer.Option(
-        False,
-        "--show-hidden/--hide-hidden",
-        help="Include hidden files.",
-    ),
-    max_depth: Optional[int] = typer.Option(
-        None,
-        "--max-depth",
-        help="Maximum recursive listing depth.",
-    ),
-    include_size: bool = typer.Option(
-        True,
-        "--include-size/--no-include-size",
-        help="Include file size metadata.",
-    ),
-    include_permissions: bool = typer.Option(
-        False,
-        "--include-permissions",
-        help="Include file permission metadata.",
-    ),
-    sort_by: str = typer.Option(
-        "name",
-        "--sort-by",
-        help="Sort key: name, size, modified, or type.",
-    ),
-    sort_desc: bool = typer.Option(
-        False,
-        "--sort-desc",
-        help="Sort in descending order.",
+        help="Sandbox session ID used for the transfer.",
     ),
     tool_id: Optional[str] = typer.Option(
         None,
@@ -882,35 +550,38 @@ def file_list_command(
         help="Sandbox tool type to resolve when --tool-id is omitted.",
     ),
 ) -> None:
-    """List files and directories in a sandbox workspace or path."""
+    """Copy one file or directory between local storage and a sandbox session."""
     try:
-        if max_depth is not None and max_depth < 0:
-            error("--max-depth must be greater than or equal to 0")
-        if sort_by not in SANDBOX_FILE_SORT_KEYS:
-            error("--sort-by must be one of: name, size, modified, type")
-
-        resolved_workspace = _normalize_workspace(workspace)
-        resolved_sandbox_dir = _resolve_sandbox_path(
-            path,
-            workspace=resolved_workspace,
-            option_name="PATH",
+        direction, local_operand, sandbox_operand = _resolve_scp_operands(
+            source,
+            destination,
         )
         session = _resolve_existing_session(
             session_id=session_id,
             tool_id=tool_id,
             tool_type=tool_type,
         )
-        result = _list_remote_path(
-            session,
-            path=resolved_sandbox_dir,
-            recursive=recursive,
-            show_hidden=show_hidden,
-            max_depth=max_depth,
-            include_size=include_size,
-            include_permissions=include_permissions,
-            sort_by=sort_by,
-            sort_desc=sort_desc,
-        )
+        if direction == "upload":
+            local_path = local_operand
+            remote_path = sandbox_operand
+            if not isinstance(local_path, Path) or not isinstance(remote_path, str):
+                raise RuntimeError("Invalid resolved upload operands")
+            _upload_scp_source(
+                session,
+                source=local_path,
+                destination=remote_path,
+            )
+            result_local_path = local_path
+        else:
+            remote_path = local_operand
+            local_path = sandbox_operand
+            if not isinstance(remote_path, str) or not isinstance(local_path, Path):
+                raise RuntimeError("Invalid resolved download operands")
+            result_local_path = _download_scp_source(
+                session,
+                source=remote_path,
+                destination=local_path,
+            )
     except typer.Exit:
         raise
     except requests.RequestException as exc:
@@ -918,9 +589,11 @@ def file_list_command(
     except Exception as exc:
         error(str(exc))
 
-    echo_json(result)
-
-
-file_command.command(name="upload")(file_upload_command)
-file_command.command(name="download")(file_download_command)
-file_command.command(name="list")(file_list_command)
+    echo_json(
+        {
+            "direction": direction,
+            "session_id": session_id,
+            "local_path": str(result_local_path),
+            "remote_path": remote_path,
+        }
+    )

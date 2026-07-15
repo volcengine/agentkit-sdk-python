@@ -1376,9 +1376,9 @@ def test_build_model_envs_infers_byteplus_provider_from_builtin_model_base_url(
 
     assert [(item.key, item.value) for item in envs] == [
         ("AGENTKIT_SANDBOX_MODEL_PROVIDER", "byteplus_coding_plan"),
-        ("OPENCODE_MODEL", "deepseek-v4-flash"),
-        ("CODEX_MODEL", "deepseek-v4-flash"),
-        ("ANTHROPIC_MODEL", "deepseek-v4-flash"),
+        ("OPENCODE_MODEL", "dola-seed-2.0-pro"),
+        ("CODEX_MODEL", "dola-seed-2.0-pro"),
+        ("ANTHROPIC_MODEL", "dola-seed-2.0-pro"),
         (
             "OPENCODE_BASE_URL",
             "https://ark.ap-southeast.bytepluses.com/api/coding/v3",
@@ -3153,7 +3153,7 @@ def test_ensure_sandbox_session_snapshot_tool_restores_first_snapshot(
     assert _FakeToolsClient.last_resume_snapshot_request.tool_id == "tool-cli"
     assert _FakeToolsClient.last_resume_snapshot_request.snapshot_id == "snapshot-first"
     assert _FakeToolsClient.last_resume_snapshot_request.ttl == 60
-    assert _FakeToolsClient.last_resume_snapshot_request.create_new_instance is True
+    assert _FakeToolsClient.last_resume_snapshot_request.create_new_instance is False
     assert _FakeToolsClient.last_get_request.tool_id == "tool-cli"
     assert _FakeToolsClient.last_get_request.session_id == "instance-restored"
     assert result == {
@@ -4066,14 +4066,13 @@ def test_cli_shell_uploads_sources_before_command(monkeypatch, tmp_path) -> None
     _patch_shell_session(monkeypatch, cli_shell, stored_session)
     events = []
 
-    def fake_upload_source_before_exec(session, *, workspace, src_dirs, dst_dir):
+    def fake_upload_scp_source(session, *, source, destination):
         events.append(
             (
-                "upload",
+                "copy",
                 session,
-                workspace,
-                [str(src_dir) for src_dir in src_dirs],
-                dst_dir,
+                str(source),
+                destination,
             )
         )
 
@@ -4097,8 +4096,8 @@ def test_cli_shell_uploads_sources_before_command(monkeypatch, tmp_path) -> None
 
     monkeypatch.setattr(
         cli_shell,
-        "_upload_source_before_exec",
-        fake_upload_source_before_exec,
+        "_upload_scp_source",
+        fake_upload_scp_source,
     )
     monkeypatch.setattr(cli_shell.requests, "post", fake_post)
 
@@ -4111,24 +4110,28 @@ def test_cli_shell_uploads_sources_before_command(monkeypatch, tmp_path) -> None
             "user-1",
             "--command",
             "echo done",
-            "--src-dir",
+            "--copy",
             str(file_one),
+            "sandbox:/workspace/project/one.txt",
+            "--copy",
             str(file_two),
-            "--workspace",
-            "/workspace",
-            "--dst-dir",
-            "project",
+            "sandbox:/workspace/project/two.txt",
         ],
     )
 
     assert result.exit_code == 0
     assert events == [
         (
-            "upload",
+            "copy",
             stored_session,
-            "/workspace",
-            [str(file_one), str(file_two)],
-            "project",
+            str(file_one),
+            "/workspace/project/one.txt",
+        ),
+        (
+            "copy",
+            stored_session,
+            str(file_two),
+            "/workspace/project/two.txt",
         ),
         (
             "post",
@@ -4146,7 +4149,6 @@ def test_cli_shell_uploads_directory_as_directory_before_command(
     tmp_path,
 ) -> None:
     from agentkit.toolkit.cli.cli import app
-    import agentkit.toolkit.cli.sandbox.cli_exec as cli_exec
     import agentkit.toolkit.cli.sandbox.cli_shell as cli_shell
 
     source_dir = tmp_path / "shell_dir"
@@ -4159,23 +4161,10 @@ def test_cli_shell_uploads_directory_as_directory_before_command(
         "endpoint": "https://sandbox.example.com",
     }
     _patch_shell_session(monkeypatch, cli_shell, stored_session)
-    monkeypatch.setattr(
-        cli_exec,
-        "_new_remote_archive_path",
-        lambda _prefix: "/tmp/agentkit-upload.tar",
-    )
     captured = {}
 
-    def fake_upload_remote_file(_session, *, local_path, remote_path):
-        assert remote_path == "/tmp/agentkit-upload.tar"
-        with tarfile.open(local_path, mode="r") as tar:
-            captured["archive_names"] = sorted(
-                member.name for member in tar.getmembers()
-            )
-
-    def fake_exec_shell_command(_session, command):
-        captured["extract_command"] = command
-        return {"success": True}
+    def fake_upload_scp_source(_session, *, source, destination):
+        captured["copy"] = (source, destination)
 
     class FakeResponse:
         text = '{"success": true}'
@@ -4195,8 +4184,7 @@ def test_cli_shell_uploads_directory_as_directory_before_command(
         captured["post"] = (url, json, timeout)
         return FakeResponse()
 
-    monkeypatch.setattr(cli_exec, "_upload_remote_file", fake_upload_remote_file)
-    monkeypatch.setattr(cli_exec, "_exec_shell_command", fake_exec_shell_command)
+    monkeypatch.setattr(cli_shell, "_upload_scp_source", fake_upload_scp_source)
     monkeypatch.setattr(cli_shell.requests, "post", fake_post)
 
     result = runner.invoke(
@@ -4208,22 +4196,14 @@ def test_cli_shell_uploads_directory_as_directory_before_command(
             "user-1",
             "--command",
             "echo done",
-            "--src-dir",
+            "--copy",
             str(source_dir),
-            "--workspace",
-            "/workspace",
-            "--dst-dir",
-            "tmp",
+            "sandbox:/workspace/tmp/shell_dir",
         ],
     )
 
     assert result.exit_code == 0
-    assert captured["archive_names"] == ["shell_dir", "shell_dir/hello.txt"]
-    assert captured["extract_command"] == (
-        "mkdir -p /workspace/tmp && tar -xf /tmp/agentkit-upload.tar "
-        "-C /workspace/tmp; status=$?; rm -f /tmp/agentkit-upload.tar; "
-        "[ $status -eq 0 ]"
-    )
+    assert captured["copy"] == (source_dir, "/workspace/tmp/shell_dir")
     assert captured["post"] == (
         "https://sandbox.example.com/v1/shell/exec",
         {"id": "", "exec_dir": "", "command": "echo done"},
@@ -4420,7 +4400,7 @@ def test_resolve_git_config_ini_supports_flat_user_keys(tmp_path) -> None:
     )
 
 
-def test_cli_shell_rejects_extra_source_without_src_dir(
+def test_cli_shell_rejects_unpaired_copy_source(
     monkeypatch,
     tmp_path,
 ) -> None:
@@ -4457,7 +4437,7 @@ def test_cli_shell_rejects_extra_source_without_src_dir(
     )
 
     assert result.exit_code == 1
-    assert "Additional source paths require --src-dir" in result.output
+    assert "Unexpected argument" in result.output
     assert posted["value"] is False
 
 
@@ -4875,10 +4855,9 @@ exec:
     tool_id: tool-1
     command: codex
     mode: tmux
-    src_dir: ./workspace
-    extra_sources:
-      - ./README.md
-    dst_dir: project
+    copy:
+      - [./workspace, project/workspace]
+      - [./README.md, project/README.md]
   - name: right
     args:
       - --session-id
@@ -4908,9 +4887,24 @@ exec:
     assert "--tool-id tool-1" in result.output
     assert "--mode tmux" in result.output
     assert "--command codex" in result.output
-    assert "--src-dir ./workspace ./README.md" in result.output
-    assert "--dst-dir project" in result.output
+    assert "--copy ./workspace project/workspace" in result.output
+    assert "--copy ./README.md project/README.md" in result.output
     assert "--session-id user-right --command opencode" in result.output
+
+
+def test_cli_sandbox_run_copy_pair_helper_edges() -> None:
+    import agentkit.toolkit.cli.sandbox.cli_run as cli_run
+
+    assert cli_run._copy_pairs(None, "copy") == []
+    assert cli_run._copy_pairs(["./src", "sandbox:/tmp/src"], "copy") == [
+        ("./src", "sandbox:/tmp/src")
+    ]
+    with pytest.raises(cli_run.typer.Exit):
+        cli_run._copy_pairs("src", "copy")
+    with pytest.raises(cli_run.typer.Exit):
+        cli_run._copy_pairs([["src"]], "copy")
+    with pytest.raises(cli_run.typer.Exit):
+        cli_run._copy_pairs([["src", {"bad": "dst"}]], "copy")
 
 
 def test_cli_sandbox_run_errors_when_terminal_exceeds_yaml_entries(
@@ -5144,34 +5138,17 @@ def test_cli_exec_uploads_directory_before_connecting(
         "endpoint": "https://sandbox.example.com/?token=abc",
     }
     _patch_exec_session(monkeypatch, cli_exec, stored_session)
-    monkeypatch.setattr(
-        cli_exec,
-        "_new_remote_archive_path",
-        lambda _prefix: "/tmp/agentkit-upload.tar",
-    )
 
     events = []
 
-    def fake_upload_remote_file(session, *, local_path, remote_path):
+    def fake_upload_scp_source(session, *, source, destination):
         assert session == stored_session
-        assert local_path.exists()
-        assert remote_path == "/tmp/agentkit-upload.tar"
-        events.append(("upload", remote_path))
-        with tarfile.open(local_path, mode="r") as tar:
-            events.append(
-                ("archive", sorted(member.name for member in tar.getmembers()))
-            )
-
-    def fake_exec_shell_command(session, command):
-        assert session == stored_session
-        events.append(("extract", command))
-        return {"success": True}
+        events.append(("copy", source, destination))
 
     def fake_connect(ws_url, initial_command, on_shell_id=None):
         events.append(("connect", ws_url, initial_command))
 
-    monkeypatch.setattr(cli_exec, "_upload_remote_file", fake_upload_remote_file)
-    monkeypatch.setattr(cli_exec, "_exec_shell_command", fake_exec_shell_command)
+    monkeypatch.setattr(cli_exec, "_upload_scp_source", fake_upload_scp_source)
     monkeypatch.setattr(cli_exec, "_connect_terminal", fake_connect)
 
     result = runner.invoke(
@@ -5181,8 +5158,9 @@ def test_cli_exec_uploads_directory_before_connecting(
             "exec",
             "--session-id",
             "user-1",
-            "--src-dir",
+            "--copy",
             str(upload_dir),
+            "sandbox:/home/gem/upload-src",
             "--command",
             "codex",
         ],
@@ -5190,19 +5168,12 @@ def test_cli_exec_uploads_directory_before_connecting(
 
     assert result.exit_code == 0
     assert events == [
-        ("upload", "/tmp/agentkit-upload.tar"),
-        ("archive", ["upload-src", "upload-src/hello.txt"]),
-        (
-            "extract",
-            "mkdir -p /home/gem && tar -xf /tmp/agentkit-upload.tar "
-            "-C /home/gem; status=$?; rm -f /tmp/agentkit-upload.tar; "
-            "[ $status -eq 0 ]",
-        ),
+        ("copy", upload_dir, "/home/gem/upload-src"),
         ("connect", "ws://sandbox.example.com/v1/shell/ws?token=abc", "codex"),
     ]
 
 
-def test_cli_exec_upload_dir_resolves_relative_dst_dir_inside_workspace(
+def test_cli_exec_upload_dir_resolves_relative_copy_destination_inside_home_gem(
     monkeypatch,
     tmp_path,
 ) -> None:
@@ -5219,26 +5190,15 @@ def test_cli_exec_upload_dir_resolves_relative_dst_dir_inside_workspace(
         "endpoint": "https://sandbox.example.com",
     }
     _patch_exec_session(monkeypatch, cli_exec, stored_session)
-    monkeypatch.setattr(
-        cli_exec,
-        "_new_remote_archive_path",
-        lambda _prefix: "/tmp/agentkit-upload.tar",
-    )
-    monkeypatch.setattr(
-        cli_exec,
-        "_upload_remote_file",
-        lambda *_args, **_kwargs: None,
-    )
     captured = {}
 
-    def fake_exec_shell_command(_session, command):
-        captured["command"] = command
-        return {"success": True}
+    def fake_upload_scp_source(_session, *, source, destination):
+        captured["copy"] = (source, destination)
 
     def fake_connect(_ws_url, initial_command=None, on_shell_id=None):
         captured["connected"] = True
 
-    monkeypatch.setattr(cli_exec, "_exec_shell_command", fake_exec_shell_command)
+    monkeypatch.setattr(cli_exec, "_upload_scp_source", fake_upload_scp_source)
     monkeypatch.setattr(cli_exec, "_connect_terminal", fake_connect)
 
     result = runner.invoke(
@@ -5248,22 +5208,14 @@ def test_cli_exec_upload_dir_resolves_relative_dst_dir_inside_workspace(
             "exec",
             "--session-id",
             "user-1",
-            "--src-dir",
+            "--copy",
             str(upload_dir),
-            "--workspace",
-            "/workspace",
-            "--dst-dir",
-            "project",
+            "project/upload-src",
         ],
     )
 
     assert result.exit_code == 0
-    assert (
-        captured["command"]
-        == "mkdir -p /workspace/project && tar -xf /tmp/agentkit-upload.tar "
-        "-C /workspace/project; status=$?; rm -f /tmp/agentkit-upload.tar; "
-        "[ $status -eq 0 ]"
-    )
+    assert captured["copy"] == (upload_dir, "/home/gem/project/upload-src")
     assert captured["connected"] is True
 
 
@@ -5285,27 +5237,15 @@ def test_cli_exec_uploads_repeated_sources_before_connecting(
         "endpoint": "https://sandbox.example.com",
     }
     _patch_exec_session(monkeypatch, cli_exec, stored_session)
-    monkeypatch.setattr(
-        cli_exec,
-        "_new_remote_archive_path",
-        lambda _prefix: "/tmp/agentkit-upload.tar",
-    )
-    uploaded = {}
     captured = {}
 
-    def fake_upload_remote_file(_session, *, local_path, remote_path):
-        uploaded["local_path"] = local_path
-        uploaded["remote_path"] = remote_path
-
-    def fake_exec_shell_command(_session, command):
-        captured["command"] = command
-        return {"success": True}
+    def fake_upload_scp_source(_session, *, source, destination):
+        captured.setdefault("copies", []).append((source, destination))
 
     def fake_connect(_ws_url, initial_command=None, on_shell_id=None):
         captured["connected"] = True
 
-    monkeypatch.setattr(cli_exec, "_upload_remote_file", fake_upload_remote_file)
-    monkeypatch.setattr(cli_exec, "_exec_shell_command", fake_exec_shell_command)
+    monkeypatch.setattr(cli_exec, "_upload_scp_source", fake_upload_scp_source)
     monkeypatch.setattr(cli_exec, "_connect_terminal", fake_connect)
 
     result = runner.invoke(
@@ -5315,50 +5255,30 @@ def test_cli_exec_uploads_repeated_sources_before_connecting(
             "exec",
             "--session-id",
             "user-1",
-            "--src-dir",
+            "--copy",
             str(file_one),
+            "sandbox:/workspace/project/one.txt",
+            "--copy",
             str(file_two),
-            "--workspace",
-            "/workspace",
-            "--dst-dir",
-            "project",
+            "sandbox:/workspace/project/two.txt",
         ],
     )
 
     assert result.exit_code == 0
-    assert uploaded["remote_path"] == "/tmp/agentkit-upload.tar"
-    assert not uploaded["local_path"].exists()
-    assert (
-        captured["command"]
-        == "mkdir -p /workspace/project && tar -xf /tmp/agentkit-upload.tar "
-        "-C /workspace/project; status=$?; rm -f /tmp/agentkit-upload.tar; "
-        "[ $status -eq 0 ]"
-    )
+    assert captured["copies"] == [
+        (file_one, "/workspace/project/one.txt"),
+        (file_two, "/workspace/project/two.txt"),
+    ]
     assert captured["connected"] is True
 
 
-def test_cli_exec_upload_rejects_duplicate_source_names(
+def test_cli_exec_copy_rejects_sandbox_source_before_connecting(
     monkeypatch,
     tmp_path,
 ) -> None:
     from agentkit.toolkit.cli.cli import app
     import agentkit.toolkit.cli.sandbox.cli_exec as cli_exec
 
-    dir_one = tmp_path / "one"
-    dir_two = tmp_path / "two"
-    dir_one.mkdir()
-    dir_two.mkdir()
-    file_one = dir_one / "same.txt"
-    file_two = dir_two / "same.txt"
-    file_one.write_text("one", encoding="utf-8")
-    file_two.write_text("two", encoding="utf-8")
-    stored_session = {
-        "session_id": "user-1",
-        "tool_id": "tool-1",
-        "instance_id": "session-1",
-        "endpoint": "https://sandbox.example.com",
-    }
-    _patch_exec_session(monkeypatch, cli_exec, stored_session)
     connected = {"value": False}
     monkeypatch.setattr(
         cli_exec,
@@ -5373,18 +5293,18 @@ def test_cli_exec_upload_rejects_duplicate_source_names(
             "exec",
             "--session-id",
             "user-1",
-            "--src-dir",
-            str(file_one),
-            str(file_two),
+            "--copy",
+            "sandbox:/tmp/input.txt",
+            str(tmp_path / "out.txt"),
         ],
     )
 
     assert result.exit_code == 1
-    assert "Duplicate source name: same.txt" in result.output
+    assert "--copy only supports local-to-sandbox transfers" in result.output
     assert connected["value"] is False
 
 
-def test_cli_exec_rejects_extra_source_without_src_dir(
+def test_cli_exec_rejects_unpaired_copy_source(
     monkeypatch,
     tmp_path,
 ) -> None:
@@ -5419,23 +5339,18 @@ def test_cli_exec_rejects_extra_source_without_src_dir(
     )
 
     assert result.exit_code == 1
-    assert "Additional source paths require --src-dir" in result.output
+    assert "Unexpected argument" in result.output
     assert connected["value"] is False
 
 
-def test_cli_exec_upload_rejects_absolute_dst_dir(monkeypatch, tmp_path) -> None:
+def test_cli_exec_copy_rejects_relative_destination_escape(
+    monkeypatch, tmp_path
+) -> None:
     from agentkit.toolkit.cli.cli import app
     import agentkit.toolkit.cli.sandbox.cli_exec as cli_exec
 
-    upload_dir = tmp_path / "upload-src"
-    upload_dir.mkdir()
-    stored_session = {
-        "session_id": "user-1",
-        "tool_id": "tool-1",
-        "instance_id": "session-1",
-        "endpoint": "https://sandbox.example.com",
-    }
-    _patch_exec_session(monkeypatch, cli_exec, stored_session)
+    source = tmp_path / "input.txt"
+    source.write_text("input", encoding="utf-8")
     connected = {"value": False}
     monkeypatch.setattr(
         cli_exec,
@@ -5450,15 +5365,14 @@ def test_cli_exec_upload_rejects_absolute_dst_dir(monkeypatch, tmp_path) -> None
             "exec",
             "--session-id",
             "user-1",
-            "--src-dir",
-            str(upload_dir),
-            "--dst-dir",
-            "/absolute",
+            "--copy",
+            str(source),
+            "sandbox:../../etc/passwd",
         ],
     )
 
     assert result.exit_code == 1
-    assert "--dst-dir must be relative to --workspace" in result.output
+    assert "Relative sandbox path must stay inside /home/gem" in result.output
     assert connected["value"] is False
 
 

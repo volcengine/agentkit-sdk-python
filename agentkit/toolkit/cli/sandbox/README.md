@@ -218,7 +218,7 @@ Provider defaults:
 | `coding_plan` | `deepseek-v4-flash` | `https://ark.cn-beijing.volces.com/api/coding/v3` |
 | `agent_plan` | `deepseek-v4-flash` | `https://ark.cn-beijing.volces.com/api/plan/v3` |
 | `byteplus_model_square` | `deepseek-v4-flash-260425` | `https://ark.ap-southeast.bytepluses.com/api/v3` |
-| `byteplus_coding_plan` | `deepseek-v4-flash` | `https://ark.ap-southeast.bytepluses.com/api/coding/v3` |
+| `byteplus_coding_plan` | `dola-seed-2.0-pro` | `https://ark.ap-southeast.bytepluses.com/api/coding/v3` |
 
 Credential resolution is delegated to the underlying SDK/service clients:
 `AgentkitToolsClient` handles `CreateTool` credentials, and `TOSService` handles
@@ -294,122 +294,56 @@ command exits with status `1` and returns structured JSON:
 }
 ```
 
-### File
+### SCP
 
-Upload, download, and list files in an existing sandbox session. File commands
-only operate on existing sessions; they do not create a session when
-`--session-id` is missing.
+Copy one file or directory between local storage and an existing sandbox
+session. `scp` operates only on existing sessions; it does not create a session
+when `--session-id` is missing.
 
 Common options:
 
-- `--session-id` / `--sid` / `-s`: required. Sandbox session ID to operate on.
+- `--session-id` / `--sid` / `-s`: required. Sandbox session ID used for the
+  transfer.
 - `--tool-id`: optional. Defaults to `AGENTKIT_SANDBOX_TOOL_ID`. If neither is
   set, the CLI resolves an existing tool by `--tool-type`.
 - `--tool-type`: optional. `CodeEnv` or `SkillEnv`; defaults to `CodeEnv`.
-- `--workspace`: optional absolute sandbox path used as the root for relative
-  sandbox paths.
 
 Path rules:
 
 - Local paths are normal local filesystem paths.
-- Sandbox paths may be absolute, or relative to `--workspace`.
-- Relative sandbox paths require `--workspace`.
-- Absolute sandbox paths must stay inside `--workspace` when both are provided.
+- Sandbox paths must be prefixed with `sandbox:`.
+- Exactly one of `SOURCE` and `DESTINATION` must be a sandbox path.
+- `sandbox:/absolute/path` is used as-is after normalization.
+- `sandbox:relative/path` is resolved under `/home/gem`.
+- Relative sandbox paths that escape `/home/gem` through `..` are rejected.
+- Empty sandbox paths and paths containing NUL bytes are rejected.
+- As with Linux `scp`, the destination's parent directory must already exist.
 
-#### Upload
-
-Upload local files:
-
-```bash
-agentkit sandbox file upload \
-  --session-id 123456789 \
-  --dst-dir /tmp/files \
-  ./a.txt ./b.txt
-```
-
-Upload a local directory:
+Upload a local file or directory:
 
 ```bash
-agentkit sandbox file upload \
-  --session-id 123456789 \
-  --workspace /home/gem \
-  --src-dir ./project \
-  --dst-dir uploads/project
+agentkit sandbox scp -s 123456789 ./project sandbox:/home/gem/project
+agentkit sandbox scp -s 123456789 ./a.txt sandbox:uploads/a.txt
 ```
 
-Upload options:
-
-- `FILE...`: local regular files to upload.
-- `--src-dir`: local directory to upload recursively. Uploads the directory
-  contents; it does not add the directory name as a top-level path.
-- `--dst-dir`: required sandbox destination directory. Created if missing.
-
-Use exactly one source form: `FILE...` or `--src-dir`. Multiple `FILE` values
-must not share the same base name because they are extracted into `--dst-dir`.
-
-#### Download
-
-Download sandbox files:
+Download from a sandbox:
 
 ```bash
-agentkit sandbox file download \
-  --session-id 123456789 \
-  --workspace /home/gem \
-  --dst-dir ./downloads \
-  uploads/a.txt uploads/b.txt
+agentkit sandbox scp -s 123456789 sandbox:/home/gem/project ./project-copy
+agentkit sandbox scp -s 123456789 sandbox:uploads/a.txt ./downloads/
 ```
-
-Download a sandbox directory:
-
-```bash
-agentkit sandbox file download \
-  --session-id 123456789 \
-  --src-dir /tmp/project \
-  --dst-dir ./project-copy
-```
-
-Download options:
-
-- `FILE...`: sandbox regular files to download.
-- `--src-dir`: sandbox directory to download recursively. Downloads the
-  directory contents; it does not add the directory name as a top-level path.
-- `--dst-dir`: required local directory. Created if missing.
-- `--overwrite`: overwrite existing local files while extracting.
-
-Use exactly one source form: `FILE...` or `--src-dir`. Multiple `FILE` values
-must not share the same base name because they are extracted into `--dst-dir`.
-Downloaded archive members must be relative regular files or directories; links,
-absolute paths, and `..` traversal are rejected.
-
-#### List
-
-List a sandbox path:
-
-```bash
-agentkit sandbox file list \
-  --session-id 123456789 \
-  /tmp/project
-```
-
-List arguments and options:
-
-- `PATH`: required sandbox path to list. Relative paths require `--workspace`.
-- `--recursive/--no-recursive`: list recursively. Defaults to no recursive.
-- `--show-hidden/--hide-hidden`: include hidden files. Defaults to hide hidden.
-- `--max-depth`: maximum recursive listing depth. Must be non-negative.
-- `--include-size/--no-include-size`: include file size metadata; defaults to
-  include size.
-- `--include-permissions`: include file permission metadata.
-- `--sort-by`: `name`, `size`, `modified`, or `type`; defaults to `name`.
-- `--sort-desc`: sort in descending order.
 
 Implementation notes:
 
-- Uploads and downloads use temporary tar archives so directories and multiple
-  files are transferred through the sandbox file API as a single payload.
-- Remote temporary archives are cleaned up after download. Cleanup is
-  best-effort: if cleanup fails, the CLI prints a warning and preserves the
-  original download or extraction result.
+- Directories are copied recursively.
+- Existing files are overwritten, and existing directories are merged, matching
+  Linux `scp` behavior.
+- File/directory type collisions are rejected.
+- Transfers use temporary tar archives internally. Remote temporary archives are
+  cleaned up after transfer; cleanup failures print a warning without masking
+  the original result.
+- Downloaded archive members must be relative regular files or directories;
+  links, absolute paths, and `..` traversal are rejected.
 
 ### Shell
 
@@ -423,8 +357,8 @@ agentkit sandbox shell \
 agentkit sandbox shell \
   --session-id 123456789 \
   --command 'ls -la /home/gem/project' \
-  --src-dir ./README.md ./requirements.txt \
-  --dst-dir project
+  --copy ./README.md sandbox:/home/gem/project/README.md \
+  --copy ./requirements.txt project/requirements.txt
 ```
 
 Options:
@@ -439,13 +373,9 @@ Options:
   `AGENTKIT_SANDBOX_TOOL_ID` are both absent.
 - `--command`: required. Command to execute in the sandbox.
 - `--exec-dir`: optional execution directory.
-- `--workspace`: optional sandbox workspace root; defaults to `/home/gem`.
-- `--src-dir`: optional local file or directory to upload before executing the
-  shell command. Additional file or directory paths can follow this option,
-  separated by spaces.
-- `--dst-dir`: optional sandbox destination directory for `--src-dir`. This is
-  a relative path appended under `--workspace`; when omitted, sources are
-  uploaded into `--workspace`.
+- `--copy SOURCE DESTINATION`: optional local-to-sandbox copy before executing
+  the shell command. May be repeated. `DESTINATION` may be `sandbox:/absolute`
+  or relative; relative destinations are resolved under `/home/gem`.
 
 The command posts to `<endpoint>/v1/shell/exec` with:
 
@@ -460,11 +390,9 @@ The command posts to `<endpoint>/v1/shell/exec` with:
 The response is returned as JSON. If the service returns `data.session_id`, the
 CLI renames it to `data.shell_id`.
 
-When `--src-dir` is provided, `shell` uses the same upload flow as
-`sandbox exec`: archive local sources, upload the archive to the session,
-extract it under `--workspace` plus `--dst-dir`, then execute `--command`. A
-directory source is extracted as that directory under the destination; its
-contents are not flattened into the destination.
+When `--copy` is provided, `shell` uploads each local source before executing
+`--command`. Sandbox sources are not supported by `--copy`; use `sandbox scp`
+for downloads.
 
 ### Web
 
@@ -546,9 +474,9 @@ without running an initial command.
 
 ```bash
 agentkit sandbox exec --session-id 123456789
-agentkit sandbox exec --session-id 123456789 --src-dir ./workspace
-agentkit sandbox exec --session-id 123456789 --src-dir ./main.py --dst-dir project
-agentkit sandbox exec --session-id 123456789 --src-dir ./README.md ./requirements.txt --dst-dir tmp
+agentkit sandbox exec --session-id 123456789 --copy ./workspace sandbox:/home/gem/workspace
+agentkit sandbox exec --session-id 123456789 --copy ./main.py project/main.py
+agentkit sandbox exec --session-id 123456789 --copy ./README.md tmp/README.md --copy ./requirements.txt tmp/requirements.txt
 ```
 
 Options:
@@ -572,13 +500,9 @@ Options:
   ```
 
   Repeated execs then attach to the same tmux session.
-- `--workspace`: optional sandbox workspace root; defaults to `/home/gem`.
-- `--src-dir`: optional local file or directory to upload before opening the
-  exec session. Additional file or directory paths can follow this option,
-  separated by spaces.
-- `--dst-dir`: optional sandbox destination directory for `--src-dir`. This is
-  a relative path appended under `--workspace`; when omitted, sources are
-  uploaded into `--workspace`.
+- `--copy SOURCE DESTINATION`: optional local-to-sandbox copy before opening
+  the exec session. May be repeated. `DESTINATION` may be `sandbox:/absolute`
+  or relative; relative destinations are resolved under `/home/gem`.
 - `--model-name`: optional. When creating a sandbox session, injects the value
   as `OPENCODE_MODEL`, `CODEX_MODEL`, and `ANTHROPIC_MODEL`. Custom model names
   are allowed.
@@ -604,12 +528,9 @@ The command connects to `<endpoint>/v1/shell/ws`, streams remote output to local
 stdout, forwards local stdin as terminal input, sends terminal resize events, and
 responds to WebSocket `ping` messages with `pong`.
 
-When `--src-dir` is provided, the command first reuses the sandbox file upload
-flow to archive the local file or directory, upload it to the session, and
-extract it into the directory resolved from `--workspace` and `--dst-dir`. The
-WebSocket exec connection is opened only after the upload and extraction
-complete. A directory source is extracted as that directory under the
-destination; its contents are not flattened into the destination.
+When `--copy` is provided, the command uploads each local source before opening
+the WebSocket exec connection. Sandbox sources are not supported by `--copy`;
+use `sandbox scp` for downloads.
 
 When the resolved tool has `TosMountConfig.MountPoints` in `GetTool`, session
 creation passes those mount points to `CreateSession` and uses each returned
@@ -658,10 +579,9 @@ exec:
     session_id: agent-a
     tool_id: t-example
     command: codex
-    src_dir: ./workspace
-    extra_sources:
-      - ./README.md
-    dst_dir: project
+    copy:
+      - [./workspace, sandbox:/home/gem/project]
+      - [./README.md, project/README.md]
   - name: agent-b
     args:
       - --session-id
@@ -672,12 +592,10 @@ exec:
 
 Mapping entries support the same option names as `sandbox exec`, written with
 underscores, such as `session_id`, `tool_id`, `tool_type`, `command`, `mode`,
-`shell_id`, `workspace`, `dst_dir`, `git_config`, `model_name`,
-`model_api_key`, `model_provider`, and `model_base_url`. Use `src_dir` or
-`src_dirs` for the
-first uploaded source and optional additional source paths; use `extra_sources`
-for additional positional sources. Use `args` when you want to provide raw
-`sandbox exec` arguments directly.
+`shell_id`, `git_config`, `model_name`, `model_api_key`, `model_provider`, and
+`model_base_url`. Use `copy` or `copies` for one `[SOURCE, DESTINATION]` pair or
+a list of pairs. Use `args` when you want to provide raw `sandbox exec`
+arguments directly.
 
 ## Local Store
 
@@ -758,5 +676,5 @@ Example:
 - `cli_shell.py`: shell command implementation.
 - `cli_exec.py`: streaming exec command implementation.
 - `cli_run.py`: multi-tab exec runner implementation.
-- `cli_file.py`: file upload, download, and list command implementation.
+- `cli_file.py`: sandbox `scp` transfer implementation.
 - `sandbox_client.py`: shared store, URL, JSON, and error helpers.

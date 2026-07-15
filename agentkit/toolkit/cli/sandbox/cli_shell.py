@@ -16,22 +16,20 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Optional
 
 import requests
 import typer
 
 from agentkit.toolkit.cli.sandbox.cli_exec import (
-    _collect_exec_upload_sources,
-    _upload_source_before_exec,
+    _collect_copy_specs,
 )
+from agentkit.toolkit.cli.sandbox.cli_file import _upload_scp_source
 from agentkit.toolkit.cli.sandbox.session_create import (
     SANDBOX_TOOL_ID_ENV,
     ensure_sandbox_session,
 )
 from agentkit.toolkit.cli.sandbox.git_config import apply_git_config_to_session
-from agentkit.toolkit.cli.sandbox.tos_config import DEFAULT_SANDBOX_WORKSPACE
 from agentkit.toolkit.cli.sandbox.tool_resolve import SandboxToolType
 from agentkit.toolkit.cli.sandbox.sandbox_client import (
     SANDBOX_EXEC_TIMEOUT_SECONDS,
@@ -74,25 +72,13 @@ def shell_command(
         "--exec-dir",
         help="Execution directory.",
     ),
-    workspace: str = typer.Option(
-        DEFAULT_SANDBOX_WORKSPACE,
-        "--workspace",
-        help=(
-            "Sandbox workspace root. Relative --dst-dir values are "
-            "resolved inside this directory."
-        ),
-    ),
-    src_dir: Optional[Path] = typer.Option(
+    copy: Optional[list[str]] = typer.Option(
         None,
-        "--src-dir",
-        help=("Local file or directory to upload before executing the command."),
-    ),
-    dst_dir: Optional[str] = typer.Option(
-        None,
-        "--dst-dir",
+        "--copy",
+        metavar="SOURCE DESTINATION",
         help=(
-            "Relative sandbox destination directory for --src-dir. Defaults "
-            "to --workspace."
+            "Copy a local file or directory into the sandbox before running "
+            "the command. May be repeated; sandbox: is optional for DESTINATION."
         ),
     ),
     git_config: Optional[str] = typer.Option(
@@ -106,6 +92,7 @@ def shell_command(
 ) -> None:
     """Execute a command in a sandbox shell."""
     try:
+        copy_specs = _collect_copy_specs(ctx, copy)
         session = ensure_sandbox_session(
             session_id=session_id,
             tool_id=tool_id,
@@ -117,13 +104,11 @@ def shell_command(
         error(str(exc))
 
     try:
-        src_dirs = _collect_exec_upload_sources(ctx, src_dir)
-        if src_dirs:
-            _upload_source_before_exec(
+        for source, destination in copy_specs:
+            _upload_scp_source(
                 session,
-                workspace=workspace,
-                src_dirs=src_dirs,
-                dst_dir=dst_dir,
+                source=source,
+                destination=destination,
             )
     except typer.Exit:
         raise

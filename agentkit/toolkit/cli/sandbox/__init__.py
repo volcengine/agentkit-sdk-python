@@ -18,7 +18,7 @@ from agentkit.toolkit.cli.sandbox.cli import sandbox_app
 from agentkit.toolkit.cli.sandbox.cli_build import build_command
 from agentkit.toolkit.cli.sandbox.cli_create import create_command
 from agentkit.toolkit.cli.sandbox.cli_exec import exec_command
-from agentkit.toolkit.cli.sandbox.cli_file import file_command
+from agentkit.toolkit.cli.sandbox.cli_file import scp_command
 from agentkit.toolkit.cli.sandbox.cli_get import get_command
 from agentkit.toolkit.cli.sandbox.cli_init_dockerfile import init_dockerfile_command
 from agentkit.toolkit.cli.sandbox.cli_run import run_command
@@ -29,7 +29,7 @@ __all__ = [
     "build_command",
     "create_command",
     "exec_command",
-    "file_command",
+    "scp_command",
     "get_command",
     "init_dockerfile_command",
     "run_command",
