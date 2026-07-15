@@ -30,6 +30,12 @@ import requests
 import typer
 
 from agentkit.toolkit.cli.sandbox.agentkit_client import AgentkitToolsClient
+from agentkit.toolkit.cli.sandbox.config_store import (
+    SandboxConfigError,
+    config_default_str,
+    configured_sandbox_config,
+    param_was_provided,
+)
 from agentkit.toolkit.cli.sandbox.session_create import SANDBOX_TOOL_ID_ENV
 from agentkit.toolkit.cli.sandbox.session_sync import sync_remote_sessions
 from agentkit.toolkit.cli.sandbox.tool_resolve import SandboxToolType
@@ -593,8 +599,9 @@ def _extract_archive(
 
 
 def file_upload_command(
-    session_id: str = typer.Option(
-        ...,
+    ctx: typer.Context,
+    session_id: Optional[str] = typer.Option(
+        None,
         "--session-id",
         "--sid",
         "-s",
@@ -621,8 +628,8 @@ def file_upload_command(
         metavar="FILE...",
         help="Local files to upload.",
     ),
-    dst_dir: str = typer.Option(
-        ...,
+    dst_dir: Optional[str] = typer.Option(
+        None,
         "--dst-dir",
         help=(
             "Sandbox destination directory. Relative paths require --workspace. "
@@ -642,6 +649,28 @@ def file_upload_command(
 ) -> None:
     """Upload a local directory or one or more files into a sandbox session."""
     try:
+        config_defaults = configured_sandbox_config()
+        if not param_was_provided(ctx, "session_id"):
+            session_id = (
+                config_default_str("session-id", data=config_defaults) or session_id
+            )
+        if not param_was_provided(ctx, "workspace"):
+            workspace = (
+                config_default_str("workspace", data=config_defaults) or workspace
+            )
+        if not param_was_provided(ctx, "dst_dir"):
+            dst_dir = config_default_str("dst-dir", data=config_defaults) or dst_dir
+        if not param_was_provided(ctx, "tool_id"):
+            tool_id = config_default_str("tool-id", data=config_defaults) or tool_id
+        if not param_was_provided(ctx, "tool_type"):
+            configured_tool_type = config_default_str(
+                "tool-type",
+                data=config_defaults,
+            )
+            if configured_tool_type:
+                tool_type = SandboxToolType(configured_tool_type)
+        if not session_id:
+            error("--session-id is required")
         resolved_workspace = _normalize_workspace(workspace)
         resolved_dst_dir = _resolve_sandbox_path(
             dst_dir,
@@ -679,6 +708,8 @@ def file_upload_command(
             archive_path.unlink(missing_ok=True)
     except typer.Exit:
         raise
+    except (SandboxConfigError, ValueError) as exc:
+        error(str(exc))
     except requests.RequestException as exc:
         error(str(exc))
     except Exception as exc:
@@ -700,8 +731,9 @@ def file_upload_command(
 
 
 def file_download_command(
-    session_id: str = typer.Option(
-        ...,
+    ctx: typer.Context,
+    session_id: Optional[str] = typer.Option(
+        None,
         "--session-id",
         "--sid",
         "-s",
@@ -749,6 +781,26 @@ def file_download_command(
     """Download a sandbox directory or one or more files."""
     local_archive_path: Path | None = None
     try:
+        config_defaults = configured_sandbox_config()
+        if not param_was_provided(ctx, "session_id"):
+            session_id = (
+                config_default_str("session-id", data=config_defaults) or session_id
+            )
+        if not param_was_provided(ctx, "workspace"):
+            workspace = (
+                config_default_str("workspace", data=config_defaults) or workspace
+            )
+        if not param_was_provided(ctx, "tool_id"):
+            tool_id = config_default_str("tool-id", data=config_defaults) or tool_id
+        if not param_was_provided(ctx, "tool_type"):
+            configured_tool_type = config_default_str(
+                "tool-type",
+                data=config_defaults,
+            )
+            if configured_tool_type:
+                tool_type = SandboxToolType(configured_tool_type)
+        if not session_id:
+            error("--session-id is required")
         resolved_workspace = _normalize_workspace(workspace)
         source_mode, sources = _validate_download_inputs(
             sandbox_dir,
@@ -799,6 +851,8 @@ def file_download_command(
             _cleanup_remote_file(session, remote_archive_path)
     except typer.Exit:
         raise
+    except (SandboxConfigError, ValueError) as exc:
+        error(str(exc))
     except requests.RequestException as exc:
         error(str(exc))
     except Exception as exc:
@@ -818,8 +872,9 @@ def file_download_command(
 
 
 def file_list_command(
-    session_id: str = typer.Option(
-        ...,
+    ctx: typer.Context,
+    session_id: Optional[str] = typer.Option(
+        None,
         "--session-id",
         "--sid",
         "-s",
@@ -886,6 +941,26 @@ def file_list_command(
 ) -> None:
     """List files and directories in a sandbox workspace or path."""
     try:
+        config_defaults = configured_sandbox_config()
+        if not param_was_provided(ctx, "session_id"):
+            session_id = (
+                config_default_str("session-id", data=config_defaults) or session_id
+            )
+        if not param_was_provided(ctx, "workspace"):
+            workspace = (
+                config_default_str("workspace", data=config_defaults) or workspace
+            )
+        if not param_was_provided(ctx, "tool_id"):
+            tool_id = config_default_str("tool-id", data=config_defaults) or tool_id
+        if not param_was_provided(ctx, "tool_type"):
+            configured_tool_type = config_default_str(
+                "tool-type",
+                data=config_defaults,
+            )
+            if configured_tool_type:
+                tool_type = SandboxToolType(configured_tool_type)
+        if not session_id:
+            error("--session-id is required")
         if max_depth is not None and max_depth < 0:
             error("--max-depth must be greater than or equal to 0")
         if sort_by not in SANDBOX_FILE_SORT_KEYS:
@@ -915,6 +990,8 @@ def file_list_command(
         )
     except typer.Exit:
         raise
+    except (SandboxConfigError, ValueError) as exc:
+        error(str(exc))
     except requests.RequestException as exc:
         error(str(exc))
     except Exception as exc:

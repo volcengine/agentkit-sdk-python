@@ -26,6 +26,10 @@ from agentkit.toolkit.cli.sandbox.agentkit_client import (
     AgentkitToolsClient,
     is_tip_agentkit_client,
 )
+from agentkit.toolkit.cli.sandbox.config_store import (
+    config_default_int,
+    config_default_str,
+)
 from agentkit.toolkit.cli.sandbox.env_config import (
     WEB_SEARCH_API_KEY_ENV as _WEB_SEARCH_API_KEY_ENV,
     build_exec_session_envs,
@@ -64,6 +68,10 @@ def build_model_envs(**kwargs):
 def _resolve_ttl(ttl: Optional[int]) -> int:
     if ttl is not None:
         return ttl
+
+    configured_ttl = config_default_int("ttl")
+    if configured_ttl is not None:
+        return configured_ttl
 
     raw = (os.getenv(SANDBOX_TTL_ENV) or "").strip()
     if not raw:
@@ -372,13 +380,16 @@ def ensure_sandbox_session_with_status(
     resolve_tool: bool = True,
     include_tos_mount_points: bool = True,
 ) -> tuple[dict[str, object], bool]:
-    resolved_session_id = session_id or str(uuid.uuid4())
+    resolved_session_id = session_id or config_default_str("session-id") or str(
+        uuid.uuid4()
+    )
     client = AgentkitToolsClient()
     ttl_seconds = _resolve_ttl(ttl)
 
     if resolve_tool:
+        resolved_tool_arg = tool_id or config_default_str("tool-id")
         resolved_tool_id = resolve_sandbox_tool_id(
-            tool_id=tool_id,
+            tool_id=resolved_tool_arg,
             tool_type=tool_type,
             client=client,
             env_var_name=SANDBOX_TOOL_ID_ENV,

@@ -130,6 +130,15 @@ class TipAgentkitToolsClient(_OpenapiAgentkitToolsClient):
         if self.uses_tip_auth:
             self._tip_session = requests.Session()
             return
+        if not region:
+            try:
+                from agentkit.toolkit.cli.sandbox.config_store import (
+                    config_default_str,
+                )
+
+                region = config_default_str("region") or region
+            except Exception:
+                pass
 
         super().__init__(
             access_key=access_key,

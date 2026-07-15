@@ -28,6 +28,16 @@ import yaml
 from agentkit.platform import VolcConfiguration
 from agentkit.sdk.tools.client import AgentkitToolsClient
 from agentkit.sdk.tools import types as tools_types
+from agentkit.toolkit.cli.sandbox.config_store import (
+    SandboxConfigError,
+    config_default_bool,
+    config_default_int,
+    config_default_str,
+    configured_network_payload,
+    configured_sandbox_config,
+    param_was_provided,
+    save_created_tool_config,
+)
 from agentkit.toolkit.cli.sandbox.env_config import (
     DEFAULT_CREATE_TOOL_TYPE,
     PRIVATE_TOOL_COMMAND,
@@ -118,6 +128,9 @@ def _resolve_create_tool_image_defaults(
 
 
 def _resolve_region(env_var_name: str, service_key: str) -> str:
+    config_region = config_default_str("region")
+    if config_region:
+        return config_region
     env_region = (os.getenv(env_var_name) or "").strip()
     if env_region:
         return env_region
@@ -663,7 +676,73 @@ def create_command(
     """
     result = None
     try:
+        config_defaults = configured_sandbox_config()
+        if not param_was_provided(ctx, "tool_type"):
+            tool_type = (
+                config_default_str("tool-type", data=config_defaults) or tool_type
+            )
+        if not param_was_provided(ctx, "tool_name"):
+            tool_name = (
+                config_default_str("tool-name", data=config_defaults) or tool_name
+            )
+        if not param_was_provided(ctx, "tos_bucket"):
+            tos_bucket = (
+                config_default_str("tos-bucket", data=config_defaults) or tos_bucket
+            )
+        if not param_was_provided(ctx, "tos_mount"):
+            tos_mount = (
+                config_default_str("tos-mount", data=config_defaults) or tos_mount
+            )
+        if not param_was_provided(ctx, "cpu"):
+            cpu = config_default_int("cpu", data=config_defaults) or cpu
+        if not param_was_provided(ctx, "model_name"):
+            model_name = (
+                config_default_str("model-name", data=config_defaults) or model_name
+            )
+        if not param_was_provided(ctx, "model_api_key"):
+            model_api_key = (
+                config_default_str("model-api-key", data=config_defaults)
+                or model_api_key
+            )
+        if not param_was_provided(ctx, "model_provider"):
+            model_provider = (
+                config_default_str("model-provider", data=config_defaults)
+                or model_provider
+            )
+        if not param_was_provided(ctx, "model_base_url"):
+            model_base_url = (
+                config_default_str("model-base-url", data=config_defaults)
+                or model_base_url
+            )
+        if not param_was_provided(ctx, "websearch_apikey"):
+            websearch_apikey = (
+                config_default_str("websearch-apikey", data=config_defaults)
+                or websearch_apikey
+            )
+        if not param_was_provided(ctx, "image_url"):
+            image_url = (
+                config_default_str("image-url", data=config_defaults) or image_url
+            )
+        if not param_was_provided(ctx, "enable_snapshot"):
+            configured_snapshot = config_default_bool(
+                "enable-snapshot",
+                data=config_defaults,
+            )
+            if configured_snapshot is not None:
+                enable_snapshot = configured_snapshot
+        if not param_was_provided(ctx, "network_config"):
+            network_payload = configured_network_payload(data=config_defaults)
+            if network_payload:
+                network_config = json.dumps(network_payload)
         skill_role_name, skill_role_name_provided = _resolve_create_extra_args(ctx)
+        if not skill_role_name_provided:
+            configured_role_name = config_default_str(
+                "role-name",
+                data=config_defaults,
+            )
+            if configured_role_name:
+                skill_role_name = configured_role_name
+                skill_role_name_provided = True
         tool_type, image_url = _resolve_create_tool_image_defaults(
             tool_type=tool_type,
             image_url=image_url,
@@ -692,8 +771,15 @@ def create_command(
             network_subnet_ids=network_subnet_ids,
         )
         save_tool_result_if_resolvable(str(result["tool_type"]), result)
+        save_created_tool_config(
+            tool_id=str(result["tool_id"]),
+            tool_name=str(result.get("name") or ""),
+            tool_type=str(result["tool_type"]),
+        )
     except (typer.Abort, typer.Exit):
         raise
+    except SandboxConfigError as exc:
+        error(str(exc))
     except Exception as exc:
         error(str(exc))
 
