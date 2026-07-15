@@ -143,6 +143,16 @@ class _FakeListToolsResponse:
         self.tools = [] if tools is None else tools
 
 
+class _FakeDeleteToolResponse:
+    def __init__(self, tool_id="tool-deleted"):
+        self.tool_id = tool_id
+
+
+class _FakeDeleteSessionResponse:
+    def __init__(self, session_id="instance-deleted"):
+        self.session_id = session_id
+
+
 class _FakeToolsClient:
     last_request = None
     last_get_request = None
@@ -151,6 +161,8 @@ class _FakeToolsClient:
     last_list_sessions_request = None
     last_list_snapshots_request = None
     last_resume_snapshot_request = None
+    last_delete_tool_request = None
+    last_delete_session_request = None
     list_sessions_requests = []
     response = _FakeCreateSessionResponse()
     get_response = _FakeGetSessionResponse()
@@ -159,9 +171,13 @@ class _FakeToolsClient:
     list_sessions_responses = [_FakeListSessionsResponse()]
     list_snapshots_response = _FakeListSessionSnapshotsResponse()
     resume_snapshot_response = _FakeResumeSessionFromSnapshotResponse()
+    delete_tool_response = _FakeDeleteToolResponse()
+    delete_session_response = _FakeDeleteSessionResponse()
     create_error = None
     get_error = None
     get_tool_error = None
+    delete_tool_error = None
+    delete_session_error = None
     resume_snapshot_error = None
     create_call_count = 0
     get_call_count = 0
@@ -170,6 +186,8 @@ class _FakeToolsClient:
     list_sessions_call_count = 0
     list_snapshots_call_count = 0
     resume_snapshot_call_count = 0
+    delete_tool_call_count = 0
+    delete_session_call_count = 0
 
     def create_session(self, request):
         _FakeToolsClient.last_request = request
@@ -223,6 +241,20 @@ class _FakeToolsClient:
             raise _FakeToolsClient.resume_snapshot_error
         return _FakeToolsClient.resume_snapshot_response
 
+    def delete_tool(self, request):
+        _FakeToolsClient.last_delete_tool_request = request
+        _FakeToolsClient.delete_tool_call_count += 1
+        if _FakeToolsClient.delete_tool_error:
+            raise _FakeToolsClient.delete_tool_error
+        return _FakeToolsClient.delete_tool_response
+
+    def delete_session(self, request):
+        _FakeToolsClient.last_delete_session_request = request
+        _FakeToolsClient.delete_session_call_count += 1
+        if _FakeToolsClient.delete_session_error:
+            raise _FakeToolsClient.delete_session_error
+        return _FakeToolsClient.delete_session_response
+
 
 @pytest.fixture(autouse=True)
 def _reset_fake_client():
@@ -233,6 +265,8 @@ def _reset_fake_client():
     _FakeToolsClient.last_list_sessions_request = None
     _FakeToolsClient.last_list_snapshots_request = None
     _FakeToolsClient.last_resume_snapshot_request = None
+    _FakeToolsClient.last_delete_tool_request = None
+    _FakeToolsClient.last_delete_session_request = None
     _FakeToolsClient.list_sessions_requests = []
     _FakeToolsClient.response = _FakeCreateSessionResponse()
     _FakeToolsClient.get_response = _FakeGetSessionResponse()
@@ -241,9 +275,13 @@ def _reset_fake_client():
     _FakeToolsClient.list_sessions_responses = [_FakeListSessionsResponse()]
     _FakeToolsClient.list_snapshots_response = _FakeListSessionSnapshotsResponse()
     _FakeToolsClient.resume_snapshot_response = _FakeResumeSessionFromSnapshotResponse()
+    _FakeToolsClient.delete_tool_response = _FakeDeleteToolResponse()
+    _FakeToolsClient.delete_session_response = _FakeDeleteSessionResponse()
     _FakeToolsClient.create_error = None
     _FakeToolsClient.get_error = None
     _FakeToolsClient.get_tool_error = None
+    _FakeToolsClient.delete_tool_error = None
+    _FakeToolsClient.delete_session_error = None
     _FakeToolsClient.resume_snapshot_error = None
     _FakeToolsClient.create_call_count = 0
     _FakeToolsClient.get_call_count = 0
@@ -252,6 +290,8 @@ def _reset_fake_client():
     _FakeToolsClient.list_sessions_call_count = 0
     _FakeToolsClient.list_snapshots_call_count = 0
     _FakeToolsClient.resume_snapshot_call_count = 0
+    _FakeToolsClient.delete_tool_call_count = 0
+    _FakeToolsClient.delete_session_call_count = 0
 
 
 def _patch_store_path(monkeypatch, tmp_path):
@@ -1600,6 +1640,186 @@ def test_ensure_sandbox_session_confirms_create_start_fail_by_user_session_id(
     assert json.loads(store_path.read_text(encoding="utf-8")) == (
         _expected_session_store("tool-cli", "user-cli", result)
     )
+
+
+def test_sandbox_delete_requires_tool_id_or_tool_name(monkeypatch) -> None:
+    from agentkit.toolkit.cli.cli import app
+    import agentkit.toolkit.cli.sandbox.cli_delete as cli_delete
+
+    monkeypatch.setattr(
+        cli_delete,
+        "AgentkitToolsClient",
+        lambda: _FakeToolsClient(),
+    )
+
+    result = runner.invoke(app, ["sandbox", "delete", "--force"])
+
+    assert result.exit_code == 1
+    assert "Specify exactly one of --tool-id or --tool-name" in result.output
+    assert _FakeToolsClient.delete_tool_call_count == 0
+    assert _FakeToolsClient.delete_session_call_count == 0
+
+
+def test_sandbox_delete_tool_by_id(monkeypatch) -> None:
+    from agentkit.toolkit.cli.cli import app
+    import agentkit.toolkit.cli.sandbox.cli_delete as cli_delete
+
+    monkeypatch.setattr(
+        cli_delete,
+        "AgentkitToolsClient",
+        lambda: _FakeToolsClient(),
+    )
+    _FakeToolsClient.get_tool_response = _FakeGetToolResponse(
+        tool_id="tool-cli",
+        name="delete-me",
+    )
+    _FakeToolsClient.delete_tool_response = _FakeDeleteToolResponse("tool-cli")
+
+    result = runner.invoke(
+        app,
+        ["sandbox", "delete", "--tool-id", "tool-cli", "--force"],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert _FakeToolsClient.get_tool_call_count == 1
+    assert _FakeToolsClient.last_get_tool_request.tool_id == "tool-cli"
+    assert _FakeToolsClient.delete_tool_call_count == 1
+    assert _FakeToolsClient.last_delete_tool_request.tool_id == "tool-cli"
+    assert "ToolId: tool-cli" in result.output
+
+
+def test_sandbox_delete_tool_by_name_resolves_tool_id(monkeypatch) -> None:
+    from agentkit.toolkit.cli.cli import app
+    import agentkit.toolkit.cli.sandbox.cli_delete as cli_delete
+
+    monkeypatch.setattr(
+        cli_delete,
+        "AgentkitToolsClient",
+        lambda: _FakeToolsClient(),
+    )
+    _FakeToolsClient.list_response = _FakeListToolsResponse(
+        [
+            _FakeListTool(
+                tool_id="tool-from-name",
+                name="demo-tool",
+                status="Ready",
+            )
+        ]
+    )
+    _FakeToolsClient.get_tool_response = _FakeGetToolResponse(
+        tool_id="tool-from-name",
+        name="demo-tool",
+    )
+    _FakeToolsClient.delete_tool_response = _FakeDeleteToolResponse("tool-from-name")
+
+    result = runner.invoke(
+        app,
+        ["sandbox", "delete", "--tool-name", "demo-tool", "--force"],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert _FakeToolsClient.list_call_count == 1
+    assert [
+        (item.name, item.values) for item in _FakeToolsClient.last_list_request.filters
+    ] == [("Name", ["demo-tool"])]
+    assert _FakeToolsClient.last_get_tool_request.tool_id == "tool-from-name"
+    assert _FakeToolsClient.last_delete_tool_request.tool_id == "tool-from-name"
+
+
+def test_sandbox_delete_session_uses_instance_id_and_clears_cache(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    from agentkit.toolkit.cli.cli import app
+    import agentkit.toolkit.cli.sandbox.cli_delete as cli_delete
+
+    monkeypatch.setattr(
+        cli_delete,
+        "AgentkitToolsClient",
+        lambda: _FakeToolsClient(),
+    )
+    store_path = _patch_store_path(monkeypatch, tmp_path)
+    cached_result = {
+        "session_id": "user-cli",
+        "tool_id": "tool-cli",
+        "instance_id": "old-instance",
+        "endpoint": "https://old.example.com",
+    }
+    _write_session_store(
+        store_path,
+        _expected_session_store("tool-cli", "user-cli", cached_result),
+    )
+    _FakeToolsClient.get_tool_response = _FakeGetToolResponse(tool_id="tool-cli")
+    _FakeToolsClient.list_sessions_responses = [
+        _FakeListSessionsResponse(
+            [
+                _FakeSessionInfo(
+                    user_session_id="user-cli",
+                    session_id="instance-cli",
+                    endpoint="https://sandbox.example.com",
+                )
+            ]
+        )
+    ]
+    _FakeToolsClient.delete_session_response = _FakeDeleteSessionResponse(
+        "instance-cli"
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "sandbox",
+            "delete",
+            "--tool-id",
+            "tool-cli",
+            "--session-id",
+            "user-cli",
+            "--force",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert _FakeToolsClient.get_tool_call_count == 0
+    assert _FakeToolsClient.list_sessions_call_count == 1
+    assert [
+        (item.name, item.values)
+        for item in _FakeToolsClient.last_list_sessions_request.filters
+    ] == [("UserSessionId", ["user-cli"])]
+    assert _FakeToolsClient.last_delete_session_request.tool_id == "tool-cli"
+    assert _FakeToolsClient.last_delete_session_request.session_id == "instance-cli"
+    assert json.loads(store_path.read_text(encoding="utf-8")) == {}
+
+
+def test_sandbox_delete_session_not_found(monkeypatch) -> None:
+    from agentkit.toolkit.cli.cli import app
+    import agentkit.toolkit.cli.sandbox.cli_delete as cli_delete
+
+    monkeypatch.setattr(
+        cli_delete,
+        "AgentkitToolsClient",
+        lambda: _FakeToolsClient(),
+    )
+    _FakeToolsClient.get_tool_response = _FakeGetToolResponse(tool_id="tool-cli")
+    _FakeToolsClient.list_sessions_responses = [_FakeListSessionsResponse()]
+
+    result = runner.invoke(
+        app,
+        [
+            "sandbox",
+            "delete",
+            "--tool-id",
+            "tool-cli",
+            "--session-id",
+            "missing-session",
+            "--force",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "Sandbox session not found: missing-session under tool tool-cli" in (
+        result.output
+    )
+    assert _FakeToolsClient.delete_session_call_count == 0
 
 
 def test_ensure_sandbox_session_waits_for_ready_after_create_start_fail(

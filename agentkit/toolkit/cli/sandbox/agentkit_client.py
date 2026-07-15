@@ -28,6 +28,8 @@ from agentkit.sdk.tools.client import AgentkitToolsClient as _OpenapiAgentkitToo
 from agentkit.sdk.tools.types import (
     CreateSessionRequest,
     CreateSessionResponse,
+    DeleteSessionRequest,
+    DeleteSessionResponse,
     GetSessionRequest,
     GetSessionResponse,
     ListSessionsRequest,
@@ -216,6 +218,13 @@ class TipAgentkitToolsClient(_OpenapiAgentkitToolsClient):
             response_type=ListSessionsResponse,
         )
 
+    def delete_session(self, request: DeleteSessionRequest) -> DeleteSessionResponse:
+        return self._invoke_tip_api(
+            api_action="DeleteSession",
+            request=request,
+            response_type=DeleteSessionResponse,
+        )
+
     def _raise_tip_unsupported(self, api_action: str) -> None:
         raise Exception(
             f"{api_action} is not available with TIP sandbox auth. "
@@ -237,6 +246,11 @@ class TipAgentkitToolsClient(_OpenapiAgentkitToolsClient):
         if self.uses_tip_auth:
             self._raise_tip_unsupported("ListTools")
         return super().list_tools(request)
+
+    def delete_tool(self, request: Any) -> Any:
+        if self.uses_tip_auth:
+            self._raise_tip_unsupported("DeleteTool")
+        return super().delete_tool(request)
 
 
 def is_tip_agentkit_client(client: object) -> bool:

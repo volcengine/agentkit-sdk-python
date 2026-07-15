@@ -20,6 +20,7 @@ import typer
 
 from agentkit.toolkit.cli.sandbox.cli_build import build_command
 from agentkit.toolkit.cli.sandbox.cli_create import create_command
+from agentkit.toolkit.cli.sandbox.cli_delete import delete_command
 from agentkit.toolkit.cli.sandbox.cli_exec import exec_command
 from agentkit.toolkit.cli.sandbox.cli_file import file_command
 from agentkit.toolkit.cli.sandbox.cli_get import get_command
@@ -43,6 +44,7 @@ sandbox_app.command(
     name="create",
     context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
 )(create_command)
+sandbox_app.command(name="delete")(delete_command)
 sandbox_app.command(name="get")(get_command)
 sandbox_app.command(name="mount")(mount_command)
 sandbox_app.command(

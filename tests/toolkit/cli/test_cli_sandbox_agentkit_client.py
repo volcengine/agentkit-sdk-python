@@ -103,6 +103,41 @@ def test_tip_client_create_session_uses_apig_endpoint_and_bearer_token(
     }
 
 
+def test_tip_client_delete_session_uses_apig_endpoint_and_bearer_token(
+    monkeypatch,
+):
+    import agentkit.toolkit.cli.sandbox.agentkit_client as agentkit_client
+
+    fake_session = _FakeTipSession()
+    monkeypatch.setenv("SANDBOX_APIG_ENDPOINT", "https://apig.example.com/sandbox")
+    monkeypatch.setenv("TIP_TOKEN", "tip-token")
+    monkeypatch.setattr(
+        agentkit_client.requests,
+        "Session",
+        lambda: fake_session,
+    )
+
+    client = agentkit_client.TipAgentkitToolsClient()
+    client.delete_session(
+        tools_types.DeleteSessionRequest(
+            tool_id="tool-1",
+            session_id="instance-1",
+        )
+    )
+
+    assert len(fake_session.calls) == 1
+    call = fake_session.calls[0]
+    parsed = urlsplit(call["url"])
+    query = parse_qs(parsed.query)
+    assert query["Action"] == ["DeleteSession"]
+    assert query["Version"] == ["2025-10-30"]
+    assert call["headers"]["Authorization"] == "Bearer tip-token"
+    assert call["json"] == {
+        "ToolId": "tool-1",
+        "SessionId": "instance-1",
+    }
+
+
 def test_tip_create_session_skips_get_tool_for_tos_mount_resolution():
     import agentkit.toolkit.cli.sandbox.session_create as session_create
 
