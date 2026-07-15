@@ -19,7 +19,7 @@ from __future__ import annotations
 import typer
 
 from agentkit.toolkit.cli.sandbox.cli_build import build_command
-from agentkit.toolkit.cli.sandbox.cli_config import config_app
+from agentkit.toolkit.cli.sandbox.cli_config import config_command
 from agentkit.toolkit.cli.sandbox.cli_create import create_command
 from agentkit.toolkit.cli.sandbox.cli_delete import delete_command
 from agentkit.toolkit.cli.sandbox.cli_exec import exec_command
@@ -64,5 +64,5 @@ sandbox_app.command(
 sandbox_app.command(name="web")(web_command)
 sandbox_app.command(name="codex-login")(codex_login_command)
 sandbox_app.command(name="model-login")(codex_login_command)  # provider-agnostic alias
-sandbox_app.add_typer(config_app, name="config")
+sandbox_app.command(name="config")(config_command)
 sandbox_app.add_typer(file_command, name="file")

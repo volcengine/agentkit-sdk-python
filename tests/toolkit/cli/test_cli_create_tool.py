@@ -290,6 +290,53 @@ def test_create_command_passes_network_options(monkeypatch):
     assert network.vpc_configuration.enable_shared_internet_access is True
 
 
+def test_create_command_uses_network_config_defaults(
+    monkeypatch,
+    sandbox_config_path,
+):
+    from agentkit.toolkit.cli.cli import app
+    from agentkit.toolkit.cli.sandbox import cli_create
+
+    _reset_fake_tools_client()
+    monkeypatch.setattr(cli_create, "AgentkitToolsClient", _FakeToolsClient)
+    monkeypatch.setattr(cli_create, "TOSService", _FakeTOSService)
+    sandbox_config_path.parent.mkdir(parents=True, exist_ok=True)
+    sandbox_config_path.write_text(
+        yaml.safe_dump(
+            {
+                "network": {
+                    "enable_public": False,
+                    "enable_private": True,
+                    "enable_shared_internet": True,
+                    "vpc_id": "vpc-from-config",
+                    "subnet_ids": ["subnet-a", "subnet-b"],
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "sandbox",
+            "create",
+            "--tool-name",
+            "demo-tool",
+        ],
+    )
+
+    assert result.exit_code == 0
+    network = _FakeToolsClient.last_request.network_configuration
+    assert network is not None
+    assert network.enable_public_network is False
+    assert network.enable_private_network is True
+    assert network.vpc_configuration is not None
+    assert network.vpc_configuration.vpc_id == "vpc-from-config"
+    assert network.vpc_configuration.subnet_ids == ["subnet-a", "subnet-b"]
+    assert network.vpc_configuration.enable_shared_internet_access is True
+
+
 def test_create_command_uses_region_envs(monkeypatch):
     from agentkit.toolkit.cli.cli import app
     from agentkit.toolkit.cli.sandbox import cli_create

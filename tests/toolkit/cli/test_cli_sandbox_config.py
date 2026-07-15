@@ -27,7 +27,7 @@ def test_sandbox_config_set_initializes_defaults_and_redacts(tmp_path, monkeypat
 
     result = runner.invoke(
         app,
-        ["sandbox", "config", "set", "model-api-key", "sk-test-secret"],
+        ["sandbox", "config", "--set", "model-api-key=sk-test-secret"],
     )
 
     assert result.exit_code == 0
@@ -40,7 +40,7 @@ def test_sandbox_config_set_initializes_defaults_and_redacts(tmp_path, monkeypat
     assert payload["session"]["ttl"] == 28800
     assert payload["session"]["workspace"] == "/home/gem"
 
-    list_result = runner.invoke(app, ["sandbox", "config", "list"])
+    list_result = runner.invoke(app, ["sandbox", "config", "--list"])
 
     assert list_result.exit_code == 0
     assert "sk-test-secret" not in list_result.output
@@ -48,19 +48,167 @@ def test_sandbox_config_set_initializes_defaults_and_redacts(tmp_path, monkeypat
     assert "/home/gem" in list_result.output
 
 
-def test_sandbox_config_unset_removes_value(tmp_path, monkeypatch):
+def test_sandbox_config_help_has_no_subcommands():
+    from agentkit.toolkit.cli.cli import app
+
+    result = runner.invoke(app, ["sandbox", "config", "--help"])
+
+    assert result.exit_code == 0
+    assert "Usage:" in result.output
+    assert "COMMAND [ARGS]" not in result.output
+    assert "Commands" not in result.output
+    assert "--set" in result.output
+    assert "--unset" in result.output
+    assert "--list" in result.output
+
+
+def test_sandbox_config_rejects_removed_subcommands(tmp_path, monkeypatch):
+    from agentkit.toolkit.cli.cli import app
+
+    monkeypatch.chdir(tmp_path)
+
+    result = runner.invoke(
+        app,
+        ["sandbox", "config", "set", "model-name", "glm-5.2"],
+    )
+
+    assert result.exit_code != 0
+    assert "unexpected extra arguments" in result.output
+
+
+def test_sandbox_config_set_option_accepts_repeated_key_values(tmp_path, monkeypatch):
+    from agentkit.toolkit.cli.cli import app
+
+    monkeypatch.chdir(tmp_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "sandbox",
+            "config",
+            "--set",
+            "model-name=glm-5.2",
+            "--set",
+            "ttl=200",
+            "--set",
+            "model-api-key=sk-test-secret",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Set model-name: glm-5.2" in result.output
+    assert "Set ttl: 200" in result.output
+    assert "Set model-api-key: <redacted>" in result.output
+    assert "sk-test-secret" not in result.output
+    payload = yaml.safe_load(
+        (tmp_path / ".agentkit" / "sandbox.yaml").read_text(encoding="utf-8")
+    )
+    assert payload["model"]["name"] == "glm-5.2"
+    assert payload["model"]["api_key"] == "sk-test-secret"
+    assert payload["session"]["ttl"] == 200
+
+
+def test_sandbox_config_unset_option_accepts_repeated_keys(tmp_path, monkeypatch):
     from agentkit.toolkit.cli.cli import app
 
     monkeypatch.chdir(tmp_path)
     assert (
         runner.invoke(
             app,
-            ["sandbox", "config", "set", "tool-id", "tool-123"],
+            [
+                "sandbox",
+                "config",
+                "--set",
+                "tool-id=tool-123",
+                "--set",
+                "session-id=session-123",
+            ],
         ).exit_code
         == 0
     )
 
-    result = runner.invoke(app, ["sandbox", "config", "unset", "tool-id"])
+    result = runner.invoke(
+        app,
+        [
+            "sandbox",
+            "config",
+            "--unset",
+            "tool-id",
+            "--unset",
+            "session-id",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Unset tool-id" in result.output
+    assert "Unset session-id" in result.output
+    payload = yaml.safe_load(
+        (tmp_path / ".agentkit" / "sandbox.yaml").read_text(encoding="utf-8")
+    )
+    assert "id" not in payload.get("tool", {})
+    assert "id" not in payload.get("session", {})
+
+
+def test_sandbox_config_list_option_prints_effective_config(tmp_path, monkeypatch):
+    from agentkit.toolkit.cli.cli import app
+
+    monkeypatch.chdir(tmp_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "sandbox",
+            "config",
+            "--set",
+            "model-name=glm-5.2",
+            "--list",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Wrote" in result.output
+    assert "model:" in result.output
+    assert "name: glm-5.2" in result.output
+    assert "workspace: /home/gem" in result.output
+
+
+def test_sandbox_config_list_option_does_not_create_config(tmp_path, monkeypatch):
+    from agentkit.toolkit.cli.cli import app
+
+    monkeypatch.chdir(tmp_path)
+
+    result = runner.invoke(app, ["sandbox", "config", "--list"])
+
+    assert result.exit_code == 0
+    assert "version: 1" in result.output
+    assert "workspace: /home/gem" in result.output
+    assert not (tmp_path / ".agentkit" / "sandbox.yaml").exists()
+
+
+def test_sandbox_config_set_option_rejects_non_key_value(tmp_path, monkeypatch):
+    from agentkit.toolkit.cli.cli import app
+
+    monkeypatch.chdir(tmp_path)
+
+    result = runner.invoke(app, ["sandbox", "config", "--set", "model-name"])
+
+    assert result.exit_code != 0
+    assert "KEY=VALUE" in result.output
+
+
+def test_sandbox_config_unset_option_removes_value(tmp_path, monkeypatch):
+    from agentkit.toolkit.cli.cli import app
+
+    monkeypatch.chdir(tmp_path)
+    assert (
+        runner.invoke(
+            app,
+            ["sandbox", "config", "--set", "tool-id=tool-123"],
+        ).exit_code
+        == 0
+    )
+
+    result = runner.invoke(app, ["sandbox", "config", "--unset", "tool-id"])
 
     assert result.exit_code == 0
     payload = yaml.safe_load(
@@ -76,7 +224,7 @@ def test_sandbox_config_accepts_underscore_aliases(tmp_path, monkeypatch):
 
     result = runner.invoke(
         app,
-        ["sandbox", "config", "set", "network_subnet_ids", "subnet-a,subnet-b"],
+        ["sandbox", "config", "--set", "network_subnet_ids=subnet-a,subnet-b"],
     )
 
     assert result.exit_code == 0
@@ -91,7 +239,7 @@ def test_sandbox_config_rejects_invalid_ttl(tmp_path, monkeypatch):
 
     monkeypatch.chdir(tmp_path)
 
-    result = runner.invoke(app, ["sandbox", "config", "set", "ttl", "0"])
+    result = runner.invoke(app, ["sandbox", "config", "--set", "ttl=0"])
 
     assert result.exit_code != 0
     assert "greater than 0" in result.output
@@ -107,23 +255,25 @@ def test_sandbox_config_list_prefers_file_over_env(tmp_path, monkeypatch):
     monkeypatch.setenv("AGENTKIT_SANDBOX_REGION", "region-from-env")
 
     assert (
-        runner.invoke(app, ["sandbox", "config", "set", "model-api-key", "file-secret"])
-        .exit_code
-        == 0
-    )
-    assert (
-        runner.invoke(app, ["sandbox", "config", "set", "tool-id", "tool-from-file"])
-        .exit_code
-        == 0
-    )
-    assert runner.invoke(app, ["sandbox", "config", "set", "ttl", "200"]).exit_code == 0
-    assert (
-        runner.invoke(app, ["sandbox", "config", "set", "region", "region-from-file"])
-        .exit_code
+        runner.invoke(
+            app,
+            [
+                "sandbox",
+                "config",
+                "--set",
+                "model-api-key=file-secret",
+                "--set",
+                "tool-id=tool-from-file",
+                "--set",
+                "ttl=200",
+                "--set",
+                "region=region-from-file",
+            ],
+        ).exit_code
         == 0
     )
 
-    result = runner.invoke(app, ["sandbox", "config", "list"])
+    result = runner.invoke(app, ["sandbox", "config", "--list"])
 
     assert result.exit_code == 0
     assert "env-secret" not in result.output

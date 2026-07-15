@@ -32,8 +32,8 @@ from agentkit.toolkit.cli.sandbox.config_store import (
     SandboxConfigError,
     config_default_bool,
     config_default_int,
+    config_default_list,
     config_default_str,
-    configured_network_payload,
     configured_sandbox_config,
     param_was_provided,
     save_created_tool_config,
@@ -730,10 +730,39 @@ def create_command(
             )
             if configured_snapshot is not None:
                 enable_snapshot = configured_snapshot
-        if not param_was_provided(ctx, "network_config"):
-            network_payload = configured_network_payload(data=config_defaults)
-            if network_payload:
-                network_config = json.dumps(network_payload)
+        if not param_was_provided(ctx, "network_enable_public"):
+            configured_public = config_default_bool(
+                "network-enable-public",
+                data=config_defaults,
+            )
+            if configured_public is not None:
+                network_enable_public = configured_public
+        if not param_was_provided(ctx, "network_enable_private"):
+            configured_private = config_default_bool(
+                "network-enable-private",
+                data=config_defaults,
+            )
+            if configured_private is not None:
+                network_enable_private = configured_private
+        if not param_was_provided(ctx, "network_enable_shared_internet"):
+            configured_shared_internet = config_default_bool(
+                "network-enable-shared-internet",
+                data=config_defaults,
+            )
+            if configured_shared_internet is not None:
+                network_enable_shared_internet = configured_shared_internet
+        if not param_was_provided(ctx, "network_vpc_id"):
+            network_vpc_id = (
+                config_default_str("network-vpc-id", data=config_defaults)
+                or network_vpc_id
+            )
+        if not param_was_provided(ctx, "network_subnet_ids"):
+            configured_subnet_ids = config_default_list(
+                "network-subnet-ids",
+                data=config_defaults,
+            )
+            if configured_subnet_ids:
+                network_subnet_ids = ",".join(configured_subnet_ids)
         skill_role_name, skill_role_name_provided = _resolve_create_extra_args(ctx)
         if not skill_role_name_provided:
             configured_role_name = config_default_str(

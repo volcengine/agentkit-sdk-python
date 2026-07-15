@@ -36,6 +36,23 @@ python3 -m pip show agentkit-sdk-python
 
 ## Commands
 
+### Config
+
+Configure default values for sandbox commands in `.agentkit/sandbox.yaml`.
+
+```bash
+agentkit sandbox config --set model-name=glm-5.2
+agentkit sandbox config --set model-api-key=sk-xxx --set ttl=28800
+agentkit sandbox config --unset tool-id --unset session-id
+agentkit sandbox config --list
+```
+
+Options:
+
+- `--set KEY=VALUE`: set a config value. Can be repeated.
+- `--unset KEY`: remove a config value. Can be repeated.
+- `--list`: print the current effective config with secrets redacted.
+
 ### Build
 
 Build and push a custom sandbox image with Volcano Engine Code Pipeline and

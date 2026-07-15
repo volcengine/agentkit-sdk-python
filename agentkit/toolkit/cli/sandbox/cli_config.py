@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Config command group for sandbox CLI."""
+"""Config command for sandbox CLI."""
 
 from __future__ import annotations
 
@@ -32,12 +32,6 @@ from agentkit.toolkit.cli.sandbox.config_store import (
 )
 from agentkit.toolkit.cli.sandbox.sandbox_client import error
 
-config_app = typer.Typer(
-    name="config",
-    help="Configure default values for sandbox commands.",
-    no_args_is_help=True,
-)
-
 
 def _dump_yaml(payload: object) -> None:
     typer.echo(
@@ -49,62 +43,97 @@ def _dump_yaml(payload: object) -> None:
     )
 
 
-@config_app.command(name="set")
-def config_set_command(
-    key: str = typer.Argument(
-        ...,
-        help="Config key, e.g. model-name, tool-type, network-vpc-id.",
-    ),
-    value: str = typer.Argument(
-        ...,
-        help="Config value.",
-    ),
-) -> None:
-    """Set a sandbox config value."""
-    try:
-        path, data, _created = ensure_sandbox_config_initialized()
-        canonical, parsed = set_config_value(data, key, value)
-        write_sandbox_config(data, path)
-    except SandboxConfigError as exc:
-        error(str(exc))
-
-    display = parsed
+def _format_config_value(canonical: str, value: object) -> object:
     if canonical in {"model-api-key", "websearch-apikey"}:
-        display = "<redacted>"
-    typer.echo(f"Set {canonical}: {display}")
-    typer.echo(f"Wrote {path}")
+        return "<redacted>"
+    return value
 
 
-@config_app.command(name="unset")
-def config_unset_command(
-    key: str = typer.Argument(
-        ...,
-        help="Config key to remove, e.g. model-api-key.",
+def _parse_set_field(field: str) -> tuple[str, str]:
+    if "=" not in field:
+        raise SandboxConfigError("--set value must use KEY=VALUE format")
+    key, value = field.split("=", 1)
+    if not key.strip():
+        raise SandboxConfigError("--set key must not be empty")
+    return key, value
+
+
+def _apply_config_options(
+    set_fields: list[str],
+    unset_keys: list[str],
+    list_config: bool,
+) -> None:
+    path = get_sandbox_config_path()
+    data = None
+    wrote = False
+
+    if set_fields:
+        try:
+            path, data, _created = ensure_sandbox_config_initialized()
+            for field in set_fields:
+                key, value = _parse_set_field(field)
+                canonical, parsed = set_config_value(data, key, value)
+                typer.echo(
+                    f"Set {canonical}: {_format_config_value(canonical, parsed)}"
+                )
+        except SandboxConfigError as exc:
+            error(str(exc))
+
+    if unset_keys:
+        if data is None:
+            if not path.exists():
+                error(f"Sandbox config not found: {path}")
+            try:
+                data = configured_sandbox_config()
+            except SandboxConfigError as exc:
+                error(str(exc))
+        try:
+            for key in unset_keys:
+                canonical, removed = unset_config_value(data, key)
+                if removed:
+                    typer.echo(f"Unset {canonical}")
+                else:
+                    typer.echo(f"{canonical} was not set")
+        except SandboxConfigError as exc:
+            error(str(exc))
+
+    if data is not None:
+        write_sandbox_config(data, path)
+        wrote = True
+
+    if wrote:
+        typer.echo(f"Wrote {path}")
+
+    if list_config:
+        try:
+            _dump_yaml(redact_sandbox_config(effective_sandbox_config()))
+        except SandboxConfigError as exc:
+            error(str(exc))
+
+
+def config_command(
+    ctx: typer.Context,
+    set_fields: list[str] = typer.Option(
+        [],
+        "--set",
+        metavar="KEY=VALUE",
+        help="Set a config value. Can be repeated.",
+    ),
+    unset_keys: list[str] = typer.Option(
+        [],
+        "--unset",
+        metavar="KEY",
+        help="Unset a config value. Can be repeated.",
+    ),
+    list_config: bool = typer.Option(
+        False,
+        "--list",
+        help="List the current effective sandbox config.",
     ),
 ) -> None:
-    """Unset a sandbox config value."""
-    path = get_sandbox_config_path()
-    if not path.exists():
-        error(f"Sandbox config not found: {path}")
-    try:
-        data = configured_sandbox_config()
-        canonical, removed = unset_config_value(data, key)
-        write_sandbox_config(data, path)
-    except SandboxConfigError as exc:
-        error(str(exc))
-
-    if removed:
-        typer.echo(f"Unset {canonical}")
-    else:
-        typer.echo(f"{canonical} was not set")
-    typer.echo(f"Wrote {path}")
-
-
-@config_app.command(name="list")
-def config_list_command() -> None:
-    """List the current effective sandbox config."""
-    try:
-        data = effective_sandbox_config()
-    except SandboxConfigError as exc:
-        error(str(exc))
-    _dump_yaml(redact_sandbox_config(data))
+    """Configure default values for sandbox commands."""
+    has_options = bool(set_fields or unset_keys or list_config)
+    if not has_options:
+        typer.echo(ctx.get_help())
+        raise typer.Exit()
+    _apply_config_options(set_fields, unset_keys, list_config)
