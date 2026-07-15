@@ -22,6 +22,9 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional
 
+from rich.console import Console
+from rich.table import Table
+
 from agentkit.sdk.tools import types as tools_types
 from agentkit.toolkit.cli.sandbox.agentkit_client import (
     AgentkitToolsClient,
@@ -38,6 +41,8 @@ DEFAULT_SANDBOX_TOOL_TYPE = "CodeEnv"
 VALID_SANDBOX_TOOL_TYPES = ("CodeEnv", "SkillEnv", "Private")
 READY_TOOL_STATUS = "Ready"
 TOOL_NOT_FOUND_ERROR_CODE = "InvalidResource.NotFound"
+
+console = Console()
 
 
 class SandboxToolType(str, Enum):
@@ -441,6 +446,56 @@ def _list_first_tool(
     return None
 
 
+def _list_tools_by_name(client: AgentkitToolsClient, tool_name: str) -> list[object]:
+    request = tools_types.ListToolsRequest(
+        filters=[
+            tools_types.FiltersItemForListTools(
+                name="Name",
+                values=[tool_name],
+            )
+        ],
+        max_results=100,
+    )
+    try:
+        response = client.list_tools(request)
+    except Exception as exc:
+        error(f"Failed to list sandbox tools by name {tool_name}: {exc}")
+    return list(response.tools or [])
+
+
+def _print_tool_name_matches(tool_name: str, matches: list[object]) -> None:
+    table = Table(title=f"Multiple sandbox tools matched: {tool_name}")
+    table.add_column("ToolId", style="cyan")
+    table.add_column("Name")
+    table.add_column("Status")
+    table.add_column("ToolType")
+    for item in matches:
+        table.add_row(
+            _get_string_field(item, "ToolId", "tool_id") or "",
+            _get_string_field(item, "Name", "name") or "",
+            _get_string_field(item, "Status", "status") or "",
+            _get_string_field(item, "ToolType", "tool_type") or "",
+        )
+    console.print(table)
+
+
+def _resolve_tool_id_by_name(
+    client: AgentkitToolsClient,
+    tool_name: str,
+) -> str:
+    matches = _list_tools_by_name(client, tool_name)
+    if not matches:
+        error(f"Sandbox tool not found by name: {tool_name}")
+    if len(matches) > 1:
+        _print_tool_name_matches(tool_name, matches)
+        error("Multiple sandbox tools matched --tool-name. Retry with --tool-id.")
+
+    resolved_tool_id = _get_string_field(matches[0], "ToolId", "tool_id")
+    if not resolved_tool_id:
+        error(f"ListTools response missing ToolId for name: {tool_name}")
+    return resolved_tool_id
+
+
 def _create_tool(tool_type: str) -> str:
     from agentkit.toolkit.cli.sandbox.config_store import (
         config_default_bool,
@@ -485,12 +540,14 @@ def resolve_sandbox_tool_id(
     *,
     tool_id: Optional[str],
     tool_type: str | SandboxToolType | None,
+    tool_name: Optional[str] = None,
     default_tool_id: object = None,
     client: AgentkitToolsClient,
     env_var_name: str,
 ) -> str:
     resolved_tool_id = resolve_existing_sandbox_tool_id(
         tool_id=tool_id,
+        tool_name=tool_name,
         tool_type=tool_type,
         default_tool_id=default_tool_id,
         client=client,
@@ -512,15 +569,29 @@ def resolve_existing_sandbox_tool_id(
     *,
     tool_id: Optional[str],
     tool_type: str | SandboxToolType | None,
+    tool_name: Optional[str] = None,
     default_tool_id: object = None,
     client: AgentkitToolsClient,
     env_var_name: str,
 ) -> str | None:
     explicit_tool_id = (tool_id or "").strip()
+    explicit_tool_name = (tool_name or "").strip()
+    if tool_name is not None and not explicit_tool_name:
+        error("--tool-name cannot be empty")
+    if explicit_tool_id and explicit_tool_name:
+        error("Specify only one of --tool-id or --tool-name.")
     if explicit_tool_id:
         return _validate_existing_tool_id(
             client,
             explicit_tool_id,
+            tool_type=tool_type,
+            save_result=True,
+        )
+    if explicit_tool_name:
+        resolved_tool_id = _resolve_tool_id_by_name(client, explicit_tool_name)
+        return _validate_existing_tool_id(
+            client,
+            resolved_tool_id,
             tool_type=tool_type,
             save_result=True,
         )

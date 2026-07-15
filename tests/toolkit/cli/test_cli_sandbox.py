@@ -1145,6 +1145,39 @@ def test_ensure_sandbox_session_options_override_env(monkeypatch, tmp_path) -> N
     assert request.user_session_id == "user-cli"
 
 
+def test_ensure_sandbox_session_tool_name_overrides_env(monkeypatch, tmp_path) -> None:
+    import agentkit.toolkit.cli.sandbox.session_create as session_create
+
+    monkeypatch.setenv("AGENTKIT_SANDBOX_TOOL_ID", "tool-env")
+    monkeypatch.setattr(
+        session_create,
+        "AgentkitToolsClient",
+        lambda: _FakeToolsClient(),
+    )
+    _patch_store_path(monkeypatch, tmp_path)
+    _patch_tool_store_path(monkeypatch, tmp_path)
+    _FakeToolsClient.list_response = _FakeListToolsResponse(
+        [_FakeListTool(tool_id="tool-from-name", name="demo-tool", status="Ready")]
+    )
+    _FakeToolsClient.get_tool_response = _FakeGetToolResponse(
+        tool_id="tool-from-name",
+        name="demo-tool",
+        status="Ready",
+    )
+
+    result = session_create.ensure_sandbox_session(
+        session_id="user-name",
+        tool_name="demo-tool",
+    )
+
+    assert result["tool_id"] == "tool-from-name"
+    assert [
+        (item.name, item.values) for item in _FakeToolsClient.last_list_request.filters
+    ] == [("Name", ["demo-tool"])]
+    assert _FakeToolsClient.last_get_tool_request.tool_id == "tool-from-name"
+    assert _FakeToolsClient.last_request.tool_id == "tool-from-name"
+
+
 def test_ensure_sandbox_session_passes_envs_to_create_session(
     monkeypatch,
     tmp_path,

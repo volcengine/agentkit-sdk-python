@@ -739,6 +739,11 @@ def add_workflow_commands(app: typer.Typer) -> None:
         tool_id: Optional[str] = typer.Option(
             None, "--tool-id", help="Skills Sandbox Tool ID (AGENTKIT_TOOL_ID)"
         ),
+        tool_name: Optional[str] = typer.Option(
+            None,
+            "--tool-name",
+            help="Skills Sandbox tool name. Resolved with ListTools(Name=...).",
+        ),
         config_path: str = typer.Option(
             "agentkit.yaml", "--config", help="Path to agentkit.yaml"
         ),
@@ -750,10 +755,21 @@ def add_workflow_commands(app: typer.Typer) -> None:
             raise typer.BadParameter(
                 "common.runtime_envs must be a mapping in agentkit.yaml"
             )
+        resolved_tool_id = tool_id
+        if tool_id is not None or tool_name is not None:
+            from agentkit.sdk.tools.client import AgentkitToolsClient
+            from agentkit.toolkit.cli.tool_lookup import resolve_tool_identifier
+
+            resolved_tool_id = resolve_tool_identifier(
+                AgentkitToolsClient(),
+                tool_id=tool_id,
+                tool_name=tool_name,
+                required=False,
+            )
         runtime_envs = runtime_envs.copy()
         runtime_envs["SKILL_SPACE_ID"] = space_id.strip()
-        if tool_id:
-            runtime_envs["AGENTKIT_TOOL_ID"] = tool_id.strip()
+        if resolved_tool_id:
+            runtime_envs["AGENTKIT_TOOL_ID"] = resolved_tool_id.strip()
         mgr.set_raw_value("common.runtime_envs", runtime_envs)
         console.print(
             Panel.fit(

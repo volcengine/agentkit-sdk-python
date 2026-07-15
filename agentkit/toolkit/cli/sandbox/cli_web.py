@@ -43,10 +43,12 @@ def _resolve_web_session(
     *,
     session_id: str,
     tool_id: Optional[str],
+    tool_name: Optional[str],
 ) -> tuple[dict[str, object], bool]:
     return ensure_sandbox_session_with_status(
         session_id=session_id,
         tool_id=tool_id,
+        tool_name=tool_name,
         tool_type=SandboxToolType.CODE_ENV.value,
     )
 
@@ -66,6 +68,12 @@ def web_command(
         "--tool_id",
         help=f"Sandbox tool ID. Defaults to {SANDBOX_TOOL_ID_ENV}.",
     ),
+    tool_name: Optional[str] = typer.Option(
+        None,
+        "--tool-name",
+        "--tool_name",
+        help="Sandbox tool name. Resolved with ListTools(Name=...).",
+    ),
 ) -> None:
     """Return the browser URL for a sandbox session."""
     try:
@@ -74,13 +82,16 @@ def web_command(
             session_id = (
                 config_default_str("session-id", data=config_defaults) or session_id
             )
-        if not param_was_provided(ctx, "tool_id"):
+        if not param_was_provided(ctx, "tool_id") and not param_was_provided(
+            ctx, "tool_name"
+        ):
             tool_id = config_default_str("tool-id", data=config_defaults) or tool_id
         if not session_id:
             error("Missing option '--session-id'.")
         session, is_new = _resolve_web_session(
             session_id=session_id,
             tool_id=tool_id,
+            tool_name=tool_name,
         )
         url = build_web_url(session.get("endpoint"))
         if not webbrowser.open(url):

@@ -113,10 +113,15 @@ def codex_login_command(
         "--tool-id",
         help=f"Sandbox tool ID. Defaults to {SANDBOX_TOOL_ID_ENV}.",
     ),
+    tool_name: Optional[str] = typer.Option(
+        None,
+        "--tool-name",
+        help="Sandbox tool name. Resolved with ListTools(Name=...).",
+    ),
     tool_type: SandboxToolType = typer.Option(
         SandboxToolType.CODE_ENV,
         "--tool-type",
-        help="Sandbox tool type to resolve when --tool-id is omitted.",
+        help="Sandbox tool type to resolve when tool id/name is omitted.",
     ),
     dry_run: bool = typer.Option(
         False,
@@ -142,13 +147,17 @@ def codex_login_command(
                 codex_home=codex_home, auth_file=auth_file, allow_login=login
             )
             summary = ml.codex_auth_summary(data)
-            build_cmd = ml.build_codex_injection_command(auth_data=data)  # sanitizes: OAuth only
+            build_cmd = ml.build_codex_injection_command(
+                auth_data=data
+            )  # sanitizes: OAuth only
             marker = ml.CODEX_INJECT_MARKER
         else:  # claude
             data = ml.read_claude_creds(creds_file=auth_file)
             src = ml.claude_creds_path(auth_file)
             summary = ml.claude_creds_summary(data)
-            build_cmd = ml.build_claude_injection_command(creds_data=data)  # sanitizes: OAuth only
+            build_cmd = ml.build_claude_injection_command(
+                creds_data=data
+            )  # sanitizes: OAuth only
             marker = ml.CLAUDE_INJECT_MARKER
     except ml.ModelLoginError as exc:
         error(str(exc))
@@ -169,7 +178,11 @@ def codex_login_command(
         )
 
     if dry_run:
-        typer.secho("\n(dry-run) would inject (OAuth token only, redacted):", fg=typer.colors.CYAN, err=True)
+        typer.secho(
+            "\n(dry-run) would inject (OAuth token only, redacted):",
+            fg=typer.colors.CYAN,
+            err=True,
+        )
         typer.secho(_redact_inject(build_cmd), err=True)
         raise typer.Exit(0)
 
@@ -178,11 +191,10 @@ def codex_login_command(
         session = ensure_sandbox_session(
             session_id=session_id,
             tool_id=tool_id,
+            tool_name=tool_name,
             tool_type=tool_type.value,
             envs=(
-                _codex_login_session_envs(tool_type)
-                if provider == "codex"
-                else None
+                _codex_login_session_envs(tool_type) if provider == "codex" else None
             ),
         )
     except typer.Exit:
@@ -196,7 +208,9 @@ def codex_login_command(
 
     out = _shell_output(_exec_shell_command(session, build_cmd))
     if marker not in out:
-        error(f"injection did not confirm (marker missing). sandbox output: {out[:200]}")
+        error(
+            f"injection did not confirm (marker missing). sandbox output: {out[:200]}"
+        )
     where = out.split(marker, 1)[1].strip() or "<sandbox>"
 
     typer.secho(
@@ -222,4 +236,9 @@ def codex_login_command(
         fg=typer.colors.BRIGHT_BLACK,
         err=True,
     )
-    typer.echo(json.dumps({"injected": True, "provider": provider, "session_id": sid, "path": where}, ensure_ascii=False))
+    typer.echo(
+        json.dumps(
+            {"injected": True, "provider": provider, "session_id": sid, "path": where},
+            ensure_ascii=False,
+        )
+    )

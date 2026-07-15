@@ -173,12 +173,14 @@ def _resolve_existing_session(
     *,
     session_id: str,
     tool_id: Optional[str],
+    tool_name: Optional[str],
     tool_type: SandboxToolType,
 ) -> dict[str, object]:
     client = AgentkitToolsClient()
     resolved_tool_id = sync_remote_sessions(
         session_id=session_id,
         tool_id=tool_id,
+        tool_name=tool_name,
         tool_type=tool_type,
         client=client,
         env_var_name=SANDBOX_TOOL_ID_ENV,
@@ -641,10 +643,15 @@ def file_upload_command(
         "--tool-id",
         help=f"Sandbox tool ID. Defaults to {SANDBOX_TOOL_ID_ENV}.",
     ),
+    tool_name: Optional[str] = typer.Option(
+        None,
+        "--tool-name",
+        help="Sandbox tool name. Resolved with ListTools(Name=...).",
+    ),
     tool_type: SandboxToolType = typer.Option(
         SandboxToolType.CODE_ENV,
         "--tool-type",
-        help="Sandbox tool type to resolve when --tool-id is omitted.",
+        help="Sandbox tool type to resolve when tool id/name is omitted.",
     ),
 ) -> None:
     """Upload a local directory or one or more files into a sandbox session."""
@@ -660,7 +667,9 @@ def file_upload_command(
             )
         if not param_was_provided(ctx, "dst_dir"):
             dst_dir = config_default_str("dst-dir", data=config_defaults) or dst_dir
-        if not param_was_provided(ctx, "tool_id"):
+        if not param_was_provided(ctx, "tool_id") and not param_was_provided(
+            ctx, "tool_name"
+        ):
             tool_id = config_default_str("tool-id", data=config_defaults) or tool_id
         if not param_was_provided(ctx, "tool_type"):
             configured_tool_type = config_default_str(
@@ -684,6 +693,7 @@ def file_upload_command(
         session = _resolve_existing_session(
             session_id=session_id,
             tool_id=tool_id,
+            tool_name=tool_name,
             tool_type=tool_type,
         )
         archive_path = _create_upload_archive(
@@ -772,10 +782,15 @@ def file_download_command(
         "--tool-id",
         help=f"Sandbox tool ID. Defaults to {SANDBOX_TOOL_ID_ENV}.",
     ),
+    tool_name: Optional[str] = typer.Option(
+        None,
+        "--tool-name",
+        help="Sandbox tool name. Resolved with ListTools(Name=...).",
+    ),
     tool_type: SandboxToolType = typer.Option(
         SandboxToolType.CODE_ENV,
         "--tool-type",
-        help="Sandbox tool type to resolve when --tool-id is omitted.",
+        help="Sandbox tool type to resolve when tool id/name is omitted.",
     ),
 ) -> None:
     """Download a sandbox directory or one or more files."""
@@ -790,7 +805,9 @@ def file_download_command(
             workspace = (
                 config_default_str("workspace", data=config_defaults) or workspace
             )
-        if not param_was_provided(ctx, "tool_id"):
+        if not param_was_provided(ctx, "tool_id") and not param_was_provided(
+            ctx, "tool_name"
+        ):
             tool_id = config_default_str("tool-id", data=config_defaults) or tool_id
         if not param_was_provided(ctx, "tool_type"):
             configured_tool_type = config_default_str(
@@ -811,6 +828,7 @@ def file_download_command(
         session = _resolve_existing_session(
             session_id=session_id,
             tool_id=tool_id,
+            tool_name=tool_name,
             tool_type=tool_type,
         )
         _exec_shell_command(
@@ -933,10 +951,15 @@ def file_list_command(
         "--tool-id",
         help=f"Sandbox tool ID. Defaults to {SANDBOX_TOOL_ID_ENV}.",
     ),
+    tool_name: Optional[str] = typer.Option(
+        None,
+        "--tool-name",
+        help="Sandbox tool name. Resolved with ListTools(Name=...).",
+    ),
     tool_type: SandboxToolType = typer.Option(
         SandboxToolType.CODE_ENV,
         "--tool-type",
-        help="Sandbox tool type to resolve when --tool-id is omitted.",
+        help="Sandbox tool type to resolve when tool id/name is omitted.",
     ),
 ) -> None:
     """List files and directories in a sandbox workspace or path."""
@@ -950,7 +973,9 @@ def file_list_command(
             workspace = (
                 config_default_str("workspace", data=config_defaults) or workspace
             )
-        if not param_was_provided(ctx, "tool_id"):
+        if not param_was_provided(ctx, "tool_id") and not param_was_provided(
+            ctx, "tool_name"
+        ):
             tool_id = config_default_str("tool-id", data=config_defaults) or tool_id
         if not param_was_provided(ctx, "tool_type"):
             configured_tool_type = config_default_str(
@@ -975,6 +1000,7 @@ def file_list_command(
         session = _resolve_existing_session(
             session_id=session_id,
             tool_id=tool_id,
+            tool_name=tool_name,
             tool_type=tool_type,
         )
         result = _list_remote_path(

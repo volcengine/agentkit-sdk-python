@@ -177,8 +177,18 @@ def config_command(
     tool_id: Optional[str] = typer.Option(
         None,
         "--tool_id",
+        "--tool-id",
         "--runtime_binding_tool_id",
+        "--runtime-binding-tool-id",
         help="Bind Runtime to a Tool ID (cloud/hybrid only)",
+    ),
+    tool_name: Optional[str] = typer.Option(
+        None,
+        "--tool-name",
+        "--tool_name",
+        "--runtime_binding_tool_name",
+        "--runtime-binding-tool-name",
+        help="Bind Runtime to a Tool name (cloud/hybrid only)",
     ),
     mcp_toolset_id: Optional[str] = typer.Option(
         None,
@@ -303,6 +313,18 @@ def config_command(
             handler.show_current_config()
             return
 
+        resolved_tool_id = tool_id
+        if tool_name is not None or tool_id is not None:
+            from agentkit.sdk.tools.client import AgentkitToolsClient
+            from agentkit.toolkit.cli.tool_lookup import resolve_tool_identifier
+
+            resolved_tool_id = resolve_tool_identifier(
+                AgentkitToolsClient(region=(region or "").strip()),
+                tool_id=tool_id,
+                tool_name=tool_name,
+                required=False,
+            )
+
         # Collect CLI parameters
         cli_params = ConfigParamHandler.collect_cli_params(
             agent_name=agent_name,
@@ -331,7 +353,7 @@ def config_command(
             runtime_jwt_allowed_clients=runtime_jwt_allowed_clients,
             memory_id=memory_id,
             knowledge_id=knowledge_id,
-            tool_id=tool_id,
+            tool_id=resolved_tool_id,
             mcp_toolset_id=mcp_toolset_id,
             runtime_network_mode=runtime_network_mode,
             runtime_vpc_id=runtime_vpc_id,

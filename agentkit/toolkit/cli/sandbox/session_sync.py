@@ -80,12 +80,14 @@ def sync_remote_sessions(
     *,
     session_id: str | None,
     tool_id: Optional[str],
+    tool_name: Optional[str] = None,
     tool_type: str | SandboxToolType | None,
     client: AgentkitToolsClient,
     env_var_name: str,
 ) -> str | None:
     resolved_tool_id = resolve_existing_sandbox_tool_id(
         tool_id=tool_id,
+        tool_name=tool_name,
         tool_type=tool_type,
         client=client,
         env_var_name=env_var_name,

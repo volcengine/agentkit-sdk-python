@@ -67,10 +67,15 @@ def get_command(
         "--tool-id",
         help=f"Sandbox tool ID. Defaults to {SANDBOX_TOOL_ID_ENV}.",
     ),
+    tool_name: Optional[str] = typer.Option(
+        None,
+        "--tool-name",
+        help="Sandbox tool name. Resolved with ListTools(Name=...).",
+    ),
     tool_type: SandboxToolType = typer.Option(
         SandboxToolType.CODE_ENV,
         "--tool-type",
-        help="Sandbox tool type to resolve when --tool-id is omitted.",
+        help="Sandbox tool type to resolve when tool id/name is omitted.",
     ),
 ) -> None:
     """Get a sandbox session after syncing remote sessions for the current tool."""
@@ -80,7 +85,9 @@ def get_command(
             session_id = (
                 config_default_str("session-id", data=config_defaults) or session_id
             )
-        if not param_was_provided(ctx, "tool_id"):
+        if not param_was_provided(ctx, "tool_id") and not param_was_provided(
+            ctx, "tool_name"
+        ):
             tool_id = config_default_str("tool-id", data=config_defaults) or tool_id
         if not param_was_provided(ctx, "tool_type"):
             configured_tool_type = config_default_str(
@@ -92,6 +99,7 @@ def get_command(
         resolved_tool_id = sync_remote_sessions(
             session_id=session_id,
             tool_id=tool_id,
+            tool_name=tool_name,
             tool_type=tool_type,
             client=AgentkitToolsClient(),
             env_var_name=SANDBOX_TOOL_ID_ENV,

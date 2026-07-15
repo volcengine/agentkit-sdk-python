@@ -65,6 +65,7 @@ from agentkit.toolkit.cli.sandbox.tool_resolve import (
     find_tool_model_provider,
     get_remote_tool_model_provider,
     get_tool_websearch_config,
+    resolve_existing_sandbox_tool_id,
 )
 from agentkit.toolkit.cli.sandbox.sandbox_client import (
     add_session_terminal_shell_id,
@@ -538,10 +539,15 @@ def exec_command(
         "--tool-id",
         help=f"Sandbox tool ID. Defaults to {SANDBOX_TOOL_ID_ENV}.",
     ),
+    tool_name: Optional[str] = typer.Option(
+        None,
+        "--tool-name",
+        help="Sandbox tool name. Resolved with ListTools(Name=...).",
+    ),
     tool_type: SandboxToolType = typer.Option(
         SandboxToolType.CODE_ENV,
         "--tool-type",
-        help="Sandbox tool type to resolve when --tool-id is omitted.",
+        help="Sandbox tool type to resolve when tool id/name is omitted.",
     ),
     command: Optional[str] = typer.Option(
         None,
@@ -637,7 +643,9 @@ def exec_command(
             session_id = (
                 config_default_str("session-id", data=config_defaults) or session_id
             )
-        if not _param_was_provided(ctx, "tool_id"):
+        if not _param_was_provided(ctx, "tool_id") and not _param_was_provided(
+            ctx, "tool_name"
+        ):
             tool_id = config_default_str("tool-id", data=config_defaults) or tool_id
         if not _param_was_provided(ctx, "tool_type"):
             configured_tool_type = config_default_str(
@@ -675,6 +683,15 @@ def exec_command(
                 config_default_str("model-base-url", data=config_defaults)
                 or model_base_url
             )
+        if tool_name:
+            tool_id = resolve_existing_sandbox_tool_id(
+                tool_id=tool_id,
+                tool_name=tool_name,
+                tool_type=tool_type,
+                client=AgentkitToolsClient(),
+                env_var_name=SANDBOX_TOOL_ID_ENV,
+            )
+            tool_name = None
         exec_mode = _normalize_exec_mode(mode)
         model_api_key_was_provided = _param_was_provided(ctx, "model_api_key")
         model_name_was_provided = _param_was_provided(ctx, "model_name")
@@ -707,6 +724,7 @@ def exec_command(
         session, is_new_session = ensure_sandbox_session_with_status(
             session_id=session_id,
             tool_id=tool_id,
+            tool_name=tool_name,
             tool_type=tool_type.value,
             envs=build_model_envs(
                 model_name=model_name,

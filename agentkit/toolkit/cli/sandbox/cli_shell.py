@@ -65,10 +65,15 @@ def shell_command(
         "--tool-id",
         help=f"Sandbox tool ID. Defaults to {SANDBOX_TOOL_ID_ENV}.",
     ),
+    tool_name: Optional[str] = typer.Option(
+        None,
+        "--tool-name",
+        help="Sandbox tool name. Resolved with ListTools(Name=...).",
+    ),
     tool_type: SandboxToolType = typer.Option(
         SandboxToolType.CODE_ENV,
         "--tool-type",
-        help="Sandbox tool type to resolve when --tool-id is omitted.",
+        help="Sandbox tool type to resolve when tool id/name is omitted.",
     ),
     command: str = typer.Option(
         ...,
@@ -117,7 +122,9 @@ def shell_command(
             session_id = (
                 config_default_str("session-id", data=config_defaults) or session_id
             )
-        if not param_was_provided(ctx, "tool_id"):
+        if not param_was_provided(ctx, "tool_id") and not param_was_provided(
+            ctx, "tool_name"
+        ):
             tool_id = config_default_str("tool-id", data=config_defaults) or tool_id
         if not param_was_provided(ctx, "tool_type"):
             configured_tool_type = config_default_str(
@@ -139,6 +146,7 @@ def shell_command(
         session = ensure_sandbox_session(
             session_id=session_id,
             tool_id=tool_id,
+            tool_name=tool_name,
             tool_type=tool_type.value,
         )
     except typer.Exit:

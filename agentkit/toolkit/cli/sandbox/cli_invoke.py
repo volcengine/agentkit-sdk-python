@@ -44,12 +44,16 @@ from agentkit.toolkit.cli.sandbox.env_config import (
     MODEL_AGENT_ENV_KEYS as _MODEL_AGENT_ENV_KEYS,
     build_invoke_session_envs as build_invoke_model_agent_envs,
 )
+from agentkit.toolkit.cli.sandbox.agentkit_client import AgentkitToolsClient
 from agentkit.toolkit.cli.sandbox.session_create import (
     SANDBOX_TOOL_ID_ENV,
     ensure_sandbox_session,
 )
 from agentkit.toolkit.cli.sandbox.sandbox_client import echo_json, error
-from agentkit.toolkit.cli.sandbox.tool_resolve import SandboxToolType
+from agentkit.toolkit.cli.sandbox.tool_resolve import (
+    SandboxToolType,
+    resolve_existing_sandbox_tool_id,
+)
 
 MODEL_AGENT_ENV_KEYS = _MODEL_AGENT_ENV_KEYS
 
@@ -57,11 +61,26 @@ MODEL_AGENT_ENV_KEYS = _MODEL_AGENT_ENV_KEYS
 def _resolve_invoke_tool_id(
     *,
     tool_id: Optional[str],
+    tool_name: Optional[str],
     tool_type: SandboxToolType,
 ) -> str:
     explicit_tool_id = (tool_id or "").strip()
+    explicit_tool_name = (tool_name or "").strip()
+    if explicit_tool_id and explicit_tool_name:
+        error("Specify only one of --tool-id or --tool-name.")
     if explicit_tool_id:
         return explicit_tool_id
+    if explicit_tool_name:
+        resolved_tool_id = resolve_existing_sandbox_tool_id(
+            tool_id=None,
+            tool_name=explicit_tool_name,
+            tool_type=tool_type,
+            client=AgentkitToolsClient(),
+            env_var_name=SANDBOX_TOOL_ID_ENV,
+        )
+        if not resolved_tool_id:
+            error(f"Sandbox tool not found by name: {explicit_tool_name}")
+        return resolved_tool_id
 
     env_tool_id = (os.getenv(SANDBOX_TOOL_ID_ENV) or "").strip()
     if env_tool_id:
@@ -228,6 +247,11 @@ def invoke_command(
             "--tool-type is used as the tool ID."
         ),
     ),
+    tool_name: Optional[str] = typer.Option(
+        None,
+        "--tool-name",
+        help="Sandbox tool name. Resolved with ListTools(Name=...).",
+    ),
     tool_type: SandboxToolType = typer.Option(
         SandboxToolType.SKILL_ENV,
         "--tool-type",
@@ -300,7 +324,9 @@ def invoke_command(
             session_id = (
                 config_default_str("session-id", data=config_defaults) or session_id
             )
-        if not param_was_provided(ctx, "tool_id"):
+        if not param_was_provided(ctx, "tool_id") and not param_was_provided(
+            ctx, "tool_name"
+        ):
             tool_id = config_default_str("tool-id", data=config_defaults) or tool_id
         if not param_was_provided(ctx, "tool_type"):
             configured_tool_type = config_default_str(
@@ -345,6 +371,7 @@ def invoke_command(
         resolved_interval = _normalize_interval(interval)
         resolved_tool_id = _resolve_invoke_tool_id(
             tool_id=tool_id,
+            tool_name=tool_name,
             tool_type=tool_type,
         )
         session = ensure_sandbox_session(
