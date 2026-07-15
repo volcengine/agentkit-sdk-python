@@ -124,9 +124,17 @@ Options:
 - `--enable-snapshot`: optional. Enables snapshot support for the created
   sandbox tool. If omitted, the CLI does not send `EnableSnapshot` in the
   `CreateTool` request.
-- `--network-config`: optional. Network configuration as inline JSON or a path
-  to a JSON file. If omitted, the tool is created with public access enabled
-  and private access disabled.
+- `--network-enable-public` / `--no-network-enable-public`: optional. Enables
+  public network access; defaults to enabled.
+- `--network-enable-private` / `--no-network-enable-private`: optional. Enables
+  private VPC network access; defaults to disabled.
+- `--network-enable-shared-internet` /
+  `--no-network-enable-shared-internet`: optional. Enables shared internet
+  access for private VPC networking; defaults to disabled.
+- `--network-vpc-id`: optional VPC ID. Required when private network access is
+  enabled.
+- `--network-subnet-ids`: optional comma-separated subnet IDs, for example
+  `subnet-aaaaaaaa,subnet-bbbbbbbb`.
 - `--model-provider`: optional. Model provider marker to inject into
   `AGENTKIT_SANDBOX_MODEL_PROVIDER`; defaults to `model_square`, or
   `byteplus_model_square` when `CLOUD_PROVIDER` / `AGENTKIT_CLOUD_PROVIDER` is
@@ -155,33 +163,27 @@ The sandbox create request maps `--cpu` to `CpuMilli=<cpu * 1000>` and
 When `--enable-snapshot` is present, the request also includes
 `EnableSnapshot=true`; otherwise that field is omitted.
 
-Network configuration uses the same access concepts as the AgentKit console:
-
-```json
-{
-  "private_access": true,
-  "public_access": true,
-  "vpc_id": "vpc-xxxxxxxx",
-  "subnet_ids": ["subnet-aaaaaaaa"],
-  "enable_shared_internet_access": true
-}
-```
-
-`public_access` defaults to `true`; `private_access` defaults to `false`.
-When `private_access` is `true`, `vpc_id` is required. `subnet_ids` may be an
-array of strings or a comma-separated string. The CLI validates JSON syntax,
-field names, field types, and field combinations before calling `CreateTool`.
-VPC and subnet existence or availability errors are returned by the control
-plane.
+Network configuration uses the same access concepts as the AgentKit console.
+Public access defaults to enabled and private access defaults to disabled. When
+private access is enabled, `--network-vpc-id` is required.
+`--network-subnet-ids` accepts one or more subnet IDs separated by commas. The
+CLI validates field combinations before calling `CreateTool`. VPC and subnet
+existence or availability errors are returned by the control plane.
 
 Examples:
 
 ```bash
 agentkit sandbox create \
-  --network-config network.json
+  --network-enable-private \
+  --network-vpc-id vpc-xxxxxxxx \
+  --network-subnet-ids subnet-aaaaaaaa,subnet-bbbbbbbb
 
 agentkit sandbox create \
-  --network-config '{"private_access":true,"public_access":true,"vpc_id":"vpc-xxxxxxxx","subnet_ids":["subnet-aaaaaaaa"]}'
+  --no-network-enable-public \
+  --network-enable-private \
+  --network-enable-shared-internet \
+  --network-vpc-id vpc-xxxxxxxx \
+  --network-subnet-ids subnet-aaaaaaaa
 ```
 
 When `--tool-type Private` is used, the CLI creates a private-image tool and
