@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import Optional
 
 from agentkit.platform.configuration import VolcConfiguration, Endpoint, Credentials
@@ -80,6 +81,7 @@ def resolve_credentials(
     *,
     explicit_access_key: Optional[str] = None,
     explicit_secret_key: Optional[str] = None,
+    explicit_session_token: Optional[str] = None,
     platform_config: Optional[VolcConfiguration] = None,
 ) -> Credentials:
     """
@@ -87,9 +89,15 @@ def resolve_credentials(
     """
     # 1. Explicit args take absolute precedence
     if explicit_access_key and explicit_secret_key:
+        token = (
+            explicit_session_token
+            or os.getenv("VOLCENGINE_SESSION_TOKEN")
+            or os.getenv("VOLC_SESSIONTOKEN")
+        )
         return Credentials(
             access_key=explicit_access_key,
             secret_key=explicit_secret_key,
+            session_token=token or None,
             source="explicit_args",
         )
 

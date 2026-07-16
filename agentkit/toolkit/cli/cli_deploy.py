@@ -53,6 +53,11 @@ def deploy_command(
     volcengine_secret_key: Optional[str] = typer.Option(
         None, "--volcengine-secret-key", help="Volcengine secret key (harness deploy)."
     ),
+    volcengine_session_token: Optional[str] = typer.Option(
+        None,
+        "--volcengine-session-token",
+        help="Volcengine session token (STS, for temporary credentials).",
+    ),
     discovery_url: Optional[str] = typer.Option(
         None,
         "--discovery-url",
@@ -81,6 +86,7 @@ def deploy_command(
             region=region,
             access_key=volcengine_access_key,
             secret_key=volcengine_secret_key,
+            session_token=volcengine_session_token,
             discovery_url=discovery_url,
             allowed_id=allowed_id,
             assume_yes=yes,
@@ -123,6 +129,7 @@ def _deploy_harness(
     region,
     access_key,
     secret_key,
+    session_token,
     discovery_url,
     allowed_id,
     assume_yes: bool = False,
@@ -157,6 +164,7 @@ def _deploy_harness(
             region=region,
             access_key=access_key,
             secret_key=secret_key,
+            session_token=session_token,
             discovery_url=discovery_url,
             allowed_id=allowed_id,
             reporter=reporter,

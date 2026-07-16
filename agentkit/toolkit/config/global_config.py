@@ -46,11 +46,13 @@ class VolcengineCredentials:
 
     access_key: str = ""
     secret_key: str = ""
+    session_token: str = ""
 
     def to_dict(self):
         return {
             "access_key": self.access_key,
             "secret_key": self.secret_key,
+            "session_token": self.session_token,
         }
 
     @classmethod
@@ -58,6 +60,7 @@ class VolcengineCredentials:
         return cls(
             access_key=data.get("access_key", ""),
             secret_key=data.get("secret_key", ""),
+            session_token=data.get("session_token", ""),
         )
 
 

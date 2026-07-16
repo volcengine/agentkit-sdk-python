@@ -424,12 +424,17 @@ class VolcConfiguration:
         if self._provider == CloudProvider.BYTEPLUS:
             gc_ak = get_global_config_str("byteplus", "access_key")
             gc_sk = get_global_config_str("byteplus", "secret_key")
+            gc_token = get_global_config_str("byteplus", "session_token")
         else:
             gc_ak = get_global_config_str("volcengine", "access_key")
             gc_sk = get_global_config_str("volcengine", "secret_key")
+            gc_token = get_global_config_str("volcengine", "session_token")
         if gc_ak and gc_sk:
             return Credentials(
-                access_key=gc_ak, secret_key=gc_sk, source="global_config"
+                access_key=gc_ak,
+                secret_key=gc_sk,
+                session_token=gc_token or None,
+                source="global_config",
             )
         return None
 

@@ -381,7 +381,7 @@ def publish_discovery(
         ) from exc
     ak = access_key or _os.getenv("VOLCENGINE_ACCESS_KEY")
     sk = secret_key or _os.getenv("VOLCENGINE_SECRET_KEY")
-    token = session_token or _os.getenv("VOLCENGINE_SESSION_TOKEN")
+    token = session_token or _os.getenv("VOLCENGINE_SESSION_TOKEN") or _os.getenv("VOLC_SESSIONTOKEN")
     endpoint = f"tos-{coords.region}.volces.com"
     client = tos.TosClientV2(ak, sk, endpoint, coords.region, security_token=token)
     try:

@@ -123,6 +123,7 @@ class BaseServiceClient(Service):
             service=service,
             explicit_access_key=access_key or None,
             explicit_secret_key=secret_key or None,
+            explicit_session_token=session_token or None,
             platform_config=platform_config,
         )
         self._credential_source = getattr(creds, "source", None)

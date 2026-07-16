@@ -196,6 +196,7 @@ def deploy_harness(
     region: Optional[str] = None,
     access_key: Optional[str] = None,
     secret_key: Optional[str] = None,
+    session_token: Optional[str] = None,
     discovery_url: Optional[str] = None,
     allowed_id: Optional[str] = None,
     reporter: Optional[Reporter] = None,
@@ -226,7 +227,8 @@ def deploy_harness(
         name: Harness name; locates ``<name>.harness.json`` and names the runtime.
         path: Directory containing the spec and Dockerfile (default: cwd).
         region: AgentKit region (default ``cn-beijing`` or ``VOLCENGINE_REGION``).
-        access_key / secret_key: Volcengine credentials (default: ``VOLCENGINE_*`` env).
+        access_key / secret_key / session_token: Volcengine credentials
+            (default: ``VOLCENGINE_*`` env; session_token is for STS temporary creds).
         discovery_url / allowed_id: OAuth2/JWT overrides for the spec ``auth`` block.
         reporter: Progress reporter forwarded to the launch (default: silent).
         on_conflict: Callback consulted when a single same-name harness exists;
@@ -264,13 +266,20 @@ def deploy_harness(
     auth = _resolve_auth(spec.get("auth"), discovery_url, allowed_id)
 
     # AgentKit authenticates via the Volcengine SDK, which reads VOLC_ACCESSKEY /
-    # VOLC_SECRETKEY from the environment. Mirror whatever AK/SK was passed (or
-    # already set as VOLCENGINE_*) into those names.
+    # VOLC_SECRETKEY / VOLC_SESSIONTOKEN from the environment. Mirror whatever
+    # AK/SK/token was passed (or already set as VOLCENGINE_*) into those names.
     ak = access_key or os.getenv("VOLCENGINE_ACCESS_KEY", "")
     sk = secret_key or os.getenv("VOLCENGINE_SECRET_KEY", "")
+    token = (
+        session_token
+        or os.getenv("VOLCENGINE_SESSION_TOKEN", "")
+        or os.getenv("VOLC_SESSIONTOKEN", "")
+    )
     if ak and sk:
         os.environ["VOLC_ACCESSKEY"] = ak
         os.environ["VOLC_SECRETKEY"] = sk
+        if token:
+            os.environ["VOLC_SESSIONTOKEN"] = token
     if not os.getenv("VOLC_ACCESSKEY") or not os.getenv("VOLC_SECRETKEY"):
         raise ValueError(
             "Volcengine credentials are required. Pass access_key / secret_key, "
@@ -282,7 +291,7 @@ def deploy_harness(
     # Resolve a name collision into a deploy mode. The harness config defaults to
     # `runtime_id: Auto` (create new); an existing same-name harness can instead
     # be updated in place (new version) after confirmation.
-    client = AgentkitRuntimeClient(region=resolved_region)
+    client = AgentkitRuntimeClient(region=resolved_region, session_token=token or "")
     matches = _find_runtimes_by_name(client, runtime_name)
     update_runtime_id = None
     if len(matches) > 1:
