@@ -57,6 +57,7 @@ from agentkit.toolkit.cli.sandbox.model_config import (
     normalize_model_base_url,
     validate_model_provider_base_url,
 )
+from agentkit.utils.http_defaults import ws_ping_interval, ws_ping_timeout
 from agentkit.toolkit.cli.sandbox.tool_resolve import (
     SandboxToolType,
     find_tool_model_provider,
@@ -393,7 +394,13 @@ def _connect_terminal(
             err=True,
         )
         with _raw_terminal_mode():
-            websocket_app.run_forever()
+            # Keepalive: without ping_interval/ping_timeout a silently dead
+            # server leaves run_forever() blocked indefinitely with no way out
+            # but Ctrl-C. Pings detect the dead peer and unblock the session.
+            websocket_app.run_forever(
+                ping_interval=ws_ping_interval(),
+                ping_timeout=ws_ping_timeout(),
+            )
     except KeyboardInterrupt:
         websocket_app.close()
     finally:
