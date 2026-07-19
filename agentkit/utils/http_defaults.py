@@ -24,10 +24,21 @@ import os
 ENV_HTTP_TIMEOUT = "AGENTKIT_HTTP_TIMEOUT"
 ENV_HTTP_RETRIES = "AGENTKIT_HTTP_RETRIES"
 ENV_STREAM_TIMEOUT = "AGENTKIT_STREAM_TIMEOUT"
+ENV_POLL_TIMEOUT = "AGENTKIT_POLL_TIMEOUT"
+ENV_WS_PING_INTERVAL = "AGENTKIT_WS_PING_INTERVAL"
+ENV_WS_PING_TIMEOUT = "AGENTKIT_WS_PING_TIMEOUT"
 
 DEFAULT_HTTP_TIMEOUT = 30.0
 DEFAULT_HTTP_RETRIES = 2
 DEFAULT_STREAM_TIMEOUT = 300.0
+# Upper bound for status-polling loops (resource create/status waits) so a
+# stuck backend can never hang the CLI forever. 30 min covers slow provisioning.
+DEFAULT_POLL_TIMEOUT = 1800.0
+# WebSocket keepalive: send a ping every interval and drop the connection if no
+# pong arrives within the timeout, so a silently dead server can't wedge the
+# interactive session indefinitely.
+DEFAULT_WS_PING_INTERVAL = 20.0
+DEFAULT_WS_PING_TIMEOUT = 10.0
 
 
 def http_timeout() -> float:
@@ -52,3 +63,35 @@ def stream_timeout() -> float:
         return max(1.0, float(os.getenv(ENV_STREAM_TIMEOUT, "300")))
     except ValueError:
         return DEFAULT_STREAM_TIMEOUT
+
+
+def poll_timeout() -> float:
+    """Return the upper bound in seconds for status-polling loops (>= 1.0)."""
+    try:
+        return max(1.0, float(os.getenv(ENV_POLL_TIMEOUT, "1800")))
+    except ValueError:
+        return DEFAULT_POLL_TIMEOUT
+
+
+def ws_ping_interval() -> float:
+    """Return the WebSocket keepalive ping interval in seconds (>= 1.0)."""
+    try:
+        return max(1.0, float(os.getenv(ENV_WS_PING_INTERVAL, "20")))
+    except ValueError:
+        return DEFAULT_WS_PING_INTERVAL
+
+
+def ws_ping_timeout() -> float:
+    """Return the WebSocket pong-wait timeout in seconds (>= 1.0).
+
+    Clamped to strictly less than the ping interval, as required by
+    ``websocket-client``'s ``run_forever``.
+    """
+    try:
+        value = max(1.0, float(os.getenv(ENV_WS_PING_TIMEOUT, "10")))
+    except ValueError:
+        value = DEFAULT_WS_PING_TIMEOUT
+    interval = ws_ping_interval()
+    if value >= interval:
+        value = max(1.0, interval - 1.0)
+    return value

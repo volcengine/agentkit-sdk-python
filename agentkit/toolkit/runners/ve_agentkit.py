@@ -33,6 +33,7 @@ from agentkit.toolkit.config.dataclass_utils import AutoSerializableMixin
 from agentkit.toolkit.models import DeployResult, InvokeResult, StatusResult
 from agentkit.toolkit.reporter import Reporter
 from agentkit.toolkit.errors import ErrorCode
+from agentkit.utils.http_defaults import poll_timeout
 from agentkit.utils.misc import (
     generate_runtime_name,
     generate_runtime_role_name,
@@ -983,7 +984,10 @@ class VeAgentkitRuntimeRunner(Runner):
         """
         last_status = None
         start_time = time.time()
-        total_time = timeout if timeout else 300  # For progress bar display
+        # None means "no caller-supplied timeout" — fall back to the bounded
+        # poll timeout so a stuck Runtime can never wedge the CLI forever.
+        effective_timeout = timeout if timeout else poll_timeout()
+        total_time = effective_timeout  # For progress bar display
         expected_time = (
             30  # Controls progress curve speed (smaller = faster initial progress)
         )
@@ -1014,10 +1018,14 @@ class VeAgentkitRuntimeRunner(Runner):
                 # Calculate elapsed time
                 elapsed_time = time.time() - start_time
 
-                # Check timeout
-                if timeout and elapsed_time > timeout:
+                # Check timeout (always bounded — effective_timeout is never None)
+                if elapsed_time > effective_timeout:
                     task.update(description="Wait timeout")
-                    return False, runtime, f"{error_message} (timeout after {timeout}s)"
+                    return (
+                        False,
+                        runtime,
+                        f"{error_message} (timeout after {effective_timeout:.0f}s)",
+                    )
 
                 # Update progress description on status change
                 if runtime.status != last_status:

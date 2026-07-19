@@ -15,6 +15,7 @@
 import time
 
 from agentkit.platform import resolve_endpoint, VolcConfiguration
+from agentkit.utils.http_defaults import poll_timeout
 from agentkit.utils.logging_config import get_logger
 from agentkit.utils.ve_sign import ve_request
 
@@ -116,12 +117,18 @@ class VeCR:
                     f"Error create cr instance {instance_name}: {error_code} {error_message}"
                 )
 
+        deadline = time.monotonic() + poll_timeout()
         while True:
             status = self._check_instance(instance_name)
             if status == "Running":
                 break
             elif status == "Failed":
                 raise ValueError(f"cr instance {instance_name} create failed")
+            elif time.monotonic() >= deadline:
+                raise TimeoutError(
+                    f"cr instance {instance_name} did not reach Running within "
+                    f"{poll_timeout():.0f}s (last status: {status})"
+                )
             else:
                 logger.debug(f"cr instance status: {status}")
                 time.sleep(30)
