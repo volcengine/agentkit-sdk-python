@@ -83,6 +83,9 @@ langgraph = ["langgraph"]
 strands = ["strands-agents"]
 agentcore = ["bedrock-agentcore"]
 frameworks = ["langchain", "langgraph", "strands-agents", "bedrock-agentcore"]
+harness-sidecar = [
+    "bytedance.agentkit_harness_sidecar>=0.1.0,<0.2.0; python_version == '3.12' and platform_system == 'Linux' and platform_machine == 'x86_64'",
+]
 
 [tool.ruff.lint]
 

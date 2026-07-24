@@ -181,9 +181,24 @@ def to_runtime_env(spec: Dict[str, Any]) -> Dict[str, str]:
     # Non-component fields: generic flatten (model.name -> MODEL_NAME, ...).
     # The `auth` block is excluded too: it configures the runtime's gateway
     # authorizer at deploy time (custom_jwt), not the container environment.
-    rest = {
-        k: v for k, v in spec.items() if k not in COMPONENT_TYPE_ENV and k != "auth"
-    }
+    sidecar_section = spec.get("sidecar")
+    sidecar_profile = spec.get("profile")
+    harness_section = spec.get("harness")
+    if isinstance(harness_section, MutableMapping):
+        if sidecar_section is None:
+            sidecar_section = harness_section.get("sidecar")
+        sidecar_profile = sidecar_profile or harness_section.get("profile")
+    excluded = set(COMPONENT_TYPE_ENV) | {"auth"}
+    rest = {k: v for k, v in spec.items() if k not in excluded}
+    if isinstance(sidecar_section, (MutableMapping, bool)):
+        rest.pop("sidecar", None)
+        if isinstance(harness_section, MutableMapping):
+            remaining_harness = dict(harness_section)
+            remaining_harness.pop("sidecar", None)
+            if remaining_harness:
+                rest["harness"] = remaining_harness
+            else:
+                rest.pop("harness", None)
     for key, value in _flatten_dict(rest).items():
         if _is_empty(value):
             continue
@@ -213,5 +228,15 @@ def to_runtime_env(spec: Dict[str, Any]) -> Dict[str, str]:
                     f"Known: {sorted(params)}"
                 )
             env[env_name] = _stringify(value)
+
+    if isinstance(sidecar_section, (MutableMapping, bool)):
+        from .sidecar_config import sidecar_config_to_env
+
+        env.update(
+            sidecar_config_to_env(
+                sidecar_section,
+                profile=str(sidecar_profile or "default"),
+            )
+        )
 
     return env
