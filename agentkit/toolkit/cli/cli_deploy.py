@@ -15,7 +15,7 @@
 """AgentKit CLI - Deploy command implementation."""
 
 from pathlib import Path
-from typing import Callable, Dict, Optional
+from typing import Callable, Dict, List, Optional
 
 import typer
 from rich.console import Console
@@ -63,6 +63,27 @@ def deploy_command(
         "--allowed-id",
         help="Comma-separated allowed client IDs for OAuth2/JWT auth (harness deploy).",
     ),
+    runtime_network_mode: Optional[str] = typer.Option(
+        None,
+        "--runtime-network-mode",
+        help="Harness Runtime network mode: public, private, or both.",
+    ),
+    runtime_vpc_id: Optional[str] = typer.Option(
+        None,
+        "--runtime-vpc-id",
+        help="Harness Runtime VPC ID (required for private/both).",
+    ),
+    runtime_subnet_ids: Optional[List[str]] = typer.Option(
+        None,
+        "--runtime-subnet-id",
+        "--runtime-subnet-ids",
+        help="Harness Runtime subnet ID. Repeat for multiple subnets.",
+    ),
+    runtime_enable_shared_internet_access: Optional[bool] = typer.Option(
+        None,
+        "--runtime-enable-shared-internet-access/--no-runtime-enable-shared-internet-access",
+        help="Enable shared internet egress for a private Harness Runtime.",
+    ),
     yes: bool = typer.Option(
         False,
         "--yes",
@@ -83,6 +104,10 @@ def deploy_command(
             secret_key=volcengine_secret_key,
             discovery_url=discovery_url,
             allowed_id=allowed_id,
+            runtime_network_mode=runtime_network_mode,
+            runtime_vpc_id=runtime_vpc_id,
+            runtime_subnet_ids=runtime_subnet_ids,
+            runtime_enable_shared_internet_access=runtime_enable_shared_internet_access,
             assume_yes=yes,
         )
         return
@@ -126,6 +151,11 @@ def _deploy_harness(
     discovery_url,
     allowed_id,
     assume_yes: bool = False,
+    *,
+    runtime_network_mode=None,
+    runtime_vpc_id=None,
+    runtime_subnet_ids=None,
+    runtime_enable_shared_internet_access=None,
 ):
     """Deploy a harness spec <name>.harness.json from the current directory."""
     import sys
@@ -159,6 +189,10 @@ def _deploy_harness(
             secret_key=secret_key,
             discovery_url=discovery_url,
             allowed_id=allowed_id,
+            runtime_network_mode=runtime_network_mode,
+            runtime_vpc_id=runtime_vpc_id,
+            runtime_subnet_ids=runtime_subnet_ids,
+            runtime_enable_shared_internet_access=runtime_enable_shared_internet_access,
             reporter=reporter,
             on_conflict=on_conflict,
         )
@@ -185,6 +219,4 @@ def _deploy_harness(
     if meta.get("runtime_apikey"):
         console.print(f"[green]API key: {meta['runtime_apikey']}[/green]")
     if endpoint:
-        console.print(
-            f"[green]Recorded in {(Path.cwd() / 'harness.json')}[/green]"
-        )
+        console.print(f"[green]Recorded in {(Path.cwd() / 'harness.json')}[/green]")

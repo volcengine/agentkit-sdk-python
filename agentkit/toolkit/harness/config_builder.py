@@ -23,6 +23,7 @@ def build_agentkit_config(
     envs: Dict[str, str],
     auth: Optional[Dict[str, Any]] = None,
     runtime_id: str = "Auto",
+    runtime_network: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Build the cloud AgentKit launch config dict (auto-provision).
 
@@ -64,6 +65,9 @@ def build_agentkit_config(
         cloud["runtime_apikey_name"] = "Auto"
         cloud["runtime_apikey"] = "Auto"
         cloud["runtime_jwt_allowed_clients"] = []
+    if runtime_network:
+        # Forwarded to the cloud runner for CreateRuntime (public/private/both).
+        cloud["runtime_network"] = runtime_network
     return {
         "common": {
             "agent_name": runtime_name,
