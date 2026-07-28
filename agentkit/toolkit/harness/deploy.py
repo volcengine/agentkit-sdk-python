@@ -198,6 +198,8 @@ def deploy_harness(
     secret_key: Optional[str] = None,
     discovery_url: Optional[str] = None,
     allowed_id: Optional[str] = None,
+    runtime_env_builder: Optional[Callable[[Dict[str, Any]], Dict[str, str]]] = None,
+    cloud_config_overrides: Optional[Dict[str, Any]] = None,
     reporter: Optional[Reporter] = None,
     on_conflict: Optional[Callable[[Dict[str, Any]], bool]] = None,
 ) -> LifecycleResult:
@@ -228,6 +230,8 @@ def deploy_harness(
         region: AgentKit region (default ``cn-beijing`` or ``VOLCENGINE_REGION``).
         access_key / secret_key: Volcengine credentials (default: ``VOLCENGINE_*`` env).
         discovery_url / allowed_id: OAuth2/JWT overrides for the spec ``auth`` block.
+        runtime_env_builder: Optional environment builder used by extensions.
+        cloud_config_overrides: Optional cloud launch configuration overrides.
         reporter: Progress reporter forwarded to the launch (default: silent).
         on_conflict: Callback consulted when a single same-name harness exists;
             returns True to update it, False to abort.
@@ -259,7 +263,7 @@ def deploy_harness(
         os.environ.setdefault(key, value)
 
     spec = _load_harness_spec(proj_dir / f"{name}.harness.json")
-    runtime_envs = to_runtime_env(spec)
+    runtime_envs = (runtime_env_builder or to_runtime_env)(spec)
     runtime_name = name
     auth = _resolve_auth(spec.get("auth"), discovery_url, allowed_id)
 
@@ -328,6 +332,7 @@ def deploy_harness(
         runtime_envs,
         auth,
         runtime_id=update_runtime_id or "Auto",
+        cloud_config_overrides=cloud_config_overrides,
     )
 
     # AgentKit's launch path exposes no hook for runtime tags, so tag the runtime
