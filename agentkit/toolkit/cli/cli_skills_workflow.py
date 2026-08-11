@@ -248,56 +248,59 @@ def _ensure_bucket_ready(
             prefix=(prefix or "").strip(),
         )
     )
-
-    exists = service.bucket_exists()
-    created_in_this_run = False
-    if not exists:
-        if assume_no:
-            raise typer.BadParameter(f"TOS bucket not found: {bucket_name}")
-        if auto_bucket or assume_yes:
-            service.create_bucket()
-            created_in_this_run = True
-        else:
-            if _is_interactive():
-                typer.confirm(
-                    f"TOS bucket '{bucket_name}' not found. Create it in current account?",
-                    abort=True,
-                )
+    try:
+        exists = service.bucket_exists()
+        created_in_this_run = False
+        if not exists:
+            if assume_no:
+                raise typer.BadParameter(f"TOS bucket not found: {bucket_name}")
+            if auto_bucket or assume_yes:
                 service.create_bucket()
                 created_in_this_run = True
             else:
+                if _is_interactive():
+                    typer.confirm(
+                        f"TOS bucket '{bucket_name}' not found. Create it in current account?",
+                        abort=True,
+                    )
+                    service.create_bucket()
+                    created_in_this_run = True
+                else:
+                    raise typer.BadParameter(
+                        f"TOS bucket '{bucket_name}' not found. Use -y/--yes to create it automatically."
+                    )
+
+        def check_owned() -> bool:
+            try:
+                return service.bucket_is_owned(bucket_name)
+            except Exception as e:
                 raise typer.BadParameter(
-                    f"TOS bucket '{bucket_name}' not found. Use -y/--yes to create it automatically."
+                    "Failed to determine TOS bucket ownership via ListBuckets. "
+                    "Upload has been blocked for security reasons. "
+                    "Please ensure your credentials have TOS ListBuckets permission, or configure a bucket you own."
+                ) from e
+
+        if created_in_this_run:
+            import time
+
+            deadline = time.time() + 10
+            while time.time() < deadline:
+                if check_owned():
+                    break
+                time.sleep(2)
+            else:
+                raise typer.BadParameter(
+                    f"Failed to verify ownership for newly created TOS bucket: {bucket_name}"
                 )
-
-    def check_owned() -> bool:
-        try:
-            return service.bucket_is_owned(bucket_name)
-        except Exception as e:
-            raise typer.BadParameter(
-                "Failed to determine TOS bucket ownership via ListBuckets. "
-                "Upload has been blocked for security reasons. "
-                "Please ensure your credentials have TOS ListBuckets permission, or configure a bucket you own."
-            ) from e
-
-    if created_in_this_run:
-        import time
-
-        deadline = time.time() + 10
-        while time.time() < deadline:
-            if check_owned():
-                break
-            time.sleep(2)
         else:
-            raise typer.BadParameter(
-                f"Failed to verify ownership for newly created TOS bucket: {bucket_name}"
-            )
-    else:
-        if not check_owned():
-            raise typer.BadParameter(
-                f"Security notice: The configured TOS bucket '{bucket_name}' is not owned by the current account. "
-                "To prevent uploading your code to a bucket you do not own, this upload has been blocked."
-            )
+            if not check_owned():
+                raise typer.BadParameter(
+                    f"Security notice: The configured TOS bucket '{bucket_name}' is not owned by the current account. "
+                    "To prevent uploading your code to a bucket you do not own, this upload has been blocked."
+                )
+    finally:
+        if hasattr(service, "close"):
+            service.close()
 
 
 def _tos_upload(
@@ -327,14 +330,18 @@ def _tos_upload(
             prefix=effective_prefix,
         )
     )
-    if verify_bucket:
-        if not service.bucket_exists():
-            raise typer.BadParameter(f"Bucket not found: {bucket}")
-        if not service.bucket_is_owned(bucket):
-            raise typer.BadParameter(
-                f"Bucket is not owned by current credentials: {bucket}"
-            )
-    return service.upload_file(zip_abs, key)
+    try:
+        if verify_bucket:
+            if not service.bucket_exists():
+                raise typer.BadParameter(f"Bucket not found: {bucket}")
+            if not service.bucket_is_owned(bucket):
+                raise typer.BadParameter(
+                    f"Bucket is not owned by current credentials: {bucket}"
+                )
+        return service.upload_file(zip_abs, key)
+    finally:
+        if hasattr(service, "close"):
+            service.close()
 
 
 def _pick_latest_version(

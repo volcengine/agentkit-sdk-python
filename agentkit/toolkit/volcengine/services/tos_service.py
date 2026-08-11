@@ -111,6 +111,7 @@ class TOSService:
                 ep.host,
                 ep.region,
                 security_token=getattr(creds, "session_token", None) or "",
+                dns_cache_time=0,
             )
             self.credentials = creds
             # Expose the actual region resolved by VolcConfiguration

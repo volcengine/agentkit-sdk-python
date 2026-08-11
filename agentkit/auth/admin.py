@@ -383,27 +383,30 @@ def publish_discovery(
     sk = secret_key or _os.getenv("VOLCENGINE_SECRET_KEY")
     token = session_token or _os.getenv("VOLCENGINE_SESSION_TOKEN")
     endpoint = f"tos-{coords.region}.volces.com"
-    client = tos.TosClientV2(ak, sk, endpoint, coords.region, security_token=token)
+    client = tos.TosClientV2(ak, sk, endpoint, coords.region, security_token=token, dns_cache_time=0)
     try:
-        client.create_bucket(bucket, acl=tos.ACLType.ACL_Public_Read)
-    except Exception as exc:  # noqa: BLE001
-        msg = str(exc)
-        if not any(k in msg for k in ("Exist", "exist", "Owned", "owned", "Conflict", "conflict")):
-            raise AuthError(
-                f"could not create the TOS bucket for the discovery doc: {msg[:120]}",
-                hint="enable TOS on this account and allow public-read buckets, or pass an existing bucket.",
-            ) from exc
-    client.put_object(
-        bucket, WELL_KNOWN_KEY, content=json.dumps(coords.discovery_doc()).encode(),
-        acl=tos.ACLType.ACL_Public_Read, content_type="application/json",
-    )
-    if custom_domain:
-        with __import__("contextlib").suppress(Exception):
-            client.put_bucket_custom_domain(bucket, domain=custom_domain)  # best-effort bind
-        return f"https://{custom_domain}"
-    url = f"https://{bucket}.{endpoint}"
-    _verify_public_discovery(url)  # fail loudly if the doc isn't anonymously readable
-    return url
+        try:
+            client.create_bucket(bucket, acl=tos.ACLType.ACL_Public_Read)
+        except Exception as exc:  # noqa: BLE001
+            msg = str(exc)
+            if not any(k in msg for k in ("Exist", "exist", "Owned", "owned", "Conflict", "conflict")):
+                raise AuthError(
+                    f"could not create the TOS bucket for the discovery doc: {msg[:120]}",
+                    hint="enable TOS on this account and allow public-read buckets, or pass an existing bucket.",
+                ) from exc
+        client.put_object(
+            bucket, WELL_KNOWN_KEY, content=json.dumps(coords.discovery_doc()).encode(),
+            acl=tos.ACLType.ACL_Public_Read, content_type="application/json",
+        )
+        if custom_domain:
+            with __import__("contextlib").suppress(Exception):
+                client.put_bucket_custom_domain(bucket, domain=custom_domain)  # best-effort bind
+            return f"https://{custom_domain}"
+        url = f"https://{bucket}.{endpoint}"
+        _verify_public_discovery(url)  # fail loudly if the doc isn't anonymously readable
+        return url
+    finally:
+        client.close()
 
 
 def _verify_public_discovery(base_url: str) -> None:

@@ -949,7 +949,8 @@ class VeCPCRBuilder(Builder):
             provider = getattr(config, "cloud_provider", None) or getattr(
                 getattr(config, "common_config", None), "cloud_provider", None
             )
-            with TOSService(tos_config, provider=provider) as tos_service:
+            tos_service = TOSService(tos_config, provider=provider)
+            try:
                 # Two-step safety check:
                 # 1) Ensure the bucket exists and is accessible.
                 # 2) Verify the bucket is owned by the current account via ListBuckets before uploading.
@@ -1095,6 +1096,9 @@ class VeCPCRBuilder(Builder):
                     f"File uploaded to TOS: {tos_url} (Region: {actual_region})"
                 )
                 return tos_url, actual_region
+            finally:
+                if hasattr(tos_service, "close"):
+                    tos_service.close()
 
         except Exception as e:
             if "AccountDisable" in str(e):
