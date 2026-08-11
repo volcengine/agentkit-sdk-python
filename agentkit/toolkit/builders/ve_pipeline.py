@@ -421,8 +421,13 @@ class VeCPCRBuilder(Builder):
                         None,
                     )
                     tos_service = TOSService(tos_config, provider=provider)
-                    tos_service.delete_file(builder_config.tos_object_key)
-                    logger.info(f"Deleted TOS archive: {builder_config.tos_object_key}")
+                    try:
+                        tos_service.delete_file(builder_config.tos_object_key)
+                        logger.info(
+                            f"Deleted TOS archive: {builder_config.tos_object_key}"
+                        )
+                    finally:
+                        tos_service.close()
 
                 except Exception as e:
                     logger.warning(f"Failed to delete TOS archive: {str(e)}")
@@ -944,149 +949,152 @@ class VeCPCRBuilder(Builder):
             provider = getattr(config, "cloud_provider", None) or getattr(
                 getattr(config, "common_config", None), "cloud_provider", None
             )
-            tos_service = TOSService(tos_config, provider=provider)
+            with TOSService(tos_config, provider=provider) as tos_service:
+                # Two-step safety check:
+                # 1) Ensure the bucket exists and is accessible.
+                # 2) Verify the bucket is owned by the current account via ListBuckets before uploading.
+                import time
 
-            # Two-step safety check:
-            # 1) Ensure the bucket exists and is accessible.
-            # 2) Verify the bucket is owned by the current account via ListBuckets before uploading.
-            import time
+                created_in_this_run = False
+                name_conflict_not_created = False
 
-            created_in_this_run = False
-            name_conflict_not_created = False
-
-            # Step 1: ensure bucket exists / accessible
-            if auto_created_bucket:
-                self.reporter.info(
-                    f"Creating auto-generated TOS bucket in current account: {bucket_name}"
-                )
-
-                # Very low probability: name collision. Retry with a new generated name.
-                max_attempts = 3
-                for attempt in range(1, max_attempts + 1):
-                    tos_service.config.bucket = bucket_name
-                    try:
-                        tos_service.create_bucket()
-                        created_in_this_run = True
-                        break
-                    except tos.exceptions.TosServerError as e:
-                        if e.status_code == 409 and attempt < max_attempts:
-                            bucket_name = TOSService.generate_bucket_name()
-                            self.reporter.warning(
-                                "Auto-generated bucket name already taken, retrying with a new name "
-                                f"(attempt {attempt + 1}/{max_attempts}): {bucket_name}"
-                            )
-                            continue
-                        raise
-            else:
-                # User-specified bucket: if not accessible/existing, attempt to create.
-                self.reporter.info(f"Checking TOS bucket accessibility: {bucket_name}")
-                if not tos_service.bucket_exists():
-                    self.reporter.warning(
-                        f"TOS bucket '{bucket_name}' is not accessible or does not exist, attempting to create it..."
+                # Step 1: ensure bucket exists / accessible
+                if auto_created_bucket:
+                    self.reporter.info(
+                        f"Creating auto-generated TOS bucket in current account: {bucket_name}"
                     )
-                    try:
-                        tos_service.create_bucket()
-                        created_in_this_run = True
-                    except tos.exceptions.TosServerError as e:
-                        if e.status_code == 409:
-                            name_conflict_not_created = True
-                        else:
+
+                    # Very low probability: name collision. Retry with a new generated name.
+                    max_attempts = 3
+                    for attempt in range(1, max_attempts + 1):
+                        tos_service.config.bucket = bucket_name
+                        try:
+                            tos_service.create_bucket()
+                            created_in_this_run = True
+                            break
+                        except tos.exceptions.TosServerError as e:
+                            if e.status_code == 409 and attempt < max_attempts:
+                                bucket_name = TOSService.generate_bucket_name()
+                                self.reporter.warning(
+                                    "Auto-generated bucket name already taken, retrying with a new name "
+                                    f"(attempt {attempt + 1}/{max_attempts}): {bucket_name}"
+                                )
+                                continue
                             raise
-
-            # Step 2: verify bucket ownership via ListBuckets
-            self.reporter.info(f"Verifying TOS bucket ownership: {bucket_name}")
-
-            def check_owned() -> bool:
-                try:
-                    return tos_service.bucket_is_owned(bucket_name)
-                except Exception as e:
-                    error_msg = (
-                        "Failed to determine TOS bucket ownership via ListBuckets. "
-                        "Upload has been blocked for security reasons. "
-                        "Please ensure your credentials have TOS ListBuckets permission, or set 'tos_bucket: Auto'."
+                else:
+                    # User-specified bucket: if not accessible/existing, attempt to create.
+                    self.reporter.info(
+                        f"Checking TOS bucket accessibility: {bucket_name}"
                     )
-                    self.reporter.error(error_msg)
-                    logger.error(f"Bucket ownership check failed: {str(e)}")
+                    if not tos_service.bucket_exists():
+                        self.reporter.warning(
+                            f"TOS bucket '{bucket_name}' is not accessible or does not exist, attempting to create it..."
+                        )
+                        try:
+                            tos_service.create_bucket()
+                            created_in_this_run = True
+                        except tos.exceptions.TosServerError as e:
+                            if e.status_code == 409:
+                                name_conflict_not_created = True
+                            else:
+                                raise
+
+                # Step 2: verify bucket ownership via ListBuckets
+                self.reporter.info(f"Verifying TOS bucket ownership: {bucket_name}")
+
+                def check_owned() -> bool:
+                    try:
+                        return tos_service.bucket_is_owned(bucket_name)
+                    except Exception as e:
+                        error_msg = (
+                            "Failed to determine TOS bucket ownership via ListBuckets. "
+                            "Upload has been blocked for security reasons. "
+                            "Please ensure your credentials have TOS ListBuckets permission, or set 'tos_bucket: Auto'."
+                        )
+                        self.reporter.error(error_msg)
+                        logger.error(f"Bucket ownership check failed: {str(e)}")
+                        raise Exception(error_msg)
+
+                if created_in_this_run:
+                    # ListBuckets may be eventually consistent shortly after creation.
+                    timeout_s = 10
+                    interval_s = 2
+                    deadline = time.time() + timeout_s
+                    owned = False
+                    while time.time() < deadline:
+                        owned = check_owned()
+                        if owned:
+                            break
+                        time.sleep(interval_s)
+                else:
+                    owned = check_owned()
+
+                if not owned:
+                    error_msg = (
+                        f"Security notice: The configured TOS bucket '{bucket_name}' is not owned by the current account. "
+                        "To prevent uploading your source code to a bucket you do not own (which could leak secrets), this upload has been blocked. "
+                        "Please choose a bucket owned by your account, use 'agentkit config --tos_bucket <your-bucket-name>' to set it."
+                    )
                     raise Exception(error_msg)
 
-            if created_in_this_run:
-                # ListBuckets may be eventually consistent shortly after creation.
-                timeout_s = 10
-                interval_s = 2
-                deadline = time.time() + timeout_s
-                owned = False
-                while time.time() < deadline:
-                    owned = check_owned()
-                    if owned:
-                        break
-                    time.sleep(interval_s)
-            else:
-                owned = check_owned()
-
-            if not owned:
-                error_msg = (
-                    f"Security notice: The configured TOS bucket '{bucket_name}' is not owned by the current account. "
-                    "To prevent uploading your source code to a bucket you do not own (which could leak secrets), this upload has been blocked. "
-                    "Please choose a bucket owned by your account, use 'agentkit config --tos_bucket <your-bucket-name>' to set it."
-                )
-                raise Exception(error_msg)
-
-            if name_conflict_not_created and owned:
-                actual_location = tos_service.get_bucket_location(bucket_name)
-                current_region = getattr(
-                    tos_service, "actual_region", config.tos_region
-                )
-                if actual_location:
-                    raise Exception(
-                        f"TOS bucket '{bucket_name}' exists in region '{actual_location}', "
-                        f"but the current configuration targets region '{current_region}'. "
-                        "TOS buckets are region-scoped and cannot be accessed across regions. "
-                        "Please either switch to the bucket's region or use a different bucket name "
-                        f"(e.g. '{bucket_name}-{current_region.split('-')[-1]}')."
+                if name_conflict_not_created and owned:
+                    actual_location = tos_service.get_bucket_location(bucket_name)
+                    current_region = getattr(
+                        tos_service, "actual_region", config.tos_region
                     )
-                else:
-                    raise Exception(
-                        f"TOS bucket '{bucket_name}' is owned by your account but does not exist "
-                        f"in the current region '{current_region}'. It may reside in another region. "
-                        "TOS buckets are region-scoped and cannot be accessed across regions. "
-                        "Please either switch to the bucket's region or use a different bucket name."
-                    )
-
-            self.reporter.success(
-                f"TOS bucket ownership verified for current account: {bucket_name}"
-            )
-
-            if created_in_this_run:
-                data_plane_timeout_s = 30
-                data_plane_interval_s = 3
-                data_plane_deadline = time.time() + data_plane_timeout_s
-                while not tos_service.bucket_exists():
-                    if time.time() >= data_plane_deadline:
+                    if actual_location:
                         raise Exception(
-                            f"TOS bucket '{bucket_name}' was created but is not yet "
-                            "available for uploads. Please retry in a few seconds."
+                            f"TOS bucket '{bucket_name}' exists in region '{actual_location}', "
+                            f"but the current configuration targets region '{current_region}'. "
+                            "TOS buckets are region-scoped and cannot be accessed across regions. "
+                            "Please either switch to the bucket's region or use a different bucket name "
+                            f"(e.g. '{bucket_name}-{current_region.split('-')[-1]}')."
                         )
-                    time.sleep(data_plane_interval_s)
+                    else:
+                        raise Exception(
+                            f"TOS bucket '{bucket_name}' is owned by your account but does not exist "
+                            f"in the current region '{current_region}'. It may reside in another region. "
+                            "TOS buckets are region-scoped and cannot be accessed across regions. "
+                            "Please either switch to the bucket's region or use a different bucket name."
+                        )
 
-            # Update config with auto-generated bucket name if applicable
-            if auto_created_bucket:
-                config.tos_bucket = bucket_name
+                self.reporter.success(
+                    f"TOS bucket ownership verified for current account: {bucket_name}"
+                )
 
-            # Generate object key for the archive
-            archive_name = os.path.basename(archive_path)
-            object_key = f"{config.tos_prefix}/{archive_name}"
+                if created_in_this_run:
+                    data_plane_timeout_s = 30
+                    data_plane_interval_s = 3
+                    data_plane_deadline = time.time() + data_plane_timeout_s
+                    while not tos_service.bucket_exists():
+                        if time.time() >= data_plane_deadline:
+                            raise Exception(
+                                f"TOS bucket '{bucket_name}' was created but is not yet "
+                                "available for uploads. Please retry in a few seconds."
+                            )
+                        time.sleep(data_plane_interval_s)
 
-            # Upload file to TOS
-            tos_url = tos_service.upload_file(archive_path, object_key)
+                # Update config with auto-generated bucket name if applicable
+                if auto_created_bucket:
+                    config.tos_bucket = bucket_name
 
-            # Get the actual region resolved by the service, or fallback to config
-            actual_region = getattr(tos_service, "actual_region", config.tos_region)
+                # Generate object key for the archive
+                archive_name = os.path.basename(archive_path)
+                object_key = f"{config.tos_prefix}/{archive_name}"
 
-            # Save object key to config for later reference
-            config.tos_object_key = object_key
+                # Upload file to TOS
+                tos_url = tos_service.upload_file(archive_path, object_key)
 
-            logger.info(f"File uploaded to TOS: {tos_url} (Region: {actual_region})")
-            return tos_url, actual_region
+                # Get the actual region resolved by the service, or fallback to config
+                actual_region = getattr(tos_service, "actual_region", config.tos_region)
+
+                # Save object key to config for later reference
+                config.tos_object_key = object_key
+
+                logger.info(
+                    f"File uploaded to TOS: {tos_url} (Region: {actual_region})"
+                )
+                return tos_url, actual_region
 
         except Exception as e:
             if "AccountDisable" in str(e):

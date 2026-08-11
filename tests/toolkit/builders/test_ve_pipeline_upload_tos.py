@@ -27,6 +27,7 @@ the exact method surface the production code calls:
   - ``bucket_is_owned(name)``    -> bool  (ListBuckets ownership gate)
   - ``get_bucket_location(name)``-> Optional[str]
   - ``upload_file(path, key)``   -> str (URL)
+  - ``close()``                  -> releases client resources
   - ``generate_bucket_name()``   -> staticmethod
   - ``.config`` (has a mutable ``.bucket`` attr) and ``.actual_region``
 
@@ -135,6 +136,15 @@ class _FakeTOSService:
         self.calls.append(("upload_file", local_path, object_key))
         return self.upload_file_returns
 
+    def close(self) -> None:
+        self.calls.append(("close",))
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
 
 @pytest.fixture(autouse=True)
 def _reset_fake_state(monkeypatch):
@@ -211,6 +221,7 @@ def test_upload_blocked_when_bucket_not_owned_by_current_account(monkeypatch, tm
     called_methods = [c[0] for c in svc.calls]
     assert "bucket_is_owned" in called_methods
     assert "upload_file" not in called_methods
+    assert called_methods[-1] == "close"
 
 
 # ---------------------------------------------------------------------------
@@ -474,3 +485,4 @@ def test_happy_path_uploads_and_returns_url_and_actual_region(monkeypatch, tmp_p
 
     # object key persisted back onto the config for later reference (L1086).
     assert config.tos_object_key == "agentkit-builds/app.tar.gz"
+    assert svc.calls[-1] == ("close",)

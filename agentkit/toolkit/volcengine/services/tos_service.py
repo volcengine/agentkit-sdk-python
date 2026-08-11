@@ -125,6 +125,23 @@ class TOSService:
             logger.error(f"Failed to initialize TOS client: {str(e)}")
             raise
 
+    def close(self) -> None:
+        """Close the TOS client and release underlying connections and resources."""
+        client, self.client = self.client, None
+        if client is None:
+            return
+
+        try:
+            client.close()
+        except Exception:
+            logger.debug("Error closing TOS client", exc_info=True)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
     def upload_file(self, local_path: str, object_key: str) -> str:
         """Upload a file to TOS.
 
