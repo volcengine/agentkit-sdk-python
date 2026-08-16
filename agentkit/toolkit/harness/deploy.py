@@ -198,6 +198,10 @@ def deploy_harness(
     secret_key: Optional[str] = None,
     discovery_url: Optional[str] = None,
     allowed_id: Optional[str] = None,
+    runtime_network_mode: Optional[str] = None,
+    runtime_vpc_id: Optional[str] = None,
+    runtime_subnet_ids: Optional[list[str]] = None,
+    runtime_enable_shared_internet_access: Optional[bool] = None,
     reporter: Optional[Reporter] = None,
     on_conflict: Optional[Callable[[Dict[str, Any]], bool]] = None,
 ) -> LifecycleResult:
@@ -228,6 +232,12 @@ def deploy_harness(
         region: AgentKit region (default ``cn-beijing`` or ``VOLCENGINE_REGION``).
         access_key / secret_key: Volcengine credentials (default: ``VOLCENGINE_*`` env).
         discovery_url / allowed_id: OAuth2/JWT overrides for the spec ``auth`` block.
+        runtime_network_mode: Runtime network mode: ``public``, ``private``, or
+            ``both``. Network settings apply only when creating a Runtime.
+        runtime_vpc_id: VPC ID required by ``private`` / ``both`` modes.
+        runtime_subnet_ids: Optional subnet IDs for the Runtime VPC attachment.
+        runtime_enable_shared_internet_access: Enable shared internet egress for
+            a private network.
         reporter: Progress reporter forwarded to the launch (default: silent).
         on_conflict: Callback consulted when a single same-name harness exists;
             returns True to update it, False to abort.
@@ -279,6 +289,17 @@ def deploy_harness(
 
     resolved_region = region or os.getenv("VOLCENGINE_REGION") or "cn-beijing"
 
+    runtime_network = {
+        key: value
+        for key, value in {
+            "mode": runtime_network_mode,
+            "vpc_id": runtime_vpc_id,
+            "subnet_ids": runtime_subnet_ids,
+            "enable_shared_internet_access": runtime_enable_shared_internet_access,
+        }.items()
+        if value is not None
+    }
+
     # Resolve a name collision into a deploy mode. The harness config defaults to
     # `runtime_id: Auto` (create new); an existing same-name harness can instead
     # be updated in place (new version) after confirmation.
@@ -300,6 +321,11 @@ def deploy_harness(
                 "Refusing to update it."
             )
         existing_id = match["runtime_id"]
+        if runtime_network:
+            raise ValueError(
+                "Runtime network configuration is supported only when creating a "
+                "Runtime. Delete the existing harness Runtime and deploy again."
+            )
         version = _get_runtime_version(client, existing_id)
         version_label = f"v{version}" if version is not None else "unknown"
         if reporter:
@@ -328,6 +354,7 @@ def deploy_harness(
         runtime_envs,
         auth,
         runtime_id=update_runtime_id or "Auto",
+        runtime_network=runtime_network,
     )
 
     # AgentKit's launch path exposes no hook for runtime tags, so tag the runtime
