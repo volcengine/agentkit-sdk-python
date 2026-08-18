@@ -8,7 +8,7 @@ import logging
 import os
 import sys
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import NAMESPACE_URL, uuid4, uuid5
 
 import uvicorn
@@ -20,6 +20,9 @@ from starlette.routing import Mount
 from typing_extensions import override
 
 from agentkit.apps.base_app import BaseAgentkitApp
+
+if TYPE_CHECKING:
+    from agentkit.plugins.llm_shield import LLMShieldPlugin
 
 logger = logging.getLogger(__name__)
 
@@ -483,6 +486,7 @@ class AgentkitLangGraphServerApp(BaseAgentkitApp):
         graph_id: str | None = None,
         input_key: str | None = None,
         allow_blocking: bool | None = None,
+        llm_shield: LLMShieldPlugin | None = None,
     ) -> None:
         super().__init__()
         self.config_path = Path(config_path).resolve()
@@ -490,6 +494,7 @@ class AgentkitLangGraphServerApp(BaseAgentkitApp):
         self.config = _normalize_config_paths(self.config_path.parent, raw_config)
         self.graph_id = _resolve_graph_id(self.config, graph_id)
         self.input_key = input_key
+        self.llm_shield = llm_shield
         _extend_python_path(self.config_path.parent, self.config)
         _prepare_langgraph_environment(self.config_path, self.config, allow_blocking=allow_blocking)
         _materialize_lazy_graph_exports(self.config.get("graphs"))
@@ -546,34 +551,79 @@ class AgentkitLangGraphServerApp(BaseAgentkitApp):
         )
 
     async def _stream_events(self, req: AgentkitRunRequest):
+        input_text = _content_text(req.new_message)
+        if self.llm_shield is not None:
+            replacement = await self.llm_shield.moderate_text(input_text, role="user")
+            if replacement is not None:
+                yield _agentkit_text_event(self.graph_id, replacement, partial=False)
+                return
         await self._ensure_thread(req.app_name or self.graph_id, req.user_id, req.session_id)
         accumulated_text = ""
         final_text = ""
-        async for chunk in self._client.runs.stream(
-            **self._run_kwargs(req),
-            stream_mode=["messages", "updates", "values"],
-            version="v2",
-        ):
-            mode, data = _stream_chunk(chunk)
-            if mode == "messages" or mode.startswith("messages/"):
-                text = _stream_message_text(data)
-                delta = _chunk_delta(accumulated_text, text)
-                if delta:
-                    accumulated_text += delta
-                    yield _agentkit_text_event(self.graph_id, delta, partial=True)
-                if text:
-                    final_text = text
-                continue
-            if mode in {"updates", "values"}:
-                interrupt = _interrupt_payload(data)
-                if interrupt is not None:
-                    yield _interrupt_event(self.graph_id, interrupt)
-                    return
-                text = _update_output_text(data)
-                if text:
-                    final_text = text
+        try:
+            async for chunk in self._client.runs.stream(
+                **self._run_kwargs(req),
+                stream_mode=["messages", "updates", "values"],
+                version="v2",
+            ):
+                mode, data = _stream_chunk(chunk)
+                if mode == "messages" or mode.startswith("messages/"):
+                    text = _stream_message_text(data)
+                    delta = _chunk_delta(accumulated_text, text)
+                    if delta:
+                        buffered_text = accumulated_text + delta
+                        if (
+                            self.llm_shield is not None
+                            and len(buffered_text.encode("utf-8")) > self.llm_shield.max_output_bytes
+                        ):
+                            yield _agentkit_text_event(
+                                self.graph_id,
+                                self.llm_shield.unavailable_message,
+                                partial=False,
+                            )
+                            return
+                        accumulated_text = buffered_text
+                        if self.llm_shield is None:
+                            yield _agentkit_text_event(self.graph_id, delta, partial=True)
+                    if text:
+                        final_text = text
+                    continue
+                if mode in {"updates", "values"}:
+                    interrupt = _interrupt_payload(data)
+                    if interrupt is not None:
+                        yield _interrupt_event(self.graph_id, interrupt)
+                        return
+                    text = _update_output_text(data)
+                    if text:
+                        if (
+                            self.llm_shield is not None
+                            and len(text.encode("utf-8")) > self.llm_shield.max_output_bytes
+                        ):
+                            yield _agentkit_text_event(
+                                self.graph_id,
+                                self.llm_shield.unavailable_message,
+                                partial=False,
+                            )
+                            return
+                        final_text = text
+        except Exception as exc:
+            if self.llm_shield is None:
+                raise
+            logger.warning(
+                "LangGraph Server stream failed while LLM Shield was enabled (%s)",
+                type(exc).__name__,
+            )
+            yield _agentkit_text_event(
+                self.graph_id,
+                self.llm_shield.unavailable_message,
+                partial=False,
+            )
+            return
         final_text = final_text or accumulated_text
         if final_text:
+            if self.llm_shield is not None:
+                replacement = await self.llm_shield.moderate_text(final_text, role="assistant")
+                final_text = replacement or final_text
             yield _agentkit_text_event(self.graph_id, final_text, partial=False)
 
     def _attach_agentkit_routes(self) -> None:
