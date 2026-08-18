@@ -35,6 +35,10 @@ from agentkit.apps.langgraph_server_app.langgraph_server_app import (
     _stream_message_text,
     _update_output_text,
 )
+from agentkit.plugins.llm_shield import (
+    LLM_SHIELD_BLOCK_MESSAGE,
+    LLM_SHIELD_UNAVAILABLE_MESSAGE,
+)
 
 
 class _FakeThreads:
@@ -135,10 +139,40 @@ class _FailingRuns:
         yield
 
 
+class _OversizedRuns:
+    async def stream(self, **kwargs):
+        del kwargs
+        yield {"type": "messages", "data": [{"type": "ai", "content": "four"}]}
+
+
 class _FakeClient:
     def __init__(self):
         self.threads = _FakeThreads()
         self.runs = _FakeRuns()
+
+
+class _FakeShield:
+    unavailable_message = LLM_SHIELD_UNAVAILABLE_MESSAGE
+
+    def __init__(
+        self,
+        *,
+        blocked_role: str | None = None,
+        unavailable=False,
+        max_output_bytes: int = 256 * 1024,
+    ):
+        self.blocked_role = blocked_role
+        self.unavailable = unavailable
+        self.max_output_bytes = max_output_bytes
+        self.calls = []
+
+    async def moderate_text(self, text: str, *, role: str):
+        self.calls.append((text, role))
+        if self.unavailable:
+            return LLM_SHIELD_UNAVAILABLE_MESSAGE
+        if role == self.blocked_role:
+            return LLM_SHIELD_BLOCK_MESSAGE
+        return None
 
 
 def _install_fake_langgraph(monkeypatch, fake_client: _FakeClient):
@@ -485,6 +519,137 @@ def test_run_sse_maps_agentkit_request_to_langgraph_thread_and_stream(tmp_path, 
     assert run_kwargs["config"]["configurable"]["tenant"] == "demo"
     assert "context" not in run_kwargs
     assert run_kwargs["if_not_exists"] == "create"
+
+
+def test_llm_shield_blocks_langgraph_input_before_thread_or_run(tmp_path, monkeypatch):
+    fake_client = _FakeClient()
+    _install_fake_langgraph(monkeypatch, fake_client)
+    shield = _FakeShield(blocked_role="user")
+    server = AgentkitLangGraphServerApp(
+        config_path=_write_config(tmp_path), llm_shield=shield
+    )
+    client = TestClient(server.app)
+
+    response = client.post(
+        "/run_sse",
+        json={
+            "appName": "lead_agent",
+            "userId": "user-1",
+            "sessionId": "session-1",
+            "newMessage": {"role": "user", "parts": [{"text": "unsafe"}]},
+            "streaming": True,
+        },
+    )
+
+    assert response.status_code == 200
+    assert LLM_SHIELD_BLOCK_MESSAGE in response.text
+    assert fake_client.threads.created == []
+    assert fake_client.runs.calls == []
+    assert shield.calls == [("unsafe", "user")]
+
+
+def test_llm_shield_buffers_and_blocks_langgraph_output(tmp_path, monkeypatch):
+    fake_client = _FakeClient()
+    _install_fake_langgraph(monkeypatch, fake_client)
+    shield = _FakeShield(blocked_role="assistant")
+    server = AgentkitLangGraphServerApp(
+        config_path=_write_config(tmp_path), llm_shield=shield
+    )
+    client = TestClient(server.app)
+
+    response = client.post(
+        "/run_sse",
+        json={
+            "appName": "lead_agent",
+            "userId": "user-1",
+            "sessionId": "session-1",
+            "newMessage": {"role": "user", "parts": [{"text": "hello"}]},
+            "streaming": True,
+        },
+    )
+
+    assert response.status_code == 200
+    assert LLM_SHIELD_BLOCK_MESSAGE in response.text
+    assert '"text":"hel"' not in response.text
+    assert '"text":"lo"' not in response.text
+    assert "final answer" not in response.text
+    assert shield.calls == [("hello", "user"), ("final answer", "assistant")]
+
+
+def test_llm_shield_fails_closed_when_service_is_unavailable(tmp_path, monkeypatch):
+    fake_client = _FakeClient()
+    _install_fake_langgraph(monkeypatch, fake_client)
+    shield = _FakeShield(unavailable=True)
+    server = AgentkitLangGraphServerApp(
+        config_path=_write_config(tmp_path), llm_shield=shield
+    )
+    client = TestClient(server.app)
+
+    response = client.post(
+        "/invoke",
+        json={"prompt": "hello"},
+        headers={"user_id": "user-1", "session_id": "session-1"},
+    )
+
+    assert response.status_code == 200
+    assert LLM_SHIELD_UNAVAILABLE_MESSAGE in response.text
+    assert fake_client.runs.calls == []
+
+
+def test_llm_shield_fails_closed_before_buffering_oversized_langgraph_output(
+    tmp_path, monkeypatch
+):
+    fake_client = _FakeClient()
+    fake_client.runs = _OversizedRuns()
+    _install_fake_langgraph(monkeypatch, fake_client)
+    shield = _FakeShield(max_output_bytes=3)
+    server = AgentkitLangGraphServerApp(
+        config_path=_write_config(tmp_path), llm_shield=shield
+    )
+    client = TestClient(server.app)
+
+    response = client.post(
+        "/run_sse",
+        json={
+            "appName": "lead_agent",
+            "userId": "user-1",
+            "sessionId": "session-1",
+            "newMessage": {"role": "user", "parts": [{"text": "ok"}]},
+            "streaming": True,
+        },
+    )
+
+    assert response.status_code == 200
+    assert LLM_SHIELD_UNAVAILABLE_MESSAGE in response.text
+    assert "four" not in response.text
+    assert shield.calls == [("ok", "user")]
+
+
+def test_llm_shield_hides_langgraph_stream_errors(tmp_path, monkeypatch, caplog):
+    fake_client = _FakeClient()
+    fake_client.runs = _FailingRuns()
+    _install_fake_langgraph(monkeypatch, fake_client)
+    shield = _FakeShield()
+    server = AgentkitLangGraphServerApp(
+        config_path=_write_config(tmp_path), llm_shield=shield
+    )
+    client = TestClient(server.app)
+
+    response = client.post(
+        "/run_sse",
+        json={
+            "appName": "lead_agent",
+            "userId": "user-1",
+            "sessionId": "session-1",
+            "newMessage": {"role": "user", "parts": [{"text": "ok"}]},
+            "streaming": True,
+        },
+    )
+
+    assert response.status_code == 200
+    assert LLM_SHIELD_UNAVAILABLE_MESSAGE in response.text
+    assert "stream boom" not in response.text
+    assert "stream boom" not in caplog.text
 
 
 def test_run_sse_streams_langgraph_server_messages_partial_without_echoing_user(tmp_path, monkeypatch):
