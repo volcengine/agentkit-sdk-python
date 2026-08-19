@@ -93,7 +93,7 @@ class OpenApiClient:
             harden_default_ssl_context()
         self.ak = access_key or os.getenv("VOLCENGINE_ACCESS_KEY") or os.getenv("VOLC_ACCESSKEY")
         self.sk = secret_key or os.getenv("VOLCENGINE_SECRET_KEY") or os.getenv("VOLC_SECRETKEY")
-        self.token = session_token or os.getenv("VOLCENGINE_SESSION_TOKEN")
+        self.token = session_token or os.getenv("VOLCENGINE_SESSION_TOKEN") or os.getenv("VOLC_SESSIONTOKEN")
         if not (self.ak and self.sk):
             raise AuthError(
                 "admin provisioning needs Volcengine credentials.",
