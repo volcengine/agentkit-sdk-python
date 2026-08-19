@@ -87,6 +87,7 @@ langgraph = ["langgraph"]
 strands = ["strands-agents"]
 agentcore = ["bedrock-agentcore"]
 frameworks = ["langchain", "langgraph", "strands-agents", "bedrock-agentcore"]
+harness-sidecar = []
 
 [tool.ruff.lint]
 
