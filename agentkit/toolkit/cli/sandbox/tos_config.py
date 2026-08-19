@@ -64,11 +64,15 @@ def build_create_tool_tos_mount_config(
             region=region,
         )
     )
-    mount_config = service.build_mount_config(
-        bucket_path=DEFAULT_TOS_BUCKET_PATH,
-        local_mount_path=resolved_local_mount_path,
-    )
-    return to_create_tool_tos_mount_config(mount_config)
+    try:
+        mount_config = service.build_mount_config(
+            bucket_path=DEFAULT_TOS_BUCKET_PATH,
+            local_mount_path=resolved_local_mount_path,
+        )
+        return to_create_tool_tos_mount_config(mount_config)
+    finally:
+        if hasattr(service, "close"):
+            service.close()
 
 
 def to_create_tool_tos_mount_config(
