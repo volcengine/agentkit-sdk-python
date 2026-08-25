@@ -290,6 +290,9 @@ def test_init_harness_env_example_ships_empty_credential_placeholders(
     }
     assert lines["VOLCENGINE_ACCESS_KEY"] == ""
     assert lines["VOLCENGINE_SECRET_KEY"] == ""
+    assert "# CLOUD_PROVIDER=byteplus" in env_text
+    assert "# BYTEPLUS_ACCESS_KEY=" in env_text
+    assert "# BYTEPLUS_SECRET_KEY=" in env_text
 
 
 def test_init_harness_is_idempotent_and_skips_existing_files(tmp_path: Path) -> None:

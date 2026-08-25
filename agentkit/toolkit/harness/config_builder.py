@@ -23,6 +23,7 @@ def build_agentkit_config(
     envs: Dict[str, str],
     auth: Optional[Dict[str, Any]] = None,
     runtime_id: str = "Auto",
+    cloud_provider: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Build the cloud AgentKit launch config dict (auto-provision).
 
@@ -37,7 +38,8 @@ def build_agentkit_config(
 
     When ``auth`` (a normalized ``{discovery_url, allowed_ids}`` block) is given,
     the runtime is gated by OAuth2/JWT (``custom_jwt``); otherwise it keeps the
-    default API-key auth (``key_auth``).
+    default API-key auth (``key_auth``). ``cloud_provider`` pins the generated
+    launch config to the same provider used to resolve credentials and region.
     """
     cloud: Dict[str, Any] = {
         "region": region,
@@ -64,16 +66,20 @@ def build_agentkit_config(
         cloud["runtime_apikey_name"] = "Auto"
         cloud["runtime_apikey"] = "Auto"
         cloud["runtime_jwt_allowed_clients"] = []
+    common: Dict[str, Any] = {
+        "agent_name": runtime_name,
+        "entry_point": "app.py",
+        "description": "Harness Server - VeADK",
+        "language": "Python",
+        "language_version": "3.12",
+        "runtime_envs": envs,
+        "launch_type": "cloud",
+    }
+    if cloud_provider:
+        common["cloud_provider"] = cloud_provider
+
     return {
-        "common": {
-            "agent_name": runtime_name,
-            "entry_point": "app.py",
-            "description": "Harness Server - VeADK",
-            "language": "Python",
-            "language_version": "3.12",
-            "runtime_envs": envs,
-            "launch_type": "cloud",
-        },
+        "common": common,
         "launch_types": {"cloud": cloud},
         "docker_build": {},
     }

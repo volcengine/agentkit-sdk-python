@@ -28,7 +28,6 @@ from typing import Any, Callable, Dict, Optional, Union
 
 from ..models import LifecycleResult
 from ..reporter import Reporter
-
 from .config_builder import build_agentkit_config
 from .env_mapping import to_runtime_env
 
@@ -43,9 +42,9 @@ _DEFAULT_HARNESS_NAME = "default"
 HARNESS_TAG_KEY = "agentkit:agenttype"
 HARNESS_TAG_VALUE = "harness"
 
-# Volcengine deploy credentials: needed locally to authenticate the build/deploy,
+# Cloud deploy credentials: needed locally to authenticate the build/deploy,
 # but must never be uploaded into the cloud runtime's environment (the runtime
-# gets its Volcengine access from its IAM role). A harness's own `.env` carries
+# gets its cloud access from its IAM role). A harness's own `.env` carries
 # these for deploy; they are excluded from the runtime env upload (see
 # COMPAT_ENV_EXCLUDE). Credentials a harness genuinely needs at runtime come from
 # its spec instead, so they are not affected.
@@ -56,6 +55,9 @@ _DEPLOY_CREDENTIAL_ENV_KEYS = {
     "VOLC_ACCESSKEY",
     "VOLC_SECRETKEY",
     "VOLC_SESSIONTOKEN",
+    "BYTEPLUS_ACCESS_KEY",
+    "BYTEPLUS_SECRET_KEY",
+    "BYTEPLUS_SESSION_TOKEN",
 }
 
 
@@ -217,16 +219,17 @@ def deploy_harness(
       (``HarnessDeployAborted``); if ``on_conflict`` is ``None`` (e.g. a
       programmatic caller or a non-interactive CLI), it fast-fails.
 
-    Credentials note: a local ``.env`` is loaded for deploy auth, but the
-    Volcengine deploy credentials in it are NOT uploaded into the runtime
+    Credentials note: a local ``.env`` is loaded for deploy auth, but the cloud
+    deploy credentials in it are NOT uploaded into the runtime
     environment (the runtime authenticates via its IAM role); other ``.env`` keys
     are still merged in.
 
     Args:
         name: Harness name; locates ``<name>.harness.json`` and names the runtime.
         path: Directory containing the spec and Dockerfile (default: cwd).
-        region: AgentKit region (default ``cn-beijing`` or ``VOLCENGINE_REGION``).
-        access_key / secret_key: Volcengine credentials (default: ``VOLCENGINE_*`` env).
+        region: AgentKit region (default resolved for the active cloud provider).
+        access_key / secret_key: Explicit cloud credentials (default: resolved from
+            provider-specific environment variables or global configuration).
         discovery_url / allowed_id: OAuth2/JWT overrides for the spec ``auth`` block.
         reporter: Progress reporter forwarded to the launch (default: silent).
         on_conflict: Callback consulted when a single same-name harness exists;
@@ -242,12 +245,13 @@ def deploy_harness(
     """
     # Heavy imports are lazy: this module is imported by `agentkit.toolkit.sdk`
     # at package init, and these pull in the runtime client / executors.
-    from agentkit.toolkit.sdk.lifecycle import launch
-    from agentkit.toolkit.models import PreflightMode
-    from agentkit.toolkit.config import utils as cfg_utils
-    from agentkit.toolkit.config.utils import load_dotenv_file
+    from agentkit.platform import VolcConfiguration, resolve_credentials
     from agentkit.sdk.runtime import types as rt_types
     from agentkit.sdk.runtime.client import AgentkitRuntimeClient
+    from agentkit.toolkit.config import utils as cfg_utils
+    from agentkit.toolkit.config.utils import load_dotenv_file
+    from agentkit.toolkit.models import PreflightMode
+    from agentkit.toolkit.sdk.lifecycle import launch
 
     proj_dir = Path(path).resolve()
     if not proj_dir.is_dir():
@@ -263,26 +267,27 @@ def deploy_harness(
     runtime_name = name
     auth = _resolve_auth(spec.get("auth"), discovery_url, allowed_id)
 
-    # AgentKit authenticates via the Volcengine SDK, which reads VOLC_ACCESSKEY /
-    # VOLC_SECRETKEY from the environment. Mirror whatever AK/SK was passed (or
-    # already set as VOLCENGINE_*) into those names.
-    ak = access_key or os.getenv("VOLCENGINE_ACCESS_KEY", "")
-    sk = secret_key or os.getenv("VOLCENGINE_SECRET_KEY", "")
-    if ak and sk:
-        os.environ["VOLC_ACCESSKEY"] = ak
-        os.environ["VOLC_SECRETKEY"] = sk
-    if not os.getenv("VOLC_ACCESSKEY") or not os.getenv("VOLC_SECRETKEY"):
-        raise ValueError(
-            "Volcengine credentials are required. Pass access_key / secret_key, "
-            "or set VOLCENGINE_ACCESS_KEY / VOLCENGINE_SECRET_KEY."
-        )
-
-    resolved_region = region or os.getenv("VOLCENGINE_REGION") or "cn-beijing"
+    # Use the shared platform abstraction so credentials and region follow the
+    # active provider (Volcengine or BytePlus) consistently with other clients.
+    platform_config = VolcConfiguration(region=region or None)
+    credentials = resolve_credentials(
+        "agentkit",
+        explicit_access_key=access_key,
+        explicit_secret_key=secret_key,
+        platform_config=platform_config,
+    )
+    resolved_region = platform_config.region
+    cloud_provider = platform_config.provider.value
 
     # Resolve a name collision into a deploy mode. The harness config defaults to
     # `runtime_id: Auto` (create new); an existing same-name harness can instead
     # be updated in place (new version) after confirmation.
-    client = AgentkitRuntimeClient(region=resolved_region)
+    client = AgentkitRuntimeClient(
+        access_key=credentials.access_key,
+        secret_key=credentials.secret_key,
+        region=resolved_region,
+        session_token=credentials.session_token or "",
+    )
     matches = _find_runtimes_by_name(client, runtime_name)
     update_runtime_id = None
     if len(matches) > 1:
@@ -328,6 +333,7 @@ def deploy_harness(
         runtime_envs,
         auth,
         runtime_id=update_runtime_id or "Auto",
+        cloud_provider=cloud_provider,
     )
 
     # AgentKit's launch path exposes no hook for runtime tags, so tag the runtime
@@ -349,11 +355,26 @@ def deploy_harness(
     cwd = os.getcwd()
     os.chdir(proj_dir)
     AgentkitRuntimeClient.create_runtime = _create_runtime_with_harness_tag
-    # Keep deploy-only Volcengine credentials in the local .env out of the
+    # Keep deploy-only cloud credentials in the local .env out of the
     # uploaded runtime environment (the compat layer auto-loads .env). Scoped to
     # this launch and restored afterwards.
     prev_exclude = cfg_utils.COMPAT_ENV_EXCLUDE
     cfg_utils.COMPAT_ENV_EXCLUDE = set(prev_exclude) | _DEPLOY_CREDENTIAL_ENV_KEYS
+    provider_prefix = "BYTEPLUS" if cloud_provider == "byteplus" else "VOLCENGINE"
+    deploy_env = {
+        "VOLC_ACCESSKEY": credentials.access_key,
+        "VOLC_SECRETKEY": credentials.secret_key,
+        "VOLC_SESSIONTOKEN": credentials.session_token,
+        f"{provider_prefix}_ACCESS_KEY": credentials.access_key,
+        f"{provider_prefix}_SECRET_KEY": credentials.secret_key,
+        f"{provider_prefix}_SESSION_TOKEN": credentials.session_token,
+    }
+    previous_deploy_env = {key: os.environ.get(key) for key in deploy_env}
+    for key, value in deploy_env.items():
+        if value:
+            os.environ[key] = value
+        else:
+            os.environ.pop(key, None)
     try:
         result = launch(
             config_dict=cfg,
@@ -363,6 +384,11 @@ def deploy_harness(
     finally:
         AgentkitRuntimeClient.create_runtime = orig_create_runtime
         cfg_utils.COMPAT_ENV_EXCLUDE = prev_exclude
+        for key, value in previous_deploy_env.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
         os.chdir(cwd)
 
     if not result.success:

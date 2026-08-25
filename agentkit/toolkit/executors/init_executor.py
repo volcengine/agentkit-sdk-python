@@ -131,13 +131,19 @@ TEMPLATES = {
 }
 
 
-# `.env.example` written into a harness directory. Carries only the Volcengine
-# deploy credentials; copy to `.env` and fill in the AK/SK before deploying.
+# `.env.example` written into a harness directory. Copy it to `.env` and fill in
+# the credential pair for the selected cloud provider before deploying.
 _HARNESS_ENV_EXAMPLE = """\
 # Volcengine credentials for harness deploy. Copy this file to `.env` and fill in.
 VOLCENGINE_ACCESS_KEY=
 VOLCENGINE_SECRET_KEY=
 # VOLCENGINE_REGION=cn-beijing
+
+# BytePlus credentials (uncomment these lines and set CLOUD_PROVIDER=byteplus).
+# CLOUD_PROVIDER=byteplus
+# BYTEPLUS_ACCESS_KEY=
+# BYTEPLUS_SECRET_KEY=
+# BYTEPLUS_REGION=ap-southeast-1
 """
 
 # Container image for the harness server. The base image's apt mirror is an
