@@ -329,6 +329,10 @@ def update_tool_command(
         client = AgentkitToolsClient(region=(region or "").strip())
         if json_body:
             payload = json.loads(json_body)
+            if not isinstance(payload, dict):
+                raise ValueError("--json must contain a JSON object")
+            payload.pop("tool_id", None)
+            payload["ToolId"] = tool_id.strip()
         else:
             payload = tools_types.UpdateToolRequest(
                 tool_id=tool_id, description=description

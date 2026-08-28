@@ -157,6 +157,11 @@ CONFIG_KEY_SPECS: dict[str, ConfigKeySpec] = {
     "cpu": ConfigKeySpec(("tool", "cpu"), _int_value, VALID_CPU_VALUES),
     "tos-bucket": ConfigKeySpec(("tool", "tos_bucket"), _str_value),
     "tos-mount": ConfigKeySpec(("tool", "tos_mount"), _str_value),
+    "tos-credential-type": ConfigKeySpec(
+        ("tool", "tos_credential_type"),
+        _str_value,
+        ("access-key", "iam-role"),
+    ),
     "role-name": ConfigKeySpec(("tool", "role_name"), _str_value),
     "enable-snapshot": ConfigKeySpec(("tool", "enable_snapshot"), _bool_value),
     "websearch-apikey": ConfigKeySpec(("tool", "websearch_apikey"), _str_value),
