@@ -108,6 +108,31 @@ def test_sandbox_config_set_option_accepts_repeated_key_values(tmp_path, monkeyp
     assert payload["session"]["ttl"] == 200
 
 
+def test_sandbox_config_accepts_tos_credential_type(tmp_path, monkeypatch):
+    from agentkit.toolkit.cli.cli import app
+
+    monkeypatch.chdir(tmp_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "sandbox",
+            "config",
+            "--set",
+            "tos-bucket=my-bucket",
+            "--set",
+            "tos-credential-type=iam-role",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = yaml.safe_load(
+        (tmp_path / ".agentkit" / "sandbox.yaml").read_text(encoding="utf-8")
+    )
+    assert payload["tool"]["tos_bucket"] == "my-bucket"
+    assert payload["tool"]["tos_credential_type"] == "iam-role"
+
+
 def test_sandbox_config_unset_option_accepts_repeated_keys(tmp_path, monkeypatch):
     from agentkit.toolkit.cli.cli import app
 

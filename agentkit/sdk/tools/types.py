@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+from enum import Enum
 from typing import Optional
 from pydantic import BaseModel, Field
 
@@ -28,6 +29,11 @@ class ToolsBaseModel(BaseModel):
 
 
 # Data Types
+class CredentialType(str, Enum):
+    TOS_CREDENTIAL_TYPE_ACCESS_KEY = "TOS_CREDENTIAL_TYPE_ACCESS_KEY"
+    TOS_CREDENTIAL_TYPE_IAM_ROLE = "TOS_CREDENTIAL_TYPE_IAM_ROLE"
+
+
 class AssociatedRuntimesForGetTool(ToolsBaseModel):
     id: Optional[str] = Field(default=None, alias="Id")
     name: Optional[str] = Field(default=None, alias="Name")
@@ -204,6 +210,9 @@ class TosMountConfigForGetTool(ToolsBaseModel):
     credentials: Optional[CredentialsForGetTool] = Field(
         default=None, alias="Credentials"
     )
+    credential_type: Optional[CredentialType] = Field(
+        default=None, alias="CredentialType"
+    )
     enable_tos: Optional[bool] = Field(default=None, alias="EnableTos")
     mount_points: Optional[list[MountPointsForGetTool]] = Field(
         default=None, alias="MountPoints"
@@ -347,6 +356,9 @@ class TlsForCreateTool(ToolsBaseModel):
 class TosMountForCreateTool(ToolsBaseModel):
     credentials: Optional[TosMountCredentialsForCreateTool] = Field(
         default=None, alias="Credentials"
+    )
+    credential_type: Optional[CredentialType] = Field(
+        default=None, alias="CredentialType"
     )
     mount_points: Optional[list[TosMountMountPointsItemForCreateTool]] = Field(
         default=None, alias="MountPoints"
@@ -677,6 +689,9 @@ class SetSessionTtlResponse(ToolsBaseModel):
 class TosMountForUpdateTool(ToolsBaseModel):
     credentials: Optional[TosMountCredentialsForUpdateTool] = Field(
         default=None, alias="Credentials"
+    )
+    credential_type: Optional[CredentialType] = Field(
+        default=None, alias="CredentialType"
     )
     mount_points: Optional[list[TosMountMountPointsItemForUpdateTool]] = Field(
         default=None, alias="MountPoints"

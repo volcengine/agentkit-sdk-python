@@ -136,6 +136,9 @@ Options:
   created without TOS mount configuration.
 - `--tos-mount`: optional. Local mount path for `--tos-bucket`; defaults to
   `/home/gem/workspace`.
+- `--tos-credential-type`: optional. TOS mount authentication mode. Accepts
+  `access-key` (the default) or `iam-role`. IAM Role mounting is supported only
+  for built-in `CodeEnv` and `SkillEnv` tools.
 - `--cpu`: optional. Sandbox vCPU count; allowed values are `2`, `4`, `8`, and
   `16`. Defaults to `4`. Memory is derived as 2 GiB per vCPU.
 - `--enable-snapshot`: optional. Enables snapshot support for the created
@@ -239,11 +242,20 @@ Provider defaults:
 | `byteplus_model_square` | `deepseek-v4-flash-260425` | `https://ark.ap-southeast.bytepluses.com/api/v3` |
 | `byteplus_coding_plan` | `dola-seed-2.0-pro` | `https://ark.ap-southeast.bytepluses.com/api/coding/v3` |
 
-Credential resolution is delegated to the underlying SDK/service clients:
-`AgentkitToolsClient` handles `CreateTool` credentials, and `TOSService` handles
-TOS credentials. The command supports the same credential sources as the shared
-Volcengine configuration, including environment variables and global
-`agentkit config --global` settings.
+Credential resolution is delegated to the underlying SDK/service clients.
+`AgentkitToolsClient` handles `CreateTool` credentials. With the default
+`--tos-credential-type access-key`, `TOSService` resolves TOS credentials and
+prepares the bucket path using the shared Volcengine configuration, including
+environment variables and global `agentkit config --global` settings. With
+`--tos-credential-type iam-role`, the bucket must already exist; the CLI does
+not initialize `TOSService` or send `Credentials` in `TosMountConfig`.
+
+```bash
+agentkit sandbox create \
+  --tool-type CodeEnv \
+  --tos-bucket existing-bucket \
+  --tos-credential-type iam-role
+```
 
 When `--tos-bucket` is set, the generated tool TOS mount uses
 `LocalMountPath: /home/gem/workspace` by default, or the path provided by

@@ -29,6 +29,35 @@ from agentkit.toolkit.volcengine.services.tos_service import (
 DEFAULT_TOS_BUCKET_PATH = "/sandbox-session/default/default"
 DEFAULT_TOS_LOCAL_PATH = "/home/gem/workspace"
 DEFAULT_SANDBOX_WORKSPACE = "/home/gem"
+DEFAULT_TOS_CREDENTIAL_TYPE = (
+    tools_types.CredentialType.TOS_CREDENTIAL_TYPE_ACCESS_KEY
+)
+
+
+def normalize_tos_credential_type(
+    value: str | tools_types.CredentialType | None,
+) -> tools_types.CredentialType:
+    if isinstance(value, tools_types.CredentialType):
+        return value
+
+    normalized = (value or "").strip().upper().replace("-", "_")
+    aliases = {
+        "": DEFAULT_TOS_CREDENTIAL_TYPE,
+        "ACCESS_KEY": tools_types.CredentialType.TOS_CREDENTIAL_TYPE_ACCESS_KEY,
+        "TOS_CREDENTIAL_TYPE_ACCESS_KEY": (
+            tools_types.CredentialType.TOS_CREDENTIAL_TYPE_ACCESS_KEY
+        ),
+        "IAM_ROLE": tools_types.CredentialType.TOS_CREDENTIAL_TYPE_IAM_ROLE,
+        "TOS_CREDENTIAL_TYPE_IAM_ROLE": (
+            tools_types.CredentialType.TOS_CREDENTIAL_TYPE_IAM_ROLE
+        ),
+    }
+    credential_type = aliases.get(normalized)
+    if credential_type is None:
+        error(
+            "--tos-credential-type must be one of: access-key, iam-role"
+        )
+    return credential_type
 
 
 def resolve_tos_bucket(tos_bucket: Optional[str]) -> str:
@@ -50,6 +79,7 @@ def build_create_tool_tos_mount_config(
     region: str,
     *,
     local_mount_path: str = DEFAULT_TOS_LOCAL_PATH,
+    credential_type: str | tools_types.CredentialType | None = None,
     tos_service_cls=TOSService,
     tos_service_config_cls=TOSServiceConfig,
 ) -> tools_types.TosMountForCreateTool | None:
@@ -58,6 +88,25 @@ def build_create_tool_tos_mount_config(
 
     resolved_bucket = resolve_tos_bucket(tos_bucket)
     resolved_local_mount_path = resolve_tos_mount_path(local_mount_path)
+    resolved_credential_type = normalize_tos_credential_type(credential_type)
+    if (
+        resolved_credential_type
+        == tools_types.CredentialType.TOS_CREDENTIAL_TYPE_IAM_ROLE
+    ):
+        return tools_types.TosMountForCreateTool(
+            EnableTos=True,
+            CredentialType=resolved_credential_type,
+            MountPoints=[
+                tools_types.TosMountMountPointsItemForCreateTool(
+                    BucketName=resolved_bucket,
+                    BucketPath=DEFAULT_TOS_BUCKET_PATH,
+                    Endpoint=TOSService.build_mount_endpoint(region),
+                    LocalMountPath=resolved_local_mount_path,
+                    ReadOnly=False,
+                )
+            ],
+        )
+
     service = tos_service_cls(
         tos_service_config_cls(
             bucket=resolved_bucket,
@@ -76,6 +125,9 @@ def to_create_tool_tos_mount_config(
 ) -> tools_types.TosMountForCreateTool:
     return tools_types.TosMountForCreateTool(
         EnableTos=True,
+        CredentialType=(
+            tools_types.CredentialType.TOS_CREDENTIAL_TYPE_ACCESS_KEY
+        ),
         Credentials=tools_types.TosMountCredentialsForCreateTool(
             AccessKeyId=mount_config.credentials.access_key_id,
             SecretAccessKey=mount_config.credentials.secret_access_key,

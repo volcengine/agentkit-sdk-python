@@ -56,8 +56,10 @@ from agentkit.toolkit.cli.sandbox.model_config import (
 )
 from agentkit.toolkit.cli.sandbox.tool_resolve import save_tool_result_if_resolvable
 from agentkit.toolkit.cli.sandbox.tos_config import (
+    DEFAULT_TOS_CREDENTIAL_TYPE,
     DEFAULT_TOS_LOCAL_PATH,
     build_create_tool_tos_mount_config,
+    normalize_tos_credential_type,
 )
 from agentkit.toolkit.cli.sandbox.sandbox_client import error
 from agentkit.toolkit.volcengine.services.tos_service import (
@@ -206,6 +208,7 @@ def _build_create_tool_request(
     tos_bucket: Optional[str],
     tos_region: str,
     tos_mount_path: str = DEFAULT_TOS_LOCAL_PATH,
+    tos_credential_type: str | tools_types.CredentialType | None = None,
     cpu: int = DEFAULT_CPU,
     model_name: Optional[str] = None,
     model_api_key: Optional[str] = None,
@@ -228,6 +231,16 @@ def _build_create_tool_request(
     is_private_tool = resolved_tool_type == PRIVATE_TOOL_TYPE
     if is_private_tool and not (image_url or "").strip():
         error("--image-url is required when --tool-type Private")
+    resolved_tos_credential_type = normalize_tos_credential_type(
+        tos_credential_type
+    )
+    if (
+        is_private_tool
+        and (tos_bucket or "").strip()
+        and resolved_tos_credential_type
+        == tools_types.CredentialType.TOS_CREDENTIAL_TYPE_IAM_ROLE
+    ):
+        error("TOS IAM Role mounting is only supported for Built-in Tools")
     command = PRIVATE_TOOL_COMMAND if is_private_tool else None
     port = PRIVATE_TOOL_PORT if is_private_tool else None
     envs = (
@@ -256,6 +269,7 @@ def _build_create_tool_request(
         tos_bucket,
         tos_region,
         local_mount_path=tos_mount_path,
+        credential_type=resolved_tos_credential_type,
         tos_service_cls=TOSService,
         tos_service_config_cls=TOSServiceConfig,
     )
@@ -451,6 +465,7 @@ def create_tool(
     tool_name: Optional[str] = None,
     tos_bucket: Optional[str] = None,
     tos_mount_path: str = DEFAULT_TOS_LOCAL_PATH,
+    tos_credential_type: str | tools_types.CredentialType | None = None,
     cpu: int = DEFAULT_CPU,
     model_name: Optional[str] = None,
     model_api_key: Optional[str] = None,
@@ -508,6 +523,7 @@ def create_tool(
         tos_bucket=tos_bucket,
         tos_region=tos_region,
         tos_mount_path=tos_mount_path,
+        tos_credential_type=tos_credential_type,
         cpu=cpu,
         model_name=model_name,
         model_api_key=model_api_key,
@@ -569,6 +585,15 @@ def create_command(
         help=(
             "Local mount path for the TOS bucket. Requires --tos-bucket. "
             f"Defaults to {DEFAULT_TOS_LOCAL_PATH} when omitted."
+        ),
+    ),
+    tos_credential_type: Optional[str] = typer.Option(
+        None,
+        "--tos-credential-type",
+        help=(
+            "TOS mount authentication: access-key or iam-role. "
+            "IAM Role is only supported for Built-in Tools. "
+            "Defaults to access-key."
         ),
     ),
     cpu: int = typer.Option(
@@ -671,6 +696,13 @@ def create_command(
         )
         tos_mount = config_default_if_unprovided(
             ctx, "tos_mount", "tos-mount", tos_mount, data=config_defaults
+        )
+        tos_credential_type = config_default_if_unprovided(
+            ctx,
+            "tos_credential_type",
+            "tos-credential-type",
+            tos_credential_type,
+            data=config_defaults,
         )
         cpu = config_default_if_unprovided(
             ctx,
@@ -777,6 +809,11 @@ def create_command(
         )
         if tos_mount is not None and not (tos_bucket or "").strip():
             error("--tos-mount requires --tos-bucket")
+        if (
+            tos_credential_type is not None
+            and not (tos_bucket or "").strip()
+        ):
+            error("--tos-credential-type requires --tos-bucket")
         model_provider_was_provided = param_was_provided(ctx, "model_provider")
         model_base_url_was_provided = param_was_provided(ctx, "model_base_url")
         result = create_tool(
@@ -784,6 +821,9 @@ def create_command(
             tool_name=tool_name,
             tos_bucket=tos_bucket,
             tos_mount_path=tos_mount or DEFAULT_TOS_LOCAL_PATH,
+            tos_credential_type=(
+                tos_credential_type or DEFAULT_TOS_CREDENTIAL_TYPE
+            ),
             cpu=cpu,
             model_name=model_name,
             model_api_key=model_api_key,

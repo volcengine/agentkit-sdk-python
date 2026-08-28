@@ -712,6 +712,10 @@ def test_build_create_tool_request_adds_tos_mount(monkeypatch):
     tos_config = request.tos_mount_config
     assert tos_config is not None
     assert tos_config.enable_tos is True
+    assert (
+        tos_config.credential_type.value
+        == "TOS_CREDENTIAL_TYPE_ACCESS_KEY"
+    )
     assert tos_config.credentials.access_key_id == _PLACEHOLDER_A
     assert tos_config.credentials.secret_access_key == _PLACEHOLDER_B
     assert len(tos_config.mount_points) == 1
@@ -735,6 +739,92 @@ def test_build_create_tool_request_adds_tos_mount(monkeypatch):
     assert request.network_configuration.enable_private_network is False
     assert request.cpu_milli == 4000
     assert request.memory_mb == 8192
+
+
+def test_build_create_tool_request_supports_tos_iam_role_mount(monkeypatch):
+    from agentkit.sdk.tools import types as tools_types
+    from agentkit.toolkit.cli.sandbox import cli_create
+
+    _reset_fake_tools_client()
+    monkeypatch.setattr(cli_create, "TOSService", _FakeTOSService)
+
+    request = cli_create._build_create_tool_request(
+        tool_type="CodeEnv",
+        name="demo-tool",
+        tos_bucket="my-bucket",
+        tos_region="cn-beijing",
+        tos_credential_type="iam-role",
+    )
+
+    assert _FakeTOSService.instances == []
+    tos_config = request.tos_mount_config
+    assert tos_config is not None
+    assert (
+        tos_config.credential_type
+        == tools_types.CredentialType.TOS_CREDENTIAL_TYPE_IAM_ROLE
+    )
+    assert tos_config.credentials is None
+    assert len(tos_config.mount_points) == 1
+    mount_point = tos_config.mount_points[0]
+    assert mount_point.bucket_name == "my-bucket"
+    assert mount_point.bucket_path == "/sandbox-session/default/default"
+    assert mount_point.endpoint == "http://tos-cn-beijing.ivolces.com"
+    assert mount_point.local_mount_path == "/home/gem/workspace"
+    assert mount_point.read_only is False
+
+
+def test_build_create_tool_request_rejects_tos_iam_role_for_private_tool(
+    capsys,
+) -> None:
+    from agentkit.toolkit.cli.sandbox import cli_create
+
+    with pytest.raises(cli_create.typer.Exit):
+        cli_create._build_create_tool_request(
+            tool_type="Private",
+            name="demo-tool",
+            image_url="registry.example.com/custom-image:latest",
+            tos_bucket="my-bucket",
+            tos_region="cn-beijing",
+            tos_credential_type="iam-role",
+        )
+
+    assert (
+        "TOS IAM Role mounting is only supported for Built-in Tools"
+        in capsys.readouterr().err
+    )
+
+
+def test_create_command_accepts_tos_iam_role(monkeypatch):
+    from agentkit.sdk.tools import types as tools_types
+    from agentkit.toolkit.cli.cli import app
+    from agentkit.toolkit.cli.sandbox import cli_create
+
+    _reset_fake_tools_client()
+    monkeypatch.setattr(cli_create, "AgentkitToolsClient", _FakeToolsClient)
+    monkeypatch.setattr(cli_create, "TOSService", _FakeTOSService)
+
+    result = runner.invoke(
+        app,
+        [
+            "sandbox",
+            "create",
+            "--tool-name",
+            "demo-tool",
+            "--tos-bucket",
+            "my-bucket",
+            "--tos-credential-type",
+            "iam-role",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert _FakeTOSService.instances == []
+    tos_config = _FakeToolsClient.last_request.tos_mount_config
+    assert (
+        tos_config.credential_type
+        == tools_types.CredentialType.TOS_CREDENTIAL_TYPE_IAM_ROLE
+    )
+    assert tos_config.credentials is None
 
 
 def test_build_create_tool_request_uses_custom_tos_mount(monkeypatch):
