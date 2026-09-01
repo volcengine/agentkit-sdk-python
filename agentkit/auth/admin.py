@@ -46,6 +46,12 @@ POLICY_NAME = "agentkit_cli_sandbox_access"
 # create sandbox sessions (the session/tool-read actions come from the custom policy).
 SANDBOX_ACCESS_POLICY = "AgentKitSandboxAccess"
 WELL_KNOWN_KEY = ".well-known/agentkit-cli"
+_TOS_BUCKET_CONFLICT_CODES = frozenset(
+    {
+        "BucketAlreadyExists",
+        "BucketAlreadyOwnedByYou",
+    }
+)
 ROLE_ACTIONS = (
     "agentkit:CreateSession", "agentkit:GetSession", "agentkit:DeleteSession",
     "agentkit:GetSessionLogs", "agentkit:SetSessionTtl",
@@ -505,9 +511,10 @@ def publish_discovery(
     client = tos.TosClientV2(ak, sk, endpoint, coords.region, security_token=token)
     try:
         client.create_bucket(bucket, acl=tos.ACLType.ACL_Public_Read)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         msg = str(exc)
-        if not any(k in msg for k in ("Exist", "exist", "Owned", "owned", "Conflict", "conflict")):
+        error_code = str(getattr(exc, "code", ""))
+        if error_code not in _TOS_BUCKET_CONFLICT_CODES:
             raise AuthError(
                 f"could not create the TOS bucket for the discovery doc: {msg[:120]}",
                 hint="enable TOS on this account and allow public-read buckets, or pass an existing bucket.",
