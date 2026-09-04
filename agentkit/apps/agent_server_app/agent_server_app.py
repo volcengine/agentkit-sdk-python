@@ -618,7 +618,9 @@ class AgentkitAgentServerApp(BaseAgentkitApp):
                         telemetry.trace_agent_server_finish(
                             path="/invoke", func_result="", exception=e
                         )
-                        error_payload = f'data: {{"error": "{str(e)}"}}\n\n'
+                        error_payload = (
+                            "data: " + json.dumps({"error": str(e)}) + "\n\n"
+                        )
                 if error_payload is not None:
                     # The identity path never suspends while retaining the
                     # original exception or its credential-bearing traceback.
