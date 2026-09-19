@@ -12,8 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+
 import pytest
 from agentkit.toolkit.config.global_config import GlobalConfig
+from agentkit.utils.global_config_io import read_global_config_dict
+
+
+def test_global_config_cache_is_scoped_to_path(tmp_path):
+    first = tmp_path / "first.yaml"
+    second = tmp_path / "second.yaml"
+    first.write_text("region: cn-beijing\n", encoding="utf-8")
+    second.write_text("region: ap-southeast-1\n", encoding="utf-8")
+    shared_mtime_ns = 1_700_000_000_000_000_000
+    os.utime(first, ns=(shared_mtime_ns, shared_mtime_ns))
+    os.utime(second, ns=(shared_mtime_ns, shared_mtime_ns))
+
+    assert read_global_config_dict(first, force_reload=True)["region"] == "cn-beijing"
+    assert read_global_config_dict(second)["region"] == "ap-southeast-1"
 
 
 class TestGlobalConfigCompatibility:
