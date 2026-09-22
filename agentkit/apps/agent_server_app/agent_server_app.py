@@ -126,13 +126,14 @@ def _resolve_memory_service(root_agent: BaseAgent) -> Any:
 
 def _create_a2a_runner(
     *,
-    root_agent: BaseAgent,
+    entry: BaseAgent | App,
     short_term_memory: BaseSessionService | Any | None,
     session_service: BaseSessionService,
     memory_service: Any,
     artifact_service: InMemoryArtifactService,
     credential_service: InMemoryCredentialService,
 ) -> Any:
+    root_agent = entry.root_agent if isinstance(entry, App) else entry
     if VeadkRunner is not None and (
         _is_veadk_agent(root_agent) or _is_veadk_short_term_memory(short_term_memory)
     ):
@@ -144,6 +145,15 @@ def _create_a2a_runner(
             app_name=root_agent.name,
             session_service=session_service,
             memory_service=memory_service,
+            credential_service=credential_service,
+            **({"plugins": entry.plugins} if isinstance(entry, App) else {}),
+        )
+    if isinstance(entry, App):
+        return Runner(
+            app=entry,
+            session_service=session_service,
+            memory_service=memory_service,
+            artifact_service=artifact_service,
             credential_service=credential_service,
         )
     return Runner(
@@ -291,7 +301,7 @@ class AgentkitAgentServerApp(BaseAgentkitApp):
         )
 
         runner = _create_a2a_runner(
-            root_agent=root_agent,
+            entry=entry,
             short_term_memory=short_term_memory,
             session_service=session_service,
             memory_service=memory_service,

@@ -30,6 +30,7 @@ from __future__ import annotations
 import pytest
 from google.adk.agents.base_agent import BaseAgent
 from google.adk.apps.app import App
+from google.adk.plugins import BasePlugin
 from google.adk.sessions.in_memory_session_service import InMemorySessionService
 
 from agentkit.apps.agent_server_app.agent_server_app import (
@@ -283,7 +284,7 @@ def test_create_a2a_runner_preserves_veadk_runner_for_veadk_agent_with_session_s
     credential_service = object()
 
     runner = _create_a2a_runner(
-        root_agent=root_agent,
+        entry=root_agent,
         short_term_memory=session_service,
         session_service=session_service,
         memory_service=memory_service,
@@ -330,7 +331,7 @@ def test_create_a2a_runner_uses_adk_runner_for_plain_adk_agent_with_session_serv
     credential_service = object()
 
     runner = _create_a2a_runner(
-        root_agent=root_agent,
+        entry=root_agent,
         short_term_memory=session_service,
         session_service=session_service,
         memory_service=memory_service,
@@ -370,7 +371,7 @@ def test_create_a2a_runner_preserves_veadk_runner_for_veadk_agent_without_memory
     credential_service = object()
 
     runner = _create_a2a_runner(
-        root_agent=root_agent,
+        entry=root_agent,
         short_term_memory=None,
         session_service=session_service,
         memory_service=memory_service,
@@ -415,7 +416,7 @@ def test_create_a2a_runner_uses_adk_runner_for_new_default_adk_agent(monkeypatch
     credential_service = object()
 
     runner = _create_a2a_runner(
-        root_agent=root_agent,
+        entry=root_agent,
         short_term_memory=None,
         session_service=session_service,
         memory_service=memory_service,
@@ -432,6 +433,88 @@ def test_create_a2a_runner_uses_adk_runner_for_new_default_adk_agent(monkeypatch
             "memory_service": memory_service,
             "artifact_service": artifact_service,
             "credential_service": credential_service,
+        }
+    ]
+
+
+def test_create_a2a_runner_preserves_app_plugins_for_adk_app(monkeypatch):
+    calls = []
+
+    class _FakeAdkRunner:
+        def __init__(self, **kwargs):
+            calls.append(kwargs)
+
+    monkeypatch.setattr(agent_server_module, "Runner", _FakeAdkRunner)
+
+    plugin = BasePlugin(name="test_plugin")
+    entry = App(
+        name="app_with_plugins",
+        root_agent=BaseAgent(name="app_root_agent"),
+        plugins=[plugin],
+    )
+    session_service = InMemorySessionService()
+    memory_service = object()
+    artifact_service = object()
+    credential_service = object()
+
+    runner = _create_a2a_runner(
+        entry=entry,
+        short_term_memory=None,
+        session_service=session_service,
+        memory_service=memory_service,
+        artifact_service=artifact_service,
+        credential_service=credential_service,
+    )
+
+    assert isinstance(runner, _FakeAdkRunner)
+    assert calls == [
+        {
+            "app": entry,
+            "session_service": session_service,
+            "memory_service": memory_service,
+            "artifact_service": artifact_service,
+            "credential_service": credential_service,
+        }
+    ]
+
+
+def test_create_a2a_runner_preserves_app_plugins_for_veadk_app(monkeypatch):
+    calls = []
+
+    class _FakeVeadkRunner:
+        def __init__(self, **kwargs):
+            calls.append(kwargs)
+
+    monkeypatch.setattr(agent_server_module, "VeadkAgent", BaseAgent)
+    monkeypatch.setattr(agent_server_module, "VeadkRunner", _FakeVeadkRunner)
+
+    plugin = BasePlugin(name="test_plugin")
+    root_agent = BaseAgent(name="veadk_app_root")
+    entry = App(name="veadk_app", root_agent=root_agent, plugins=[plugin])
+    session_service = InMemorySessionService()
+    memory_service = object()
+    artifact_service = object()
+    credential_service = object()
+
+    runner = _create_a2a_runner(
+        entry=entry,
+        short_term_memory=None,
+        session_service=session_service,
+        memory_service=memory_service,
+        artifact_service=artifact_service,
+        credential_service=credential_service,
+    )
+
+    assert isinstance(runner, _FakeVeadkRunner)
+    assert calls == [
+        {
+            "agent": root_agent,
+            "short_term_memory": None,
+            "app_name": "veadk_app_root",
+            "session_service": session_service,
+            "memory_service": memory_service,
+            "credential_service": credential_service,
+            "plugins": [plugin],
         }
     ]
 

@@ -13,5 +13,5 @@ def test_package_and_project_versions_match_next_header_capable_release():
         (Path(__file__).parents[1] / "pyproject.toml").read_text(encoding="utf8")
     )
 
-    assert VERSION == "0.8.6"
+    assert VERSION == "0.8.8"
     assert project["project"]["version"] == VERSION
