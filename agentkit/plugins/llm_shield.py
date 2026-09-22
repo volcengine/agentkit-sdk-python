@@ -91,25 +91,37 @@ class LLMShieldPlugin(BasePlugin):
     def from_env(cls) -> LLMShieldPlugin | None:
         """Build the plugin from the migration runtime environment.
 
-        Disabled and empty values return ``None`` without resolving credentials
-        or constructing a client. Enabled configurations require only an App
-        ID; request authentication uses AgentKit's AK/SK, STS, or Runtime IAM
+        A configured ``TOOL_LLM_SHIELD_APP_ID`` is the enablement signal, so
+        migrations do not need a separate switch. ``ENABLE_LLM_SHIELD`` is an
+        optional override: ``0/false/no/off`` forces the plugin off even when an
+        App ID is configured, while ``1/true/yes/on`` requires an App ID and
+        fails fast without one. Most configurations require only the App ID;
+        request authentication uses AgentKit's AK/SK, STS, or Runtime IAM
         credential chain.
         """
 
-        raw_enabled = os.getenv("ENABLE_LLM_SHIELD", "").strip().lower()
-        if raw_enabled in _FALSE_VALUES:
-            return None
-        if raw_enabled not in _TRUE_VALUES:
+        raw_override = os.getenv("ENABLE_LLM_SHIELD", "").strip().lower()
+        app_id = os.getenv("TOOL_LLM_SHIELD_APP_ID", "").strip()
+        if os.getenv("TOOL_LLM_SHIELD_API_KEY", "").strip():
+            logger.warning(
+                "TOOL_LLM_SHIELD_API_KEY is deprecated and ignored; "
+                "LLM Shield authenticates with AgentKit credentials"
+            )
+        forced_off = bool(raw_override) and raw_override in _FALSE_VALUES
+        required_on = raw_override in _TRUE_VALUES
+        if raw_override and not (forced_off or required_on):
             raise ValueError(
                 "ENABLE_LLM_SHIELD must be one of 1/true/yes/on or 0/false/no/off"
             )
+        if forced_off:
+            return None
 
-        app_id = os.getenv("TOOL_LLM_SHIELD_APP_ID", "").strip()
         if not app_id:
-            raise ValueError(
-                "TOOL_LLM_SHIELD_APP_ID is required when ENABLE_LLM_SHIELD=true"
-            )
+            if required_on:
+                raise ValueError(
+                    "TOOL_LLM_SHIELD_APP_ID is required when ENABLE_LLM_SHIELD=true"
+                )
+            return None
 
         region = os.getenv("TOOL_LLM_SHIELD_REGION", "").strip()
         region = region or _DEFAULT_REGION

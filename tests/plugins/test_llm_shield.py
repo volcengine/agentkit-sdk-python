@@ -43,17 +43,36 @@ def _clean_llm_shield_env(monkeypatch):
     for name in (
         "ENABLE_LLM_SHIELD",
         "TOOL_LLM_SHIELD_APP_ID",
+        "TOOL_LLM_SHIELD_API_KEY",
         "TOOL_LLM_SHIELD_REGION",
     ):
         monkeypatch.delenv(name, raising=False)
 
 
-@pytest.mark.parametrize("value", [None, "", "0", "false", "FALSE", "no", "off"])
-def test_from_env_returns_none_when_disabled(monkeypatch, value):
-    if value is not None:
-        monkeypatch.setenv("ENABLE_LLM_SHIELD", value)
+def test_from_env_returns_none_without_app_id_or_override(monkeypatch):
+    assert LLMShieldPlugin.from_env() is None
+
+    monkeypatch.setenv("ENABLE_LLM_SHIELD", "")
 
     assert LLMShieldPlugin.from_env() is None
+
+
+@pytest.mark.parametrize("value", ["0", "false", "FALSE", "no", "off"])
+def test_from_env_override_disables_even_with_app_id(monkeypatch, value):
+    monkeypatch.setenv("ENABLE_LLM_SHIELD", value)
+    monkeypatch.setenv("TOOL_LLM_SHIELD_APP_ID", "app-test")
+
+    assert LLMShieldPlugin.from_env() is None
+
+
+def test_from_env_enables_with_app_id_and_no_switch(monkeypatch):
+    monkeypatch.setenv("TOOL_LLM_SHIELD_APP_ID", "app-test")
+
+    plugin = LLMShieldPlugin.from_env()
+
+    assert plugin is not None
+    assert plugin.app_id == "app-test"
+    assert plugin.region == "cn-beijing"
 
 
 @pytest.mark.parametrize("value", ["1", "true", "TRUE", "yes", "on"])
@@ -82,8 +101,28 @@ def test_from_env_rejects_invalid_boolean(monkeypatch):
         LLMShieldPlugin.from_env()
 
 
-def test_from_env_uses_explicit_shield_region(monkeypatch):
+def test_from_env_ignores_deprecated_api_key_with_warning(monkeypatch, caplog):
+    monkeypatch.setenv("TOOL_LLM_SHIELD_APP_ID", "app-test")
+    monkeypatch.setenv("TOOL_LLM_SHIELD_API_KEY", "deprecated-key")
+
+    with caplog.at_level("WARNING"):
+        plugin = LLMShieldPlugin.from_env()
+
+    assert plugin is not None
+    assert "TOOL_LLM_SHIELD_API_KEY is deprecated" in caplog.text
+
+
+def test_from_env_warns_about_deprecated_api_key_without_app_id(monkeypatch, caplog):
     monkeypatch.setenv("ENABLE_LLM_SHIELD", "true")
+    monkeypatch.setenv("TOOL_LLM_SHIELD_API_KEY", "deprecated-key")
+
+    with caplog.at_level("WARNING"), pytest.raises(ValueError):
+        LLMShieldPlugin.from_env()
+
+    assert "TOOL_LLM_SHIELD_API_KEY is deprecated" in caplog.text
+
+
+def test_from_env_uses_explicit_shield_region(monkeypatch):
     monkeypatch.setenv("TOOL_LLM_SHIELD_APP_ID", "app-test")
     monkeypatch.setenv("TOOL_LLM_SHIELD_REGION", "cn-shanghai")
 
