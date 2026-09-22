@@ -55,8 +55,11 @@ class _ModerationResult:
 class LLMShieldPlugin(BasePlugin):
     """Moderate AgentKit text boundaries with Volcengine LLM Shield.
 
-    New applications opt in explicitly through :meth:`from_env`. Existing
-    AgentKit applications are unchanged until they construct this plugin.
+    Applications opt in by attaching the plugin to the ADK ``App.plugins``
+    boundary; :meth:`from_env` reads the migration runtime environment, where a
+    configured ``TOOL_LLM_SHIELD_APP_ID`` enables moderation and
+    ``ENABLE_LLM_SHIELD`` only overrides that default. Existing AgentKit
+    applications are unchanged until they construct this plugin.
     """
 
     unavailable_message = LLM_SHIELD_UNAVAILABLE_MESSAGE
