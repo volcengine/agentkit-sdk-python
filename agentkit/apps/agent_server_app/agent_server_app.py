@@ -26,6 +26,7 @@ from a2a.types import AgentCard
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from google.adk.a2a.utils.agent_to_a2a import to_a2a
+from agentkit.apps.a2a_app.task_diagnostics import observe_task_store
 from google.adk.agents.base_agent import BaseAgent
 from google.adk.agents.run_config import RunConfig, StreamingMode
 from google.adk.apps.app import App
@@ -49,6 +50,7 @@ from google.adk.utils.context_utils import Aclosing
 from google.genai import types
 from opentelemetry import trace
 from typing_extensions import override
+from pydantic import Field
 
 try:  # pragma: no cover - exercised when users install veadk explicitly.
     from veadk import Agent as VeadkAgent
@@ -58,6 +60,12 @@ except ImportError:  # pragma: no cover - default migration path avoids veadk.
     VeadkAgent = None  # type: ignore[assignment]
     ShortTermMemory = None  # type: ignore[assignment,misc]
     VeadkRunner = None  # type: ignore[assignment]
+
+from agentkit.apps.agent_server_app.diagnostics import (
+    phase,
+    mark_execution_event,
+    mark_execution_error,
+)
 
 from agentkit.apps.agent_server_app.middleware import (
     AgentkitTelemetryHTTPMiddleware,
@@ -91,6 +99,15 @@ else:
     RuntimeIdentity = Any
 
 logger = logging.getLogger(__name__)
+
+
+class DiagnosticRunAgentRequest(RunAgentRequest):
+    # 独立的诊断关联字段，不占用 ADK invocation_id 的恢复执行语义。
+    agentkit_diagnostic_run_id: str | None = Field(
+        default=None,
+        alias="agentkitDiagnosticRunId",
+        pattern=r"^[A-Za-z0-9_-]{1,64}$",
+    )
 
 
 def _is_veadk_short_term_memory(value: Any) -> bool:
@@ -316,7 +333,7 @@ class AgentkitAgentServerApp(BaseAgentkitApp):
             "protocol": a2a_protocol,
             "agent_card": agent_card,
             "push_config_store": push_config_store,
-            "task_store": task_store,
+            "task_store": observe_task_store(task_store),
         }
         if enable_auth:
             to_a2a_kwargs["agent_executor_factory"] = (
@@ -395,9 +412,10 @@ class AgentkitAgentServerApp(BaseAgentkitApp):
 
         @self.app.post("/run_sse")
         async def run_agent_sse(
-            req: RunAgentRequest, request: Request
+            req: DiagnosticRunAgentRequest, request: Request
         ) -> StreamingResponse:
             logger.info("Overriding run_agent_sse endpoint...")
+            request_span = trace.get_current_span()
             identity_context = AgentkitAgentServerApp._request_identity_context(self)
             effective_user_id = (
                 identity_context.user_sub if identity_context else req.user_id
@@ -410,17 +428,23 @@ class AgentkitAgentServerApp(BaseAgentkitApp):
                     credential_service=self.server.credential_service,
                 )
             # SSE endpoint
-            session = await self.server.session_service.get_session(
-                app_name=req.app_name,
-                user_id=effective_user_id,
-                session_id=req.session_id,
-            )
+            with phase("runtime.session.get"):
+                session = await self.server.session_service.get_session(
+                    app_name=req.app_name,
+                    user_id=effective_user_id,
+                    session_id=req.session_id,
+                )
             if not session:
                 e = HTTPException(status_code=404, detail="Session not found")
-                telemetry.trace_agent_server_finish(
-                    path="/run_sse", func_result="", exception=e
-                )
+                mark_execution_error(e, request_span)
                 raise e
+
+            # 诊断 ID 只用于关联，不作为任务、租户或恢复执行的权威标识。
+            request_span.set_attribute("gen_ai.session.id", session.id)
+            if req.agentkit_diagnostic_run_id:
+                request_span.set_attribute(
+                    "agentkit.run.id", req.agentkit_diagnostic_run_id
+                )
 
             # Convert the events to properly formatted SSE
             async def event_generator():
@@ -429,7 +453,9 @@ class AgentkitAgentServerApp(BaseAgentkitApp):
                     stream_mode = (
                         StreamingMode.SSE if req.streaming else StreamingMode.NONE
                     )
-                    runner = await self.server.get_runner_async(req.app_name)
+                    with phase("runtime.runner.get"):
+                        runner = await self.server.get_runner_async(req.app_name)
+                    first_event = True
                     async with Aclosing(
                         runner.run_async(
                             user_id=effective_user_id,
@@ -441,6 +467,11 @@ class AgentkitAgentServerApp(BaseAgentkitApp):
                         )
                     ) as agen:
                         async for event in agen:
+                            if first_event:
+                                mark_execution_event(
+                                    "agent.execution.first_event", request_span
+                                )
+                                first_event = False
                             # ADK Web renders artifacts from `actions.artifactDelta`
                             # during part processing *and* during action processing
                             # 1) the original event with `artifactDelta` cleared (content)
@@ -469,19 +500,16 @@ class AgentkitAgentServerApp(BaseAgentkitApp):
                                     sse_event,
                                 )
                                 yield f"data: {sse_event}\n\n"
+                    mark_execution_event("agent.execution.finished", request_span)
                 except Exception as e:
                     if getattr(self, "runtime_identity", None) is not None:
                         safe_error = RuntimeError("agent execution failed")
                         logger.error("Agent execution failed in identity mode")
-                        telemetry.trace_agent_server_finish(
-                            path="/run_sse", func_result="", exception=safe_error
-                        )
+                        mark_execution_error(safe_error, request_span)
                         error_payload = 'data: {"error":"agent execution failed"}\n\n'
                     else:
                         logger.exception("Error in event_generator: %s", e)
-                        telemetry.trace_agent_server_finish(
-                            path="/run_sse", func_result="", exception=e
-                        )
+                        mark_execution_error(e, request_span)
                         error_payload = f"data: {json.dumps({'error': str(e)})}\n\n"
                 if error_payload is not None:
                     # Yield only after the caught exception variable and its
@@ -523,6 +551,7 @@ class AgentkitAgentServerApp(BaseAgentkitApp):
             self.app.add_middleware(InboundAuthCaptureMiddleware)
 
         async def _invoke_compat(request: Request):
+            request_span = trace.get_current_span()
             # Use current request span from middleware for telemetry
             span = trace.get_current_span()
 
@@ -551,9 +580,7 @@ class AgentkitAgentServerApp(BaseAgentkitApp):
                 exception = HTTPException(
                     status_code=404, detail="No agents configured"
                 )
-                telemetry.trace_agent_server_finish(
-                    path="/invoke", func_result="", exception=exception
-                )
+                mark_execution_error(exception, request_span)
                 raise exception
             app_name = app_names[0]
             if getattr(self, "_enable_auth_enabled", False):
@@ -586,18 +613,25 @@ class AgentkitAgentServerApp(BaseAgentkitApp):
             content = types.UserContent(parts=[types.Part(text=text or "")])
 
             # Ensure session exists
-            session = await self.server.session_service.get_session(
-                app_name=app_name, user_id=user_id, session_id=session_id
-            )
-            if not session:
-                await self.server.session_service.create_session(
+            with phase("runtime.session.get"):
+                session = await self.server.session_service.get_session(
                     app_name=app_name, user_id=user_id, session_id=session_id
                 )
+            if not session:
+                with phase("runtime.session.create"):
+                    session = await self.server.session_service.create_session(
+                        app_name=app_name, user_id=user_id, session_id=session_id
+                    )
+
+            if session:
+                trace.get_current_span().set_attribute("gen_ai.session.id", session.id)
 
             async def event_generator():
                 error_payload = None
                 try:
-                    runner = await self.server.get_runner_async(app_name)
+                    with phase("runtime.runner.get"):
+                        runner = await self.server.get_runner_async(app_name)
+                    first_event = True
                     async with Aclosing(
                         runner.run_async(
                             user_id=user_id,
@@ -607,6 +641,11 @@ class AgentkitAgentServerApp(BaseAgentkitApp):
                         )
                     ) as agen:
                         async for event in agen:
+                            if first_event:
+                                mark_execution_event(
+                                    "agent.execution.first_event", request_span
+                                )
+                                first_event = False
                             yield (
                                 "data: "
                                 + event.model_dump_json(
@@ -614,20 +653,15 @@ class AgentkitAgentServerApp(BaseAgentkitApp):
                                 )
                                 + "\n\n"
                             )
-                    # finish span on successful end of stream handled by middleware
-                    pass
+                    mark_execution_event("agent.execution.finished", request_span)
                 except Exception as e:
                     if getattr(self, "runtime_identity", None) is not None:
                         safe_error = RuntimeError("agent execution failed")
                         logger.error("Agent execution failed in identity mode")
-                        telemetry.trace_agent_server_finish(
-                            path="/invoke", func_result="", exception=safe_error
-                        )
+                        mark_execution_error(safe_error, request_span)
                         error_payload = 'data: {"error":"agent execution failed"}\n\n'
                     else:
-                        telemetry.trace_agent_server_finish(
-                            path="/invoke", func_result="", exception=e
-                        )
+                        mark_execution_error(e, request_span)
                         error_payload = f'data: {{"error": "{str(e)}"}}\n\n'
                 if error_payload is not None:
                     # The identity path never suspends while retaining the
