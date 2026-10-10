@@ -149,3 +149,19 @@ def test_cancelled_request_is_closed(spans):
         )
     request = spans.get_finished_spans()[0]
     assert [event.name for event in request.events] == ["http.response.incomplete"]
+
+
+def test_deferred_execution_error_preserves_latency_labels(spans, monkeypatch):
+    from fastapi import HTTPException
+    from unittest.mock import Mock
+    from agentkit.apps.agent_server_app.diagnostics import mark_execution_error
+
+    histogram = Mock()
+    monkeypatch.setattr(telemetry, "latency_histogram", histogram)
+    with telemetry.tracer.start_as_current_span("agent_server_request") as span:
+        mark_execution_error(HTTPException(status_code=404), span)
+        assert span.is_recording()
+        telemetry.trace_agent_server_finish(
+            path="/run_sse", func_result="", exception=None
+        )
+    assert histogram.record.call_args.args[1]["error_type"] == "HTTPException_404"

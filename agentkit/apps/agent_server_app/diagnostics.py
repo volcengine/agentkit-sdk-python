@@ -28,5 +28,8 @@ def mark_execution_event(name: str, span: trace.Span) -> None:
 def mark_execution_error(error: BaseException, span: trace.Span) -> None:
     # 请求 Span 由中间件在发送完成后结束；执行失败只记录类型，避免泄露异常正文。
     span.set_attribute("error.type", type(error).__name__)
+    code = getattr(error, "status_code", None)
+    if code:
+        span.set_attribute("agentkit.error.status_code", code)
     span.set_status(trace.Status(trace.StatusCode.ERROR))
     span.add_event("agent.execution.failed")

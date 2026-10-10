@@ -14,6 +14,7 @@
 
 import logging
 import time
+from collections.abc import Mapping
 from typing import Optional
 
 from opentelemetry import trace
@@ -111,6 +112,15 @@ class Telemetry:
                     )
                 else:
                     attributes["error_type"] = exception.__class__.__name__
+            else:
+                # 执行错误先标记、响应发送后才结束；沿用原有错误分类指标。
+                recorded = getattr(span, "attributes", None)
+                if isinstance(recorded, Mapping) and recorded.get("error.type"):
+                    error_type = recorded["error.type"]
+                    code = recorded.get("agentkit.error.status_code")
+                    attributes["error_type"] = (
+                        f"{error_type}_{code}" if code else error_type
+                    )
             # only record invoke request latency metrics
             if (
                 hasattr(span, "start_time")
