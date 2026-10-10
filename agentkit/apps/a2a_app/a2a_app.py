@@ -46,6 +46,11 @@ def _wrap_agent_executor_execute_func(execute_func: Callable) -> Callable:
 
         with telemetry.tracer.start_as_current_span(name="a2a_invocation") as span:
             exception = None
+            # 执行失败仍要完成观测收尾；不能让未赋值的返回值遮住原始异常。
+            result = None
+            # 使用协议真实 Task 标识，不以会话或一次 execute 的结束推断任务完成。
+            if context.task_id:
+                span.set_attribute("agentkit.task.id", context.task_id)
             try:
                 result = await execute_func(
                     executor_instance, context=context, event_queue=event_queue
