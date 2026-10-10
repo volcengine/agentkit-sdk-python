@@ -131,13 +131,13 @@ async def test_cancel_closes_inner_stream_and_ends_execution(traces):
 def test_adapter_installs_once_and_correlates_real_protocol_routes(
     traces, monkeypatch, tmp_path
 ):
+    from agentkit.apps.langgraph_server_app.langgraph_server_app import (
+        AgentkitLangGraphServerApp,
+    )
     from tests.apps.test_langgraph_server_app import (
         _FakeClient,
         _install_fake_langgraph,
         _write_config,
-    )
-    from agentkit.apps.langgraph_server_app.langgraph_server_app import (
-        AgentkitLangGraphServerApp,
     )
 
     app = _install_fake_langgraph(monkeypatch, _FakeClient())

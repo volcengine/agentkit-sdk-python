@@ -5,7 +5,7 @@ from functools import wraps
 
 from opentelemetry import trace
 
-from agentkit.apps.agent_server_app.diagnostics import phase, mark_execution_error
+from agentkit.apps.agent_server_app.diagnostics import mark_execution_error, phase
 from agentkit.apps.agent_server_app.middleware import AgentkitTelemetryHTTPMiddleware
 
 
