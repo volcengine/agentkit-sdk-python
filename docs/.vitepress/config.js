@@ -60,6 +60,7 @@ export default {
           collapsed: true,
           items: [
             { text: 'Runtime 快速开始', link: '/content/4.runtime/1.runtime_quickstart' },
+            { text: 'Runtime 性能诊断', link: '/content/4.runtime/2.performance_diagnostics' },
           ],
         },
         {

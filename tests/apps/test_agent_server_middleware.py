@@ -103,9 +103,10 @@ def test_http_scope_starts_span_and_calls_trace_agent_server(fake_telemetry):
 
     asyncio.run(mw(scope, _noop_receive, send))
 
-    fake_telemetry.tracer.start_span.assert_called_once_with(
-        name="agent_server_request"
-    )
+    kwargs = fake_telemetry.tracer.start_span.call_args.kwargs
+    assert kwargs["name"] == "agent_server_request"
+    assert kwargs["kind"] is middleware_mod.trace.SpanKind.SERVER
+    assert "context" in kwargs
     fake_telemetry.trace_agent_server.assert_called_once()
     kwargs = fake_telemetry.trace_agent_server.call_args.kwargs
     assert kwargs["func_name"] == "GET /hello"

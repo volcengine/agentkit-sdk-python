@@ -16,6 +16,7 @@ from typing import Callable
 
 from opentelemetry import context as context_api
 from opentelemetry import trace
+from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
 
 from agentkit.apps.agent_server_app.telemetry import telemetry
 from agentkit.apps.auth.inbound import redact_inbound_auth_headers
@@ -33,7 +34,13 @@ class AgentkitTelemetryHTTPMiddleware:
         path = scope.get("path", "")
         headers_list = scope.get("headers", [])
         headers = {k.decode("latin-1"): v.decode("latin-1") for k, v in headers_list}
-        span = telemetry.tracer.start_span(name="agent_server_request")
+        # 仅提取标准 Trace 上下文，不把上游 baggage 当作可信租户或任务属性。
+        parent = TraceContextTextMapPropagator().extract(
+            {key.lower(): value for key, value in headers.items()}
+        )
+        span = telemetry.tracer.start_span(
+            name="agent_server_request", context=parent, kind=trace.SpanKind.SERVER
+        )
         ctx = trace.set_span_in_context(span)
         token = context_api.attach(ctx)
         headers = redact_inbound_auth_headers(headers)
@@ -52,19 +59,22 @@ class AgentkitTelemetryHTTPMiddleware:
             text="",  # do not consume body in middleware
         )
 
+        first_body = True
+
         async def send_wrapper(message):
-            try:
-                if message.get("type") == "http.response.body":
-                    more_body = message.get("more_body", False)
-                    if not more_body:
-                        telemetry.trace_agent_server_finish(
-                            path=path, func_result="", exception=None
-                        )
-                elif message.get("type") == "http.response.start":
-                    # could record status code if needed
-                    pass
-            finally:
-                await send(message)
+            nonlocal first_body
+            # HTTP Span 包含实际发送；后端执行结束由执行事件单独标记。
+            await send(message)
+            if message.get("type") == "http.response.start":
+                span.set_attribute("http.response.status_code", message["status"])
+            elif message.get("type") == "http.response.body":
+                if first_body and message.get("body"):
+                    first_body = False
+                    span.add_event("http.response.first_body")
+                if not message.get("more_body", False):
+                    telemetry.trace_agent_server_finish(
+                        path=path, func_result="", exception=None
+                    )
 
         try:
             await self.app(scope, receive, send_wrapper)
@@ -72,4 +82,8 @@ class AgentkitTelemetryHTTPMiddleware:
             telemetry.trace_agent_server_finish(path=path, func_result="", exception=e)
             raise
         finally:
+            # 断开或取消可能没有最终 body；仍需结束请求 Span，避免留下悬挂记录。
+            if span.is_recording():
+                span.add_event("http.response.incomplete")
+                span.end()
             context_api.detach(token)
