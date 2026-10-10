@@ -33,6 +33,7 @@ from starlette.routing import Route
 from starlette.requests import Request
 
 from agentkit.apps.a2a_app.telemetry import telemetry
+from agentkit.apps.a2a_app.task_diagnostics import observe_task_store
 from agentkit.apps.base_app import BaseAgentkitApp
 
 logger = logging.getLogger(__name__)
@@ -203,7 +204,7 @@ class AgentkitA2aApp(BaseAgentkitApp):
         a2a_app = A2AStarletteApplication(
             agent_card=agent_card,
             http_handler=DefaultRequestHandler(
-                agent_executor=self._agent_executor, task_store=self._task_store
+                agent_executor=self._agent_executor, task_store=observe_task_store(self._task_store)
             ),
         ).build()
 

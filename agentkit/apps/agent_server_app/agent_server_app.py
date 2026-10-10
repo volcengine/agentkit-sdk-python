@@ -26,6 +26,7 @@ from a2a.types import AgentCard
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from google.adk.a2a.utils.agent_to_a2a import to_a2a
+from agentkit.apps.a2a_app.task_diagnostics import observe_task_store
 from google.adk.agents.base_agent import BaseAgent
 from google.adk.agents.run_config import RunConfig, StreamingMode
 from google.adk.apps.app import App
@@ -332,7 +333,7 @@ class AgentkitAgentServerApp(BaseAgentkitApp):
             "protocol": a2a_protocol,
             "agent_card": agent_card,
             "push_config_store": push_config_store,
-            "task_store": task_store,
+            "task_store": observe_task_store(task_store),
         }
         if enable_auth:
             to_a2a_kwargs["agent_executor_factory"] = (
