@@ -155,6 +155,59 @@ class VeCR:
         except Exception as _:
             raise ValueError(f"Error check cr instance {instance_name}: {response}")
 
+    def list_registries(self, page_number: int = 1, page_size: int = 100) -> dict:
+        """List Container Registry instances."""
+        response = self._ve_request(
+            request_body={"PageNumber": page_number, "PageSize": page_size},
+            action="ListRegistries",
+        )
+        try:
+            return response["Result"]
+        except KeyError as error:
+            raise ValueError(f"List CR registries failed: {response}") from error
+
+    def list_namespaces(
+        self,
+        registry: str,
+        page_number: int = 1,
+        page_size: int = 100,
+    ) -> dict:
+        """List namespaces in a Container Registry instance."""
+        response = self._ve_request(
+            request_body={
+                "Registry": registry,
+                "PageNumber": page_number,
+                "PageSize": page_size,
+            },
+            action="ListNamespaces",
+        )
+        try:
+            return response["Result"]
+        except KeyError as error:
+            raise ValueError(f"List CR namespaces failed: {response}") from error
+
+    def list_repositories(
+        self,
+        registry: str,
+        namespace: str,
+        page_number: int = 1,
+        page_size: int = 100,
+    ) -> dict:
+        """List repositories under a Container Registry namespace."""
+        response = self._ve_request(
+            request_body={
+                "Registry": registry,
+                "Namespace": namespace,
+                "PageNumber": page_number,
+                "PageSize": page_size,
+            },
+            action="ListRepositories",
+        )
+        try:
+            return response["Result"]
+        except KeyError as error:
+            raise ValueError(f"List CR repositories failed: {response}") from error
+
     def _create_namespace(
         self,
         instance_name: str = DEFAULT_CR_INSTANCE_NAME,

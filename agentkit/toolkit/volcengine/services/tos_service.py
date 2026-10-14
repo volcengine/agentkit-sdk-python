@@ -16,9 +16,10 @@ import os
 import logging
 from dataclasses import dataclass, field
 from typing import List, Optional
-from agentkit.utils.misc import generate_random_id
+from agentkit.platform import Credentials
 from agentkit.toolkit.config.dataclass_utils import AutoSerializableMixin
 from agentkit.toolkit.config.constants import DEFAULT_TOS_BUCKET_TEMPLATE_NAME
+from agentkit.utils.misc import generate_random_id
 
 try:
     import tos
@@ -76,7 +77,12 @@ class TOSMountConfig:
 class TOSService:
     """Wrapper for Volcano Engine TOS (Object Storage) service."""
 
-    def __init__(self, config: TOSServiceConfig, provider: Optional[str] = None):
+    def __init__(
+        self,
+        config: TOSServiceConfig,
+        provider: Optional[str] = None,
+        credentials: Optional[Credentials] = None,
+    ):
         """Initialize TOS service with configuration.
 
         Args:
@@ -90,6 +96,7 @@ class TOSService:
 
         self.config = config
         self.provider = provider
+        self.explicit_credentials = credentials
         self.client = None
         self.credentials = None
         self._init_client()
@@ -101,7 +108,14 @@ class TOSService:
 
             # Use configured region if available
             region = self.config.region.strip() if self.config.region else None
-            config = VolcConfiguration(region=region, provider=self.provider)
+            credentials = self.explicit_credentials
+            config = VolcConfiguration(
+                region=region,
+                provider=self.provider,
+                access_key=credentials.access_key if credentials else None,
+                secret_key=credentials.secret_key if credentials else None,
+                session_token=credentials.session_token if credentials else None,
+            )
             creds = config.get_service_credentials("tos")
             ep = config.get_service_endpoint("tos")
 
@@ -346,15 +360,31 @@ class TOSService:
         Returns:
             List[str]: Bucket names under the current account.
         """
+        return [bucket["Name"] for bucket in self.list_buckets()]
+
+    def list_buckets(self) -> List[dict]:
+        """List buckets owned by the current credentials.
+
+        Returns normalized names and locations so callers can avoid selecting a
+        bucket from a different physical TOS region.
+        """
         try:
             out = self.client.list_buckets()
             buckets = getattr(out, "buckets", None) or []
-            names: List[str] = []
-            for b in buckets:
-                name = getattr(b, "name", None)
-                if name:
-                    names.append(name)
-            return names
+            result: List[dict] = []
+            for bucket in buckets:
+                name = getattr(bucket, "name", None)
+                if not name:
+                    continue
+                result.append(
+                    {
+                        "Name": name,
+                        "Location": getattr(bucket, "location", None)
+                        or getattr(self, "actual_region", ""),
+                        "CreationDate": getattr(bucket, "creation_date", None) or "",
+                    }
+                )
+            return result
         except Exception as e:
             logger.error(f"Failed to list buckets: {str(e)}")
             raise

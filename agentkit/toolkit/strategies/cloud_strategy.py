@@ -120,6 +120,8 @@ class CloudStrategy(Strategy):
         runtime_name, cp_pipeline_name = self._prepare_runtime_name(
             strategy_config.runtime_name, common_config.agent_name
         )
+        if strategy_config.cp_pipeline_name not in ("", AUTO_CREATE_VE):
+            cp_pipeline_name = strategy_config.cp_pipeline_name
 
         # Track generated names if they differ from config
         if runtime_name != strategy_config.runtime_name:
