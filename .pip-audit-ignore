@@ -1,0 +1,13 @@
+# pip-audit vulnerability allowlist (consumed by .github/workflows/security-audit.yml).
+#
+# One advisory ID per line (GHSA-xxxx-.... or PYSEC-YYYY-NNN). Blank lines and
+# '#'-comments are ignored. Every entry MUST carry a justification comment:
+# why it is not exploitable here and/or the tracking issue + intended fix date.
+# The security gate is strict; this file is the only sanctioned escape hatch,
+# and it should stay as short as possible.
+#
+# Example:
+#   # GHSA-xxxx-yyyy-zzzz: transitive via <pkg>, not reachable from SDK runtime;
+#   #   tracking #123, drop once <pkg> ships the patched release.
+#
+# (currently empty — the Python runtime dependency set has no known CVEs)

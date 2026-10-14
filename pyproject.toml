@@ -70,6 +70,7 @@ agentkit_identity = ["py.typed"]
 [dependency-groups]
 dev = [
     "pre-commit>=4.3.0",
+    "pip-audit>=2.7.0",
 ]
 toolkit = [
     "pyyaml>=6.0.2",
