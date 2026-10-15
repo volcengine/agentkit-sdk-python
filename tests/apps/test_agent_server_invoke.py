@@ -208,11 +208,13 @@ class _FakeSessionService:
 
     async def get_session(self, **kwargs):
         self.get_calls.append(kwargs)
-        return self._existing
+        return (
+            pytypes.SimpleNamespace(id=kwargs["session_id"]) if self._existing else None
+        )
 
     async def create_session(self, **kwargs):
         self.create_calls.append(kwargs)
-        return object()
+        return pytypes.SimpleNamespace(id=kwargs["session_id"])
 
 
 class _FakeCredentialService:
@@ -258,12 +260,21 @@ class _FakeSelf:
 
 # Records of telemetry calls so tests can assert wiring without touching a
 # real OTEL span (whose set_attribute/end side-effects we don't want here).
-_TELEMETRY_CALLS: dict = {"server": [], "finish": []}
+_TELEMETRY_CALLS: dict = {"server": [], "finish": [], "execution_error": []}
 
 
 class _FakeSpan:
     def __init__(self) -> None:
         self.recording = True
+
+    def get_span_context(self):
+        return mod.trace.INVALID_SPAN_CONTEXT
+
+    def set_attribute(self, key, value):
+        pass
+
+    def add_event(self, name):
+        pass
 
     def is_recording(self):
         return self.recording
@@ -282,6 +293,7 @@ def _isolate_telemetry_and_span(monkeypatch):
     """
     _TELEMETRY_CALLS["server"].clear()
     _TELEMETRY_CALLS["finish"].clear()
+    _TELEMETRY_CALLS["execution_error"].clear()
 
     def _fake_trace_agent_server(*, func_name, span, headers, text):
         _TELEMETRY_CALLS["server"].append(
@@ -295,7 +307,12 @@ def _isolate_telemetry_and_span(monkeypatch):
 
     monkeypatch.setattr(mod.telemetry, "trace_agent_server", _fake_trace_agent_server)
     monkeypatch.setattr(mod.telemetry, "trace_agent_server_finish", _fake_trace_finish)
-    monkeypatch.setattr(mod.trace, "get_current_span", lambda: _FakeSpan())
+    monkeypatch.setattr(
+        mod,
+        "mark_execution_error",
+        lambda error, span: _TELEMETRY_CALLS["execution_error"].append(error),
+    )
+    monkeypatch.setattr(mod.trace, "get_current_span", lambda context=None: _FakeSpan())
     yield
 
 
@@ -354,12 +371,9 @@ def test_invoke_404_reports_finish_telemetry_for_invoke_path_with_the_exception(
     with pytest.raises(HTTPException) as excinfo:
         asyncio.run(invoke(request))
 
-    # The 404 branch traces a finish event on the /invoke path carrying the
-    # raised HTTPException before re-raising.
-    assert len(_TELEMETRY_CALLS["finish"]) == 1
-    finish = _TELEMETRY_CALLS["finish"][0]
-    assert finish["path"] == "/invoke"
-    assert finish["exception"] is excinfo.value
+    # 错误记录不结束 HTTP Span，发送完成仍由中间件负责。
+    assert _TELEMETRY_CALLS["execution_error"] == [excinfo.value]
+    assert not _TELEMETRY_CALLS["finish"]
 
 
 # ===========================================================================
@@ -712,8 +726,5 @@ def test_invoke_stream_error_path_traces_finish_with_the_exception():
     response = asyncio.run(invoke(request))
     asyncio.run(_drain(response))
 
-    # The except branch traces a finish event for /invoke carrying the error.
-    assert len(_TELEMETRY_CALLS["finish"]) == 1
-    finish = _TELEMETRY_CALLS["finish"][0]
-    assert finish["path"] == "/invoke"
-    assert finish["exception"] is boom
+    assert _TELEMETRY_CALLS["execution_error"] == [boom]
+    assert not _TELEMETRY_CALLS["finish"]
