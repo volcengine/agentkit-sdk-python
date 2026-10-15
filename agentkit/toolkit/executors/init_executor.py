@@ -84,7 +84,7 @@ TEMPLATES = {
         "filepath": "eino_a2a",
         "name": "Eino A2A Agent App",
         "language": "Golang",
-        "language_version": "1.24",
+        "language_version": "1.25",
         "description": "A2A Application Based on the Eino Framework",
         "type": "A2A App",
     },
@@ -109,7 +109,7 @@ TEMPLATES = {
         "filepath": "veadk_go_basic",
         "name": "Basic Go Agent App",
         "language": "Golang",
-        "language_version": "1.24",
+        "language_version": "1.25",
         "description": "Basic Agent App Based on the VeADK-Go Framework",
         "type": "Basic App",
     },
@@ -117,7 +117,7 @@ TEMPLATES = {
         "filepath": "veadk_go_a2a",
         "name": "A2A Go Agent App",
         "language": "Golang",
-        "language_version": "1.24",
+        "language_version": "1.25",
         "description": "A2A Application Based on the VeADK-Go Framework",
         "type": "A2A App",
     },
@@ -600,7 +600,7 @@ class InitExecutor(BaseExecutor):
             )
 
         elif language.lower() == "golang":
-            go_ver = language_version or "1.24"
+            go_ver = language_version or "1.25"
             with open(dependencies_file_path, "w", encoding="utf-8") as gomod:
                 gomod.write(f"module {project_name}\n\ngo {go_ver}\n")
             self.created_files.append(dependencies_file_path.name)

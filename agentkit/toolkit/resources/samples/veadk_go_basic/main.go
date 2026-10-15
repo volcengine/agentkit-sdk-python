@@ -33,7 +33,7 @@ func main() {
 		return
 	}
 
-	app := simple_app.NewAgentkitSimpleApp(apps.ApiConfig{
+	app := simple_app.NewAgentkitSimpleApp(&apps.ApiConfig{
 		Port:         8000,
 		WriteTimeout: 120 * time.Second,
 		ReadTimeout:  120 * time.Second,
