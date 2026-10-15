@@ -70,6 +70,12 @@ def load_veadk_yaml_file(project_dir: Path) -> Dict[str, str]:
         with open(config_yaml_path, "r", encoding="utf-8") as yaml_file:
             config_dict = safe_load(yaml_file) or {}
 
+        if not isinstance(config_dict, dict):
+            logger.warning(
+                "Invalid YAML format in config.yaml: config.yaml root must be a mapping"
+            )
+            return {}
+
         # Flatten nested dictionary structure like veADK does
         flattened_config = flatten_dict(config_dict)
         # Convert to uppercase keys like veADK does

@@ -14,8 +14,36 @@
 
 import os
 
+import pytest
+
 from agentkit.toolkit.config import CommonConfig
-from agentkit.toolkit.config.utils import load_dotenv_file, merge_runtime_envs
+from agentkit.toolkit.config.utils import (
+    load_dotenv_file,
+    load_veadk_yaml_file,
+    merge_runtime_envs,
+)
+
+
+@pytest.mark.parametrize("content", ["- item\n", "not-a-mapping\n", "true\n", "42\n"])
+def test_load_veadk_yaml_file_ignores_non_mapping_root(tmp_path, caplog, content):
+    (tmp_path / "config.yaml").write_text(content, encoding="utf-8")
+
+    assert load_veadk_yaml_file(tmp_path) == {}
+    assert "config.yaml root must be a mapping" in caplog.text
+
+
+def test_merge_runtime_envs_continues_after_non_mapping_yaml(tmp_path):
+    (tmp_path / "config.yaml").write_text("- item\n", encoding="utf-8")
+    (tmp_path / ".env").write_text("ENV_FILE_VALUE=retained\n", encoding="utf-8")
+    common = CommonConfig(runtime_envs={"COMMON_VALUE": "retained"})
+
+    assert merge_runtime_envs(
+        common, {"runtime_envs": {"STRATEGY_VALUE": "retained"}}, tmp_path
+    ) == {
+        "ENV_FILE_VALUE": "retained",
+        "COMMON_VALUE": "retained",
+        "STRATEGY_VALUE": "retained",
+    }
 
 
 def test_load_dotenv_file_returns_values(tmp_path, monkeypatch):
