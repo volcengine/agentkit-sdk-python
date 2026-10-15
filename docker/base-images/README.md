@@ -1,28 +1,29 @@
 # AgentKit Go base images
 
-This directory contains the Dockerfiles used to publish the Go base images
-referenced by the AgentKit Go templates.
+This directory records the Go base images referenced by the AgentKit Go
+templates.
+
+The original Dockerfiles for these base images are not currently available in
+this repository. The images published to the prod public registry were copied
+from the existing cn-beijing registry images by retagging and pushing.
 
 ## Images
 
 - `agentkit-prod-public-cn-beijing.cr.volces.com/base/compile_basego:1.25`
 - `agentkit-prod-public-cn-beijing.cr.volces.com/base/runtime_basego:latest`
 
-## Build
+## Publish history
 
 ```bash
-docker build --platform linux/amd64 \
-  -t agentkit-prod-public-cn-beijing.cr.volces.com/base/compile_basego:1.25 \
-  docker/base-images/compile_basego/1.25
+docker tag \
+  agentkit-cn-beijing.cr.volces.com/base/compile_basego:1.25 \
+  agentkit-prod-public-cn-beijing.cr.volces.com/base/compile_basego:1.25
 
-docker build --platform linux/amd64 \
-  -t agentkit-prod-public-cn-beijing.cr.volces.com/base/runtime_basego:latest \
-  docker/base-images/runtime_basego/latest
-```
-
-## Push
-
-```bash
 docker push agentkit-prod-public-cn-beijing.cr.volces.com/base/compile_basego:1.25
+
+docker tag \
+  agentkit-cn-beijing.cr.volces.com/base/runtime_basego:latest \
+  agentkit-prod-public-cn-beijing.cr.volces.com/base/runtime_basego:latest
+
 docker push agentkit-prod-public-cn-beijing.cr.volces.com/base/runtime_basego:latest
 ```
