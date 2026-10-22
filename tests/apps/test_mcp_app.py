@@ -256,7 +256,7 @@ def test_invoking_async_tool_wrapper_returns_result_and_traces_as_mcp_tool(
     assert call["args"] == (5,)
 
 
-def test_invoking_sync_tool_wrapper_raises_unbound_local_error_when_func_fails(
+def test_invoking_sync_tool_wrapper_propagates_original_error_and_records_span(
     app, fake_telemetry
 ):
     boom = ValueError("kaboom")
@@ -267,19 +267,20 @@ def test_invoking_sync_tool_wrapper_raises_unbound_local_error_when_func_fails(
     app.tool(failing_tool)
     wrapper = app._mcp_server.registered[0]
 
-    # NOTE: latent bug -- when the wrapped func raises, ``result`` is never
-    # assigned, so the ``finally`` block's ``telemetry.trace_tool(..., func_result=result, ...)``
-    # dereferences an unbound local. That UnboundLocalError is raised out of the
-    # ``finally`` and MASKS the original ValueError, so trace_tool is never
-    # invoked. We pin the actual current behavior: an UnboundLocalError, not the
-    # original ValueError, escapes and no telemetry call is recorded.
-    with pytest.raises(UnboundLocalError):
+    # The original exception must propagate; the finally-block telemetry call
+    # must not raise UnboundLocalError and mask it. trace_tool records the
+    # exception on the span with no successful result.
+    with pytest.raises(ValueError, match="kaboom"):
         wrapper()
 
-    assert fake_telemetry.calls == []
+    assert len(fake_telemetry.calls) == 1
+    call = fake_telemetry.calls[0]
+    assert call["operation_type"] == "mcp_tool"
+    assert call["exception"] is boom
+    assert call["func_result"] is None
 
 
-def test_invoking_async_tool_wrapper_raises_unbound_local_error_when_func_fails(
+def test_invoking_async_tool_wrapper_propagates_original_error_and_records_span(
     app, fake_telemetry
 ):
     boom = ValueError("kaboom")
@@ -290,13 +291,17 @@ def test_invoking_async_tool_wrapper_raises_unbound_local_error_when_func_fails(
     app.tool(failing_tool)
     wrapper = app._mcp_server.registered[0]
 
-    # NOTE: latent bug -- see sync counterpart. The async wrapper's ``finally``
-    # references the unbound ``result``, raising UnboundLocalError that masks the
-    # original ValueError; trace_tool is never reached.
-    with pytest.raises(UnboundLocalError):
+    # The original exception must propagate; the finally-block telemetry call
+    # must not raise UnboundLocalError and mask it. trace_tool records the
+    # exception on the span with no successful result.
+    with pytest.raises(ValueError, match="kaboom"):
         asyncio.run(wrapper())
 
-    assert fake_telemetry.calls == []
+    assert len(fake_telemetry.calls) == 1
+    call = fake_telemetry.calls[0]
+    assert call["operation_type"] == "mcp_tool"
+    assert call["exception"] is boom
+    assert call["func_result"] is None
 
 
 # ---------------------------------------------------------------------------
@@ -380,7 +385,31 @@ def test_invoking_async_agent_tool_wrapper_traces_as_agent_mcp_tool_with_args_as
     assert call["args"] == (2, 3)
 
 
-def test_invoking_async_agent_tool_wrapper_raises_unbound_local_error_when_func_fails(
+def test_invoking_sync_agent_tool_wrapper_propagates_original_error_and_records_span(
+    app, fake_telemetry
+):
+    boom = RuntimeError("agent boom")
+
+    def failing_agent():
+        raise boom
+
+    app.agent_as_a_tool(failing_agent)
+    wrapper = app._mcp_server.registered[0]
+
+    # The original exception must propagate; the finally-block telemetry call
+    # must not raise UnboundLocalError and mask it. trace_tool records the
+    # exception on the span with no successful result.
+    with pytest.raises(RuntimeError, match="agent boom"):
+        wrapper()
+
+    assert len(fake_telemetry.calls) == 1
+    call = fake_telemetry.calls[0]
+    assert call["operation_type"] == "agent_mcp_tool"
+    assert call["exception"] is boom
+    assert call["func_result"] is None
+
+
+def test_invoking_async_agent_tool_wrapper_propagates_original_error_and_records_span(
     app, fake_telemetry
 ):
     boom = RuntimeError("agent boom")
@@ -391,13 +420,17 @@ def test_invoking_async_agent_tool_wrapper_raises_unbound_local_error_when_func_
     app.agent_as_a_tool(failing_agent)
     wrapper = app._mcp_server.registered[0]
 
-    # NOTE: latent bug -- same unbound-``result`` defect as the tool() wrappers.
-    # The ``finally`` block raises UnboundLocalError, masking the original
-    # RuntimeError, and trace_tool is never called.
-    with pytest.raises(UnboundLocalError):
+    # The original exception must propagate; the finally-block telemetry call
+    # must not raise UnboundLocalError and mask it. trace_tool records the
+    # exception on the span with no successful result.
+    with pytest.raises(RuntimeError, match="agent boom"):
         asyncio.run(wrapper())
 
-    assert fake_telemetry.calls == []
+    assert len(fake_telemetry.calls) == 1
+    call = fake_telemetry.calls[0]
+    assert call["operation_type"] == "agent_mcp_tool"
+    assert call["exception"] is boom
+    assert call["func_result"] is None
 
 
 # ---------------------------------------------------------------------------
