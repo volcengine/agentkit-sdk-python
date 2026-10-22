@@ -267,7 +267,7 @@ def config_command(
         --agent_name myGoAgent \\
         --entry_point main.go \\
         --language Golang \\
-        --language_version 1.24
+        --language_version 1.25
     
     \b
     # App-level vs Strategy-level environment variables

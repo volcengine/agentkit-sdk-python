@@ -4,7 +4,7 @@ FROM {{ base_image_builder }} AS builder
 {% elif base_image_default_builder %}
 FROM {{ base_image_default_builder }} AS builder
 {% else %}
-FROM agentkit-cn-beijing.cr.volces.com/base/compile_basego:1.24 AS builder
+FROM agentkit-prod-public-cn-beijing.cr.volces.com/base/compile_basego:1.25 AS builder
 {% endif %}
 
 WORKDIR /src
@@ -16,7 +16,7 @@ COPY . .
 ARG BUILD_OUTPUT_DIR=/app
 ARG BUILD_BINARY_NAME={{ binary_name }}
 
-ENV GO_VERSION=1.24 \
+ENV GO_VERSION={{ language_version or "1.25" }} \
     GOPATH=/go \
     PATH=/usr/local/go/bin:/go/bin:$PATH \
     GO111MODULE=on \
@@ -47,7 +47,7 @@ FROM {{ base_image_runtime }}
 {% elif base_image_default_runtime %}
 FROM {{ base_image_default_runtime }}
 {% else %}
-FROM agentkit-cn-beijing.cr.volces.com/base/runtime_basego:latest
+FROM agentkit-prod-public-cn-beijing.cr.volces.com/base/runtime_basego:latest
 {% endif %}
 
 # put binary into a standard location; use the same build-time args to locate artifact

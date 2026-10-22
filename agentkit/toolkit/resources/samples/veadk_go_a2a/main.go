@@ -33,7 +33,7 @@ func main() {
 		return
 	}
 
-	a2aApp := a2a_app.NewAgentkitA2AServerApp(apps.ApiConfig{
+	a2aApp := a2a_app.NewAgentkitA2AServerApp(&apps.ApiConfig{
 		Port:         8000,
 		WriteTimeout: 120 * time.Second,
 		ReadTimeout:  120 * time.Second,

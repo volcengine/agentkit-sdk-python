@@ -36,7 +36,7 @@ class DockerBuildConfig(AutoSerializableMixin):
         Go project with multi-stage build:
         >>> docker_build:
         >>>   base_image:
-        >>>     builder: "golang:1.24-alpine"
+        >>>     builder: "golang:1.25-alpine"
         >>>     runtime: "alpine:latest"
         >>>   build_script: "scripts/install_certs.sh"
     """
@@ -48,7 +48,7 @@ class DockerBuildConfig(AutoSerializableMixin):
             "detail": (
                 "For Python projects, use a string like 'python:3.12-alpine'. "
                 "For Go projects, use a dict with 'builder' and 'runtime' keys, "
-                "e.g., {'builder': 'golang:1.24-alpine', 'runtime': 'alpine:latest'}"
+                "e.g., {'builder': 'golang:1.25-alpine', 'runtime': 'alpine:latest'}"
             ),
         },
     )

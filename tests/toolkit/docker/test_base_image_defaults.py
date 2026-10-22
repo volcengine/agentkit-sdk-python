@@ -39,6 +39,18 @@ def test_resolve_python_default_base_image_for_byteplus() -> None:
     )
 
 
+def test_resolve_golang_default_base_images() -> None:
+    defaults = resolve_dockerfile_base_image_defaults(
+        language="Golang", language_version="1.25", provider=CloudProvider.VOLCENGINE
+    )
+    assert defaults.context["base_image_default_builder"] == (
+        "agentkit-prod-public-cn-beijing.cr.volces.com/base/compile_basego:1.25"
+    )
+    assert defaults.context["base_image_default_runtime"] == (
+        "agentkit-prod-public-cn-beijing.cr.volces.com/base/runtime_basego:latest"
+    )
+
+
 def test_managed_dockerfile_regenerates_when_provider_changes(tmp_path: Path) -> None:
     manager = DockerfileManager(tmp_path)
 

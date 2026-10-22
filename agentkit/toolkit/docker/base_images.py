@@ -35,10 +35,10 @@ _PYTHON_BASE_IMAGE_BYTEPLUS_TEMPLATE = (
 )
 
 _GOLANG_BUILDER_BASE_IMAGE_DEFAULT = (
-    "agentkit-cn-beijing.cr.volces.com/base/compile_basego:1.24"
+    "agentkit-prod-public-cn-beijing.cr.volces.com/base/compile_basego:1.25"
 )
 _GOLANG_RUNTIME_BASE_IMAGE_DEFAULT = (
-    "agentkit-cn-beijing.cr.volces.com/base/runtime_basego:latest"
+    "agentkit-prod-public-cn-beijing.cr.volces.com/base/runtime_basego:latest"
 )
 
 
