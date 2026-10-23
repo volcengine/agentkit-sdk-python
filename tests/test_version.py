@@ -8,10 +8,10 @@ except ModuleNotFoundError:  # pragma: no cover - Python 3.10 compatibility
 from agentkit.version import VERSION
 
 
-def test_package_and_project_versions_match_next_header_capable_release():
+def test_package_and_project_versions_match():
     project = tomllib.loads(
         (Path(__file__).parents[1] / "pyproject.toml").read_text(encoding="utf8")
     )
 
-    assert VERSION == "0.9.1"
+    # 发布版本会随上游前进，约束两处声明一致，而不是将后续版本锁回旧发布号。
     assert project["project"]["version"] == VERSION

@@ -304,3 +304,47 @@ def test_env_route_reports_veadk_when_runtime_iam_role_trn_is_absent(monkeypatch
 
     assert response.status_code == 200
     assert response.json() == {"env": "veadk"}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failed", [False, True])
+async def test_execute_preserves_protocol_task_and_original_error(monkeypatch, failed):
+    from a2a.server.agent_execution.context import RequestContext
+    from a2a.server.events.event_queue import EventQueue
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+    from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+    from agentkit.apps.a2a_app.a2a_app import _wrap_agent_executor_execute_func
+    from agentkit.apps.a2a_app.telemetry import telemetry
+
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    monkeypatch.setattr(telemetry, "tracer", provider.get_tracer("test.a2a"))
+    failure = ValueError("original executor failure")
+    observed = []
+    monkeypatch.setattr(
+        telemetry, "trace_a2a_agent",
+        lambda func, span, context, result, exception: observed.append((result, exception)),
+    )
+
+    async def execute(self, context, event_queue):
+        if failed:
+            raise failure
+        return "result"
+
+    wrapped = _wrap_agent_executor_execute_func(execute)
+    try:
+        if failed:
+            with pytest.raises(ValueError) as caught:
+                await wrapped(object(), RequestContext(task_id="protocol-task"), EventQueue())
+            assert caught.value is failure
+            assert observed == [(None, failure)]
+        else:
+            assert await wrapped(object(), RequestContext(task_id="protocol-task"), EventQueue()) == "result"
+            assert observed == [("result", None)]
+        span = exporter.get_finished_spans()[0]
+        assert span.attributes["agentkit.task.id"] == "protocol-task"
+        assert not any(event.name == "task.completed" for event in span.events)
+    finally:
+        provider.shutdown()
