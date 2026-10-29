@@ -18,10 +18,11 @@ import time
 from typing import Callable
 
 from opentelemetry import trace
-from opentelemetry.trace import get_tracer
 from opentelemetry.metrics import get_meter
+from opentelemetry.trace import get_tracer
 from opentelemetry.trace.span import Span
 
+from agentkit.apps.telemetry_content import should_trace_content
 from agentkit.apps.utils import safe_serialize_to_json_string
 
 _GEN_AI_CLIENT_OPERATION_DURATION_BUCKETS = [
@@ -82,11 +83,12 @@ class Telemetry:
 
         span.set_attribute(key="gen_ai.func_name", value=func.__name__)
 
-        span.set_attribute(
-            key="gen_ai.input", value=safe_serialize_to_json_string(args)
-        )
-        safe_result = safe_serialize_to_json_string(func_result)
-        span.set_attribute(key="gen_ai.output", value=safe_result)
+        if should_trace_content():
+            span.set_attribute(
+                key="gen_ai.input", value=safe_serialize_to_json_string(args)
+            )
+            safe_result = safe_serialize_to_json_string(func_result)
+            span.set_attribute(key="gen_ai.output", value=safe_result)
 
         span.set_attribute(key="gen_ai.span.kind", value="tool")
         span.set_attribute(key="gen_ai.operation.name", value="tool")
