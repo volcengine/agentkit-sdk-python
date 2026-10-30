@@ -12,14 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Auto-generated from API JSON definition
-# Do not edit manually
+# Includes generated management APIs and maintained async command APIs.
 
 from __future__ import annotations
 
 from typing import Dict
 from agentkit.client import BaseAgentkitClient
+from ._data_plane import ToolsDataPlaneMixin
 from .types import (
+    DeleteAsyncCommandResponse,
+    DeleteAsyncCommandRequest,
+    ViewAsyncCommandResponse,
+    ViewAsyncCommandRequest,
+    AsyncExecCommandResponse,
+    AsyncExecCommandRequest,
     CreateSessionRequest,
     CreateSessionResponse,
     CreateSessionSnapshotRequest,
@@ -59,10 +65,13 @@ from .types import (
 )
 
 
-class AgentkitToolsClient(BaseAgentkitClient):
+class AgentkitToolsClient(ToolsDataPlaneMixin, BaseAgentkitClient):
     """AgentKit Tools Management Service"""
 
     API_ACTIONS: Dict[str, str] = {
+        "DeleteAsyncCommand": "DeleteAsyncCommand",
+        "ViewAsyncCommand": "ViewAsyncCommand",
+        "AsyncExecCommand": "AsyncExecCommand",
         "CreateSession": "CreateSession",
         "CreateSessionSnapshot": "CreateSessionSnapshot",
         "CreateTool": "CreateTool",
@@ -89,6 +98,8 @@ class AgentkitToolsClient(BaseAgentkitClient):
         secret_key: str = "",
         region: str = "",
         session_token: str = "",
+        *,
+        data_plane_host: str = "",
     ) -> None:
         super().__init__(
             access_key=access_key,
@@ -96,6 +107,7 @@ class AgentkitToolsClient(BaseAgentkitClient):
             region=region,
             session_token=session_token,
             service_name="tools",
+            data_plane_host=data_plane_host,
         )
 
     def create_session(self, request: CreateSessionRequest) -> CreateSessionResponse:
@@ -234,4 +246,31 @@ class AgentkitToolsClient(BaseAgentkitClient):
             api_action="UpdateTool",
             request=request,
             response_type=UpdateToolResponse,
+        )
+
+    def async_exec_command(
+        self, request: AsyncExecCommandRequest
+    ) -> AsyncExecCommandResponse:
+        return self._invoke_api(
+            api_action="AsyncExecCommand",
+            request=request,
+            response_type=AsyncExecCommandResponse,
+        )
+
+    def view_async_command(
+        self, request: ViewAsyncCommandRequest
+    ) -> ViewAsyncCommandResponse:
+        return self._invoke_api(
+            api_action="ViewAsyncCommand",
+            request=request,
+            response_type=ViewAsyncCommandResponse,
+        )
+
+    def delete_async_command(
+        self, request: DeleteAsyncCommandRequest
+    ) -> DeleteAsyncCommandResponse:
+        return self._invoke_api(
+            api_action="DeleteAsyncCommand",
+            request=request,
+            response_type=DeleteAsyncCommandResponse,
         )
