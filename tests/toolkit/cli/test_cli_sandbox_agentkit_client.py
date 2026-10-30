@@ -172,15 +172,88 @@ def test_tip_client_pause_and_resume_session_use_apig_endpoint(monkeypatch):
         "SessionId": "instance-1",
         "ToolId": "tool-1",
     }
-    assert parse_qs(urlsplit(resume_call["url"]).query)["Action"] == [
-        "ResumeSession"
-    ]
+    assert parse_qs(urlsplit(resume_call["url"]).query)["Action"] == ["ResumeSession"]
     assert resume_call["json"] == {
         "SessionId": "instance-1",
         "ToolId": "tool-1",
         "Ttl": 30,
         "TtlUnit": "minute",
     }
+
+
+def test_tip_client_async_commands_use_apig_endpoint(monkeypatch):
+    import agentkit.toolkit.cli.sandbox.agentkit_client as agentkit_client
+
+    class FakeAsyncTipSession(_FakeTipSession):
+        def __init__(self):
+            super().__init__()
+            self.payloads = [
+                {"Result": {"TaskId": "task-1", "Status": "running"}},
+                {
+                    "Result": {
+                        "TaskId": "task-1",
+                        "Status": "completed",
+                        "Output": "done",
+                        "ExitCode": 0,
+                    }
+                },
+                {"Result": {"TaskId": "task-1", "Deleted": True}},
+            ]
+
+        def post(self, url, *, json, headers, timeout):
+            super().post(url, json=json, headers=headers, timeout=timeout)
+            return _FakeTipResponse(self.payloads.pop(0))
+
+    fake_session = FakeAsyncTipSession()
+    monkeypatch.setenv("SANDBOX_APIG_ENDPOINT", "https://apig.example.com/sandbox")
+    monkeypatch.setenv("TIP_TOKEN", "tip-token")
+    monkeypatch.setattr(agentkit_client.requests, "Session", lambda: fake_session)
+
+    client = agentkit_client.TipAgentkitToolsClient()
+    session = {"tool_id": "tool-1", "user_session_id": "user-1"}
+    created = client.async_exec_command(
+        tools_types.AsyncExecCommandRequest(**session, command="echo done", ttl=60)
+    )
+    viewed = client.view_async_command(
+        tools_types.ViewAsyncCommandRequest(**session, task_id=created.task_id)
+    )
+    deleted = client.delete_async_command(
+        tools_types.DeleteAsyncCommandRequest(**session, task_id=created.task_id)
+    )
+
+    assert created.task_id == "task-1"
+    assert viewed.output == "done"
+    assert viewed.exit_code == 0
+    assert deleted.deleted is True
+    assert [
+        parse_qs(urlsplit(call["url"]).query)["Action"][0]
+        for call in fake_session.calls
+    ] == ["AsyncExecCommand", "ViewAsyncCommand", "DeleteAsyncCommand"]
+    assert all(
+        call["headers"]["Authorization"] == "Bearer tip-token"
+        for call in fake_session.calls
+    )
+    assert fake_session.calls[0]["json"] == {
+        "ToolId": "tool-1",
+        "UserSessionId": "user-1",
+        "Ttl": 60,
+        "Command": "echo done",
+    }
+
+
+def test_non_tip_client_forwards_data_plane_host(monkeypatch):
+    import agentkit.toolkit.cli.sandbox.agentkit_client as agentkit_client
+
+    monkeypatch.delenv("SANDBOX_APIG_ENDPOINT", raising=False)
+    monkeypatch.delenv("TIP_TOKEN", raising=False)
+    client = agentkit_client.TipAgentkitToolsClient(
+        access_key="ak",
+        secret_key="sk",
+        region="cn-beijing",
+        data_plane_host="custom.example.com",
+    )
+
+    assert client.data_plane_host == "custom.example.com"
 
 
 def test_tip_create_session_skips_get_tool_for_tos_mount_resolution():
