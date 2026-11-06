@@ -786,9 +786,14 @@ def test_run_and_invoke_routes_use_langgraph_server_stream(tmp_path, monkeypatch
     assert fake_client.runs.calls[-1]["input"] == {"question": ""}
 
 
-def test_run_sse_returns_error_event_when_langgraph_stream_fails(tmp_path, monkeypatch):
+@pytest.mark.parametrize("failure_mode", ["raised", "error_frame"])
+def test_run_sse_returns_error_event_when_langgraph_stream_fails(tmp_path, monkeypatch, failure_mode):
     fake_client = _FakeClient()
     fake_client.runs = _FailingRuns()
+    if failure_mode == "error_frame":
+        async def error_frames(**kwargs):
+            yield {"type": "error", "data": {"error": "private model input"}}
+        fake_client.runs.stream = error_frames
     _install_fake_langgraph(monkeypatch, fake_client)
     server = AgentkitLangGraphServerApp(config_path=_write_config(tmp_path))
     client = TestClient(server.app)
@@ -806,7 +811,8 @@ def test_run_sse_returns_error_event_when_langgraph_stream_fails(tmp_path, monke
     )
 
     assert response.status_code == 200
-    assert "stream boom" in response.text
+    assert ("stream boom" if failure_mode == "raised" else "LangGraph execution failed") in response.text
+    assert "private model input" not in response.text
 
 
 def test_session_create_tolerates_empty_and_invalid_json_bodies(tmp_path, monkeypatch):

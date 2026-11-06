@@ -358,3 +358,22 @@ def test_identity_mode_does_not_return_or_log_arbitrary_agent_errors(caplog):
     assert secret not in response.text
     assert "agent execution failed" in response.text
     assert secret not in caplog.text
+
+
+def test_native_run_diagnostics_keeps_identity_v1_route_denied():
+    server, calls = _server_with_recording_runner()
+    with TestClient(server.app) as client:
+        response = client.post(
+            "/run",
+            headers={"Authorization": "Bearer valid.jwt.value"},
+            json={
+                "appName": "identity_integration_agent",
+                "userId": "mallory",
+                "sessionId": "run-session",
+                "agentkitDiagnosticRunId": "identity-run",
+                "newMessage": {"role": "user", "parts": [{"text": "hello"}]},
+            },
+        )
+    # Identity V1 未授权原生 /run；补观测不能扩大其允许访问的路由范围。
+    assert response.status_code == 403
+    assert calls == []

@@ -20,16 +20,15 @@ import agentkit.sdk.runtime.types as runtime_types
 from agentkit.toolkit.config import CommonConfig
 from agentkit.toolkit.errors import ErrorCode
 from agentkit.toolkit.runners.ve_agentkit import (
-    VeAgentkitRuntimeRunner,
-    VeAgentkitRunnerConfig,
-    RUNTIME_STATUS_READY,
-    RUNTIME_STATUS_ERROR,
-    RUNTIME_STATUS_UNRELEASED,
     ARTIFACT_TYPE_DOCKER_IMAGE,
-    AUTH_TYPE_KEY_AUTH,
     AUTH_TYPE_CUSTOM_JWT,
+    AUTH_TYPE_KEY_AUTH,
+    RUNTIME_STATUS_ERROR,
+    RUNTIME_STATUS_READY,
+    RUNTIME_STATUS_UNRELEASED,
+    VeAgentkitRunnerConfig,
+    VeAgentkitRuntimeRunner,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fakes
@@ -360,7 +359,8 @@ def test_create_new_runtime_accepts_exclusive_gateway_with_network(monkeypatch):
         create_response=runtime_types.CreateRuntimeResponse(RuntimeId="rt-new"),
         get_runtime_responses=[
             _make_runtime(
-                status="Ready",
+                runtime_id="rt-new",
+                status=RUNTIME_STATUS_READY,
                 gateway_mode="Exclusive",
                 gateway_instance_id="g-123",
             )
@@ -550,6 +550,7 @@ def test_wait_for_status_polls_until_target_reached(monkeypatch):
     )
 
     assert ok is True
+    assert err is None
     assert runtime.status == RUNTIME_STATUS_READY
     assert len(client.get_calls) == 3
 
@@ -611,6 +612,7 @@ def test_wait_for_status_multiple_accepts_any_target(monkeypatch):
     )
 
     assert ok is True
+    assert err is None
     assert runtime.status == RUNTIME_STATUS_UNRELEASED
 
 
@@ -636,7 +638,9 @@ def test_update_existing_runtime_not_found_returns_resource_not_found(monkeypatc
     assert client.update_calls == []
 
 
-def test_update_existing_runtime_wrong_artifact_type_returns_config_invalid(monkeypatch):
+def test_update_existing_runtime_wrong_artifact_type_returns_config_invalid(
+    monkeypatch,
+):
     runner = VeAgentkitRuntimeRunner()
     # artifact_type is not the docker image type -> CONFIG_INVALID guard.
     existing = _make_runtime(runtime_id="r-code", artifact_type="code")
@@ -670,14 +674,14 @@ def test_update_existing_runtime_direct_to_ready_submits_update_and_skips_releas
     monkeypatch,
 ):
     runner = VeAgentkitRuntimeRunner()
-    existing = _make_runtime(runtime_id="r-up", status=RUNTIME_STATUS_READY, name="orig-name")
+    existing = _make_runtime(
+        runtime_id="r-up", status=RUNTIME_STATUS_READY, name="orig-name"
+    )
     # get_runtime is called: once for the initial fetch, then by the wait loop.
     ready_after_update = _make_runtime(
         runtime_id="r-up", status=RUNTIME_STATUS_READY, api_key="k-updated"
     )
-    client = _FakeRuntimeClient(
-        get_runtime_responses=[existing, ready_after_update]
-    )
+    client = _FakeRuntimeClient(get_runtime_responses=[existing, ready_after_update])
     _install_client(monkeypatch, runner, client)
 
     cfg = _make_config(
@@ -832,7 +836,9 @@ def test_update_existing_runtime_update_wait_error_returns_deploy_failed(monkeyp
     assert client.release_calls == []
 
 
-def test_update_existing_runtime_release_wait_failure_returns_deploy_failed(monkeypatch):
+def test_update_existing_runtime_release_wait_failure_returns_deploy_failed(
+    monkeypatch,
+):
     runner = VeAgentkitRuntimeRunner()
     existing = _make_runtime(runtime_id="r-rf", status=RUNTIME_STATUS_READY)
     unreleased = _make_runtime(runtime_id="r-rf", status=RUNTIME_STATUS_UNRELEASED)
@@ -879,4 +885,6 @@ def test_update_existing_runtime_warns_and_ignores_network_and_clears_none_bindi
     assert ureq.tool_id == ""
     # runtime_network is ignored on update (network only applies to create),
     # so no NetworkConfiguration is sent as part of the update request.
-    assert not hasattr(ureq, "network_configuration") or ureq.network_configuration is None
+    assert (
+        not hasattr(ureq, "network_configuration") or ureq.network_configuration is None
+    )

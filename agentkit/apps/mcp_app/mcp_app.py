@@ -25,6 +25,7 @@ from fastmcp.server.server import Transport
 
 from agentkit.apps.base_app import BaseAgentkitApp
 from agentkit.apps.mcp_app.telemetry import telemetry
+from agentkit.apps.mcp_app.request_diagnostics import tool_span_options
 
 logger = logging.getLogger(__name__)
 
@@ -40,16 +41,20 @@ class AgentkitMCPApp(BaseAgentkitApp):
 
             @wraps(func)
             async def async_wrapper(*args, **kwargs) -> Any:
-                # with tracer.start_as_current_span("tool") as span:
-                with telemetry.tracer.start_as_current_span(name="tool") as span:
+                with telemetry.tracer.start_as_current_span(
+                    name="tool", record_exception=False, **tool_span_options()
+                ) as span:
+                    # 异常由 trace_tool 统一记录，关闭上下文管理器的重复异常事件。
                     exception = None
+                    # 工具失败时仍需上报原始异常；未产生返回值不能掩盖业务错误。
+                    result = None
                     try:
                         result = await func(*args, **kwargs)
 
                     except Exception as e:
                         logger.error("Invoke tool function failed: %s", e)
                         exception = e
-                        raise e
+                        raise
                     finally:
                         # handler trace span and metrics
                         telemetry.trace_tool(
@@ -68,15 +73,19 @@ class AgentkitMCPApp(BaseAgentkitApp):
 
             @wraps(func)
             def sync_wrapper(*args, **kwargs) -> Any:
-                # with tracer.start_as_current_span("tool") as span:
-                with telemetry.tracer.start_as_current_span(name="tool") as span:
+                with telemetry.tracer.start_as_current_span(
+                    name="tool", record_exception=False, **tool_span_options()
+                ) as span:
+                    # 异常由 trace_tool 统一记录，关闭上下文管理器的重复异常事件。
                     exception = None
+                    # 工具失败时仍需上报原始异常；未产生返回值不能掩盖业务错误。
+                    result = None
                     try:
                         result = func(*args, **kwargs)
                     except Exception as e:
                         logger.error("Invoke tool function failed: %s", e)
                         exception = e
-                        raise e
+                        raise
                     finally:
                         telemetry.trace_tool(
                             func,
@@ -97,14 +106,19 @@ class AgentkitMCPApp(BaseAgentkitApp):
 
             @wraps(func)
             async def async_wrapper(*args, **kwargs) -> Any:
-                with telemetry.tracer.start_as_current_span(name="tool") as span:
+                with telemetry.tracer.start_as_current_span(
+                    name="tool", record_exception=False, **tool_span_options()
+                ) as span:
+                    # 异常由 trace_tool 统一记录，关闭上下文管理器的重复异常事件。
                     exception = None
+                    # 工具失败时仍需上报原始异常；未产生返回值不能掩盖业务错误。
+                    result = None
                     try:
                         result = await func(*args, **kwargs)
                     except Exception as e:
                         logger.error("Invoke tool function failed: %s", e)
                         exception = e
-                        raise e
+                        raise
                     finally:
                         telemetry.trace_tool(
                             func,
@@ -121,14 +135,19 @@ class AgentkitMCPApp(BaseAgentkitApp):
 
             @wraps(func)
             def sync_wrapper(*args, **kwargs) -> Any:
-                with telemetry.tracer.start_as_current_span(name="tool") as span:
+                with telemetry.tracer.start_as_current_span(
+                    name="tool", record_exception=False, **tool_span_options()
+                ) as span:
+                    # 异常由 trace_tool 统一记录，关闭上下文管理器的重复异常事件。
                     exception = None
+                    # 工具失败时仍需上报原始异常；未产生返回值不能掩盖业务错误。
+                    result = None
                     try:
                         result = func(*args, **kwargs)
                     except Exception as e:
                         logger.error("Invoke tool function failed: %s", e)
                         exception = e
-                        raise e
+                        raise
                     finally:
                         telemetry.trace_tool(
                             func,
