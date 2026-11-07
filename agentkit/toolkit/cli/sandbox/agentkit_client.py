@@ -26,8 +26,12 @@ import requests
 from agentkit.platform.constants import SERVICE_METADATA
 from agentkit.sdk.tools.client import AgentkitToolsClient as _OpenapiAgentkitToolsClient
 from agentkit.sdk.tools.types import (
+    AsyncExecCommandRequest,
+    AsyncExecCommandResponse,
     CreateSessionRequest,
     CreateSessionResponse,
+    DeleteAsyncCommandRequest,
+    DeleteAsyncCommandResponse,
     DeleteSessionRequest,
     DeleteSessionResponse,
     GetSessionRequest,
@@ -38,6 +42,8 @@ from agentkit.sdk.tools.types import (
     PauseSessionResponse,
     ResumeSessionRequest,
     ResumeSessionResponse,
+    ViewAsyncCommandRequest,
+    ViewAsyncCommandResponse,
 )
 
 SANDBOX_APIG_ENDPOINT_ENV = "SANDBOX_APIG_ENDPOINT"
@@ -126,6 +132,8 @@ class TipAgentkitToolsClient(_OpenapiAgentkitToolsClient):
         region: str = "",
         session_token: str = "",
         timeout: int = 30,
+        *,
+        data_plane_host: str = "",
     ) -> None:
         self._tip_endpoint = _env_value(SANDBOX_APIG_ENDPOINT_ENV).rstrip("/")
         self._tip_token = _env_value(TIP_TOKEN_ENV)
@@ -149,6 +157,7 @@ class TipAgentkitToolsClient(_OpenapiAgentkitToolsClient):
             secret_key=secret_key,
             region=region,
             session_token=session_token,
+            data_plane_host=data_plane_host,
         )
 
     @property
@@ -250,6 +259,33 @@ class TipAgentkitToolsClient(_OpenapiAgentkitToolsClient):
             api_action="ResumeSession",
             request=request,
             response_type=ResumeSessionResponse,
+        )
+
+    def async_exec_command(
+        self, request: AsyncExecCommandRequest
+    ) -> AsyncExecCommandResponse:
+        return self._invoke_tip_api(
+            api_action="AsyncExecCommand",
+            request=request,
+            response_type=AsyncExecCommandResponse,
+        )
+
+    def view_async_command(
+        self, request: ViewAsyncCommandRequest
+    ) -> ViewAsyncCommandResponse:
+        return self._invoke_tip_api(
+            api_action="ViewAsyncCommand",
+            request=request,
+            response_type=ViewAsyncCommandResponse,
+        )
+
+    def delete_async_command(
+        self, request: DeleteAsyncCommandRequest
+    ) -> DeleteAsyncCommandResponse:
+        return self._invoke_tip_api(
+            api_action="DeleteAsyncCommand",
+            request=request,
+            response_type=DeleteAsyncCommandResponse,
         )
 
     def _raise_tip_unsupported(self, api_action: str) -> None:
