@@ -46,6 +46,7 @@ def _wrap_agent_executor_execute_func(execute_func: Callable) -> Callable:
 
         with telemetry.tracer.start_as_current_span(name="a2a_invocation") as span:
             exception = None
+            result = None
             try:
                 result = await execute_func(
                     executor_instance, context=context, event_queue=event_queue
