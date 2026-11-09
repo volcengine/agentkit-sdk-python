@@ -159,12 +159,29 @@ class _FakeEvent:
     """Event stand-in with the real ``model_dump_json`` signature."""
 
     def __init__(self, payload: dict) -> None:
-        self._payload = payload
+        self._payload = dict(payload)
+        self._has_id = "id" in payload
+        self._has_partial = "partial" in payload
+        self.id = payload.get("id")
+        self.partial = payload.get("partial", False)
         self.dump_kwargs = None
+
+    def model_copy(self, deep=False):
+        payload = dict(self._payload)
+        if self._has_id or self.id is not None:
+            payload["id"] = self.id
+        if self._has_partial:
+            payload["partial"] = self.partial
+        return _FakeEvent(payload)
 
     def model_dump_json(self, exclude_none=False, by_alias=False):
         self.dump_kwargs = {"exclude_none": exclude_none, "by_alias": by_alias}
-        return json.dumps(self._payload)
+        payload = dict(self._payload)
+        if self._has_id or self.id is not None:
+            payload["id"] = self.id
+        if self._has_partial:
+            payload["partial"] = self.partial
+        return json.dumps(payload)
 
 
 class _FakeRunner:
@@ -628,7 +645,7 @@ def test_invoke_returns_sse_streaming_response_with_cache_headers():
 def test_invoke_stream_emits_sse_data_frames_per_event():
     ev1 = _FakeEvent({"id": 1, "text": "a"})
     ev2 = _FakeEvent({"id": 2, "text": "b"})
-    invoke, _self, server, _ss, runner = _build(
+    invoke, _self, server, _ss, _runner = _build(
         agents=("my_app",), existing_session=object(), events=[ev1, ev2]
     )
     request = _FakeRequest(json_payload={"prompt": "hi"})
@@ -645,6 +662,27 @@ def test_invoke_stream_emits_sse_data_frames_per_event():
     # Each event is dumped with the ADK-web serialization flags.
     assert ev1.dump_kwargs == {"exclude_none": True, "by_alias": True}
     assert ev2.dump_kwargs == {"exclude_none": True, "by_alias": True}
+
+
+def test_invoke_stream_rewrites_duplicate_partial_payload_event_ids():
+    ev1 = _FakeEvent({"id": "same-id", "partial": True, "text": "a"})
+    ev2 = _FakeEvent({"id": "same-id", "partial": True, "text": "b"})
+    ev3 = _FakeEvent({"id": "same-id", "partial": False, "text": "done"})
+    invoke, _self, _server, _ss, _runner = _build(
+        agents=("my_app",), existing_session=object(), events=[ev1, ev2, ev3]
+    )
+    request = _FakeRequest(json_payload={"prompt": "hi"})
+
+    response = asyncio.run(invoke(request))
+    chunks = asyncio.run(_drain(response))
+
+    payloads = [json.loads(chunk.removeprefix("data: ").strip()) for chunk in chunks]
+    assert [payload["id"] for payload in payloads] == [
+        "same-id:veid:0",
+        "same-id:veid:1",
+        "same-id",
+    ]
+    assert [payload["partial"] for payload in payloads] == [True, True, False]
 
 
 def test_invoke_stream_runs_agent_with_sse_run_config_and_identity():

@@ -59,9 +59,6 @@ except ImportError:  # pragma: no cover - default migration path avoids veadk.
     ShortTermMemory = None  # type: ignore[assignment,misc]
     VeadkRunner = None  # type: ignore[assignment]
 
-from agentkit.apps.agent_server_app.middleware import (
-    AgentkitTelemetryHTTPMiddleware,
-)
 from agentkit.apps.agent_server_app.credential_service import (
     AgentkitCredentialService,
 )
@@ -70,7 +67,9 @@ from agentkit.apps.agent_server_app.inbound_auth_adapter import (
     build_a2a_inbound_auth_executor_factory,
     save_inbound_auth,
 )
-from agentkit.apps.auth.inbound import redact_inbound_auth_headers
+from agentkit.apps.agent_server_app.middleware import (
+    AgentkitTelemetryHTTPMiddleware,
+)
 from agentkit.apps.agent_server_app.origin import (
     add_cors_compat_middleware,
     adk_supports_regex_origins,
@@ -79,6 +78,7 @@ from agentkit.apps.agent_server_app.origin import (
     supports_get_fast_api_kwarg,
 )
 from agentkit.apps.agent_server_app.telemetry import telemetry
+from agentkit.apps.auth.inbound import redact_inbound_auth_headers
 from agentkit.apps.base_app import BaseAgentkitApp
 
 if TYPE_CHECKING:
@@ -122,6 +122,34 @@ def _resolve_memory_service(root_agent: BaseAgent) -> Any:
         if long_term_memory:
             return long_term_memory
     return InMemoryMemoryService()
+
+
+class _SsePayloadEventIdRewriter:
+    def __init__(self) -> None:
+        self._emitted_ids: set[str] = set()
+        self._next_id = 0
+
+    def prepare(self, event: Any) -> Any:
+        event_id = str(getattr(event, "id", "") or "")
+        should_rewrite = (
+            bool(getattr(event, "partial", False))
+            or not event_id
+            or event_id in self._emitted_ids
+        )
+        if should_rewrite:
+            event = event.model_copy(deep=True)
+            unique_id = (
+                f"{event_id}:veid:{self._next_id}"
+                if event_id
+                else f"veid:{self._next_id}"
+            )
+            self._next_id += 1
+            event.id = unique_id
+
+        emitted_id = str(getattr(event, "id", "") or "")
+        if emitted_id:
+            self._emitted_ids.add(emitted_id)
+        return event
 
 
 def _create_a2a_runner(
@@ -425,6 +453,7 @@ class AgentkitAgentServerApp(BaseAgentkitApp):
             # Convert the events to properly formatted SSE
             async def event_generator():
                 error_payload = None
+                event_id_rewriter = _SsePayloadEventIdRewriter()
                 try:
                     stream_mode = (
                         StreamingMode.SSE if req.streaming else StreamingMode.NONE
@@ -460,6 +489,9 @@ class AgentkitAgentServerApp(BaseAgentkitApp):
                                     artifact_event,
                                 ]
                             for event_to_stream in events_to_stream:
+                                event_to_stream = event_id_rewriter.prepare(
+                                    event_to_stream
+                                )
                                 sse_event = event_to_stream.model_dump_json(
                                     exclude_none=True,
                                     by_alias=True,
@@ -596,6 +628,7 @@ class AgentkitAgentServerApp(BaseAgentkitApp):
 
             async def event_generator():
                 error_payload = None
+                event_id_rewriter = _SsePayloadEventIdRewriter()
                 try:
                     runner = await self.server.get_runner_async(app_name)
                     async with Aclosing(
@@ -607,6 +640,7 @@ class AgentkitAgentServerApp(BaseAgentkitApp):
                         )
                     ) as agen:
                         async for event in agen:
+                            event = event_id_rewriter.prepare(event)
                             yield (
                                 "data: "
                                 + event.model_dump_json(
