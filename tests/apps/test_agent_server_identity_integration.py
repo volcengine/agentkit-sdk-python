@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import time
+from types import SimpleNamespace
 
 from a2a.utils.constants import AGENT_CARD_WELL_KNOWN_PATH
 from google.adk.agents.base_agent import BaseAgent
@@ -48,6 +50,42 @@ class _RecordingRunner:
             )
             if False:
                 yield None
+
+        return events()
+
+
+class _RunSseJsonEvent:
+    def __init__(self, payload):
+        self._payload = dict(payload)
+        self._has_partial = "partial" in payload
+        self.id = payload.get("id")
+        self.partial = payload.get("partial", False)
+        self.actions = SimpleNamespace(artifact_delta={})
+        self.content = None
+
+    def model_copy(self, deep=False):
+        payload = dict(self._payload)
+        payload["id"] = self.id
+        if self._has_partial:
+            payload["partial"] = self.partial
+        return _RunSseJsonEvent(payload)
+
+    def model_dump_json(self, exclude_none=False, by_alias=False):
+        payload = dict(self._payload)
+        payload["id"] = self.id
+        if self._has_partial:
+            payload["partial"] = self.partial
+        return json.dumps(payload)
+
+
+class _RunSseEventRunner:
+    def __init__(self, events):
+        self._events = events
+
+    def run_async(self, **kwargs):
+        async def events():
+            for event in self._events:
+                yield event
 
         return events()
 
@@ -147,6 +185,53 @@ def test_run_sse_uses_verified_subject_for_existing_session():
         )
     assert response.status_code == 200
     assert calls == [{"user_id": "alice", "identity_sub": "alice"}]
+
+
+def test_run_sse_rewrites_duplicate_partial_payload_event_ids():
+    server = AgentkitAgentServerApp(agent=BaseAgent(name="run_sse_event_id_agent"))
+    asyncio.run(
+        server.server.session_service.create_session(
+            app_name="run_sse_event_id_agent",
+            user_id="body-user",
+            session_id="sse-session",
+        )
+    )
+    runner = _RunSseEventRunner(
+        [
+            _RunSseJsonEvent({"id": "same-id", "partial": True, "text": "a"}),
+            _RunSseJsonEvent({"id": "same-id", "partial": True, "text": "b"}),
+            _RunSseJsonEvent({"id": "same-id", "partial": False, "text": "done"}),
+        ]
+    )
+
+    async def get_runner_async(app_name):
+        return runner
+
+    server.server.get_runner_async = get_runner_async
+
+    with TestClient(server.app) as client:
+        response = client.post(
+            "/run_sse",
+            json={
+                "appName": "run_sse_event_id_agent",
+                "userId": "body-user",
+                "sessionId": "sse-session",
+                "newMessage": {"role": "user", "parts": [{"text": "hello"}]},
+                "streaming": True,
+            },
+        )
+
+    assert response.status_code == 200
+    payloads = [
+        json.loads(frame.removeprefix("data: "))
+        for frame in response.text.strip().split("\n\n")
+    ]
+    assert [payload["id"] for payload in payloads] == [
+        "same-id:veid:0",
+        "same-id:veid:1",
+        "same-id",
+    ]
+    assert [payload["partial"] for payload in payloads] == [True, True, False]
 
 
 def test_run_sse_inbound_auth_uses_body_user_id_without_identity():
