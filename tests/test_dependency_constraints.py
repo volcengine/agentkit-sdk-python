@@ -50,4 +50,4 @@ def test_opentelemetry_bounds_allow_google_adk_2_7_runtime_baseline() -> None:
 def test_next_release_version_records_dependency_metadata_change() -> None:
     pyproject = _pyproject()
 
-    assert pyproject["project"]["version"] == "0.9.1"
+    assert pyproject["project"]["version"] == "0.9.2"
