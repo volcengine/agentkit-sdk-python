@@ -15,6 +15,7 @@ from langchain.agents import create_agent
 from langgraph.prebuilt import create_react_agent
 from agentkit.frameworks import LangChainAgentkitBridge, LangGraphAgentkitBridge
 from agentkit.plugins import LLMShieldPlugin
+from agentkit.plugins.agentsentry_v3 import MISSING_PLAN
 
 
 class Model(BaseChatModel):
@@ -83,7 +84,7 @@ async def test_original_agent(framework, plan, expected, monkeypatch):
     bridge = (
         LangChainAgentkitBridge(original, name="test", input_key="messages")
         if framework == "langchain"
-        else LangGraphAgentkitBridge(original, name="test")
+        else LangGraphAgentkitBridge(original, name="test", stream_nodes=("agent",))
     )
     shield = LLMShieldPlugin.from_env()
 
@@ -107,11 +108,35 @@ async def test_original_agent(framework, plan, expected, monkeypatch):
         )
     ]
     assert len(executed) == expected
-    texts = " ".join(
-        p.text or "" for e in events if e.content for p in e.content.parts or []
-    )
-    if plan == "risk":
-        assert "blocked-risk" in texts
+    if not expected:
+        reason = "blocked-risk" if plan == "risk" else MISSING_PLAN
+        notice_delta = f"\n\n{reason}"
+        earlier_deltas = [
+            event for event in events[:-1]
+            if event.partial and event.content.parts[0].text != notice_delta
+        ]
+        if plan:
+            assert earlier_deltas
+        if earlier_deltas:
+            assert events[-2].partial
+            assert events[-2].content.parts[0].text == notice_delta
+            assert events[-2].id != events[-1].id
+        else:
+            assert all(not event.partial for event in events)
+        terminal = events[-1]
+        assert not terminal.partial
+        assert terminal.is_final_response()
+        payload = terminal.model_dump(by_alias=True, exclude_none=True)
+        assert "errorCode" not in payload
+        assert "errorMessage" not in payload
+        assert payload["content"]["parts"][0]["text"] == reason
+
+        history = await sessions.get_session(app_name="test", user_id="u", session_id="s")
+        assert history.events[-1].id == terminal.id
+        assert history.events[-1].content.parts[0].text == reason
+        assert history.events[-1].error_code is None
+    else:
+        assert all(event.error_code is None for event in events)
     if plan:
         assert any(
             t == "prefix\n" + plan and k["hook_name"] == "before_tool_call"
