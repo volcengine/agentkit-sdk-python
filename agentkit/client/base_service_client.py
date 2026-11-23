@@ -25,6 +25,7 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from volcengine.ApiInfo import ApiInfo
+from volcengine.auth.SignerV4 import SignerV4
 from volcengine.base.Service import Service
 from volcengine.Credentials import Credentials as VolcCredentials
 from volcengine.ServiceInfo import ServiceInfo
@@ -316,7 +317,11 @@ class BaseServiceClient(Service):
         params: Dict[str, Any] = None,
     ) -> T:
         """
-        Unified API invocation with error handling.
+        Unified POST API invocation with error handling.
+
+        Sends the request as a JSON body (``Action``/``Version`` travel in
+        the query string); endpoints declared as HTTP GET in the OpenAPI
+        definition must use :meth:`_invoke_get_api` instead.
 
         Args:
             api_action: The API action name (e.g., 'GetUser', 'ListRuntimes')
@@ -331,6 +336,56 @@ class BaseServiceClient(Service):
             ApiError: If the API call fails or returns an error response.
             NetworkError: If a transport-level failure occurs.
         """
+        body = json.dumps(request.model_dump(by_alias=True, exclude_none=True))
+        return self._invoke_action(
+            api_action, response_type, params=params, body=body
+        )
+
+    def _invoke_get_api(
+        self,
+        api_action: str,
+        params: Dict[str, Any],
+        response_type: Type[T],
+    ) -> T:
+        """
+        Unified GET API invocation with error handling.
+
+        For endpoints declared as HTTP GET in the OpenAPI definition
+        (``google.api.http get``): business params travel in the query
+        string with their PascalCase keys, next to ``Action``/``Version``,
+        and no JSON body is sent.
+
+        Args:
+            api_action: The API action name (e.g., 'ListUsers')
+            params: Business query parameters (PascalCase keys; int/bool
+                values are stringified by ``Service.prepare_request``)
+            response_type: The response type to parse into
+
+        Returns:
+            Typed response object
+
+        Raises:
+            ApiError: If the API call fails or returns an error response.
+            NetworkError: If a transport-level failure occurs.
+        """
+        return self._invoke_action(
+            api_action, response_type, params=params, body=None
+        )
+
+    def _invoke_action(
+        self,
+        api_action: str,
+        response_type: Type[T],
+        *,
+        params: Dict[str, Any] = None,
+        body: Optional[str],
+    ) -> T:
+        """
+        Shared invocation skeleton for :meth:`_invoke_api` (POST, JSON
+        body) and :meth:`_invoke_get_api` (GET, query-string params):
+        credential auto-refresh, the two-attempt credential-error retry,
+        typed error wrapping and response parsing.
+        """
         # Imported lazily: ``agentkit.toolkit`` pulls in ``sdk`` which imports
         # back into ``agentkit.client``, so a module-level import would cycle.
         from agentkit.toolkit.errors import ApiError
@@ -344,13 +399,14 @@ class BaseServiceClient(Service):
                 self._refresh_credentials_if_needed(force=True)
 
             try:
-                res = self.json(
-                    api=api_action,
-                    params=params or {},
-                    body=json.dumps(
-                        request.model_dump(by_alias=True, exclude_none=True)
-                    ),
-                )
+                if body is None:
+                    res = self._send_get(api_action, params or {})
+                else:
+                    res = self.json(
+                        api=api_action,
+                        params=params or {},
+                        body=body,
+                    )
             except (
                 requests.exceptions.ConnectionError,
                 requests.exceptions.Timeout,
@@ -406,3 +462,41 @@ class BaseServiceClient(Service):
                 f"Failed to {api_action}: {str(last_error)}"
             ) from last_error
         raise ApiError(f"Failed to {api_action}: Unknown error")
+
+    def _send_get(self, api_action: str, params: Dict[str, Any]) -> str:
+        """Send one GET-style OpenAPI request and return the raw response
+        text.
+
+        Mirrors ``Service.json`` (which signs POSTs directly) for GETs:
+        ``prepare_request`` merges business ``params`` into the query
+        string next to ``Action``/``Version``, the request is signed with
+        an empty-string body (``sha256("")`` — what the server expects for
+        bodyless GETs, matching the agentkit-cli signer), and no body is
+        sent on the wire.
+
+        ``Service.request`` cannot be used here: its ``VolcAuth`` hook
+        copies the PreparedRequest body into the signed request, and
+        requests drops an empty-string body to ``None``
+        (``PreparedRequest.prepare_body``: ``if not data: body = None``),
+        so ``Util.sha256(None)`` crashes with "object supporting the
+        buffer API required".
+        """
+        api_info = self.api_info[api_action]
+        # Pass a copy: prepare_request mutates the dict while
+        # stringifying values.
+        r = self.prepare_request(api_info, dict(params or {}))
+        r.body = ""
+        SignerV4.sign(r, self.service_info.credentials)
+        url = r.build()
+        resp = self.session.request(
+            api_info.method,
+            url,
+            headers=r.headers,
+            timeout=(
+                self.service_info.connection_timeout,
+                self.service_info.socket_timeout,
+            ),
+        )
+        if resp.status_code == 200:
+            return resp.text
+        raise Exception(resp.text)
