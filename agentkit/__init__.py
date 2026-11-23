@@ -14,10 +14,10 @@
 
 # Note: BaseAgentkitClient and ApiConfig are internal infrastructure classes.
 # Users should use the high-level service clients instead:
-# - from agentkit.memory import AgentkitMemory
-# - from agentkit.knowledge import AgentkitKnowledge
-# - from agentkit.mcp import AgentkitMCP
-# - from agentkit.runtime import AgentkitRuntime
-# - from agentkit.tools import AgentkitTools
+# - from agentkit.sdk.memory import AgentkitMemoryClient
+# - from agentkit.sdk.knowledge import AgentkitKnowledgeClient
+# - from agentkit.sdk.mcp import AgentkitMCPClient
+# - from agentkit.sdk.runtime import AgentkitRuntimeClient
+# - from agentkit.sdk.tools import AgentkitToolsClient
 
 __all__ = []
