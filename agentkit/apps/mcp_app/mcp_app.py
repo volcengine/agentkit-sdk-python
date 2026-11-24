@@ -43,6 +43,7 @@ class AgentkitMCPApp(BaseAgentkitApp):
                 # with tracer.start_as_current_span("tool") as span:
                 with telemetry.tracer.start_as_current_span(name="tool") as span:
                     exception = None
+                    result = None
                     try:
                         result = await func(*args, **kwargs)
 
@@ -71,6 +72,7 @@ class AgentkitMCPApp(BaseAgentkitApp):
                 # with tracer.start_as_current_span("tool") as span:
                 with telemetry.tracer.start_as_current_span(name="tool") as span:
                     exception = None
+                    result = None
                     try:
                         result = func(*args, **kwargs)
                     except Exception as e:
@@ -99,6 +101,7 @@ class AgentkitMCPApp(BaseAgentkitApp):
             async def async_wrapper(*args, **kwargs) -> Any:
                 with telemetry.tracer.start_as_current_span(name="tool") as span:
                     exception = None
+                    result = None
                     try:
                         result = await func(*args, **kwargs)
                     except Exception as e:
@@ -123,6 +126,7 @@ class AgentkitMCPApp(BaseAgentkitApp):
             def sync_wrapper(*args, **kwargs) -> Any:
                 with telemetry.tracer.start_as_current_span(name="tool") as span:
                     exception = None
+                    result = None
                     try:
                         result = func(*args, **kwargs)
                     except Exception as e:
