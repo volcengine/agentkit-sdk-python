@@ -141,6 +141,7 @@ def protect_migrated_tools(method):
             return
         guard = _make_guard(plugin, ctx)
         events = method(self, ctx)
+        streamed_text = False
         try:
             while True:
                 token = _active_guard.set(guard)
@@ -156,8 +157,12 @@ def protect_migrated_tools(method):
                     _active_guard.reset(token)
                 if guard.blocked:
                     break
+                streamed_text = streamed_text or getattr(event, "partial", False) is True
                 yield event
             if guard.blocked:
+                if streamed_text:
+                    # Live clients may drop complete text after an earlier delta.
+                    yield adk_event(ctx, self.name, f"\n\n{guard.blocked}", partial=True)
                 yield adk_event(ctx, self.name, guard.blocked, partial=False)
         finally:
             token = _active_guard.set(guard)
