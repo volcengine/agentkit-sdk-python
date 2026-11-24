@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Auto-generated from API JSON definition
-# Do not edit manually
+# Includes generated management APIs and maintained async command APIs.
 
 from __future__ import annotations
 
@@ -794,3 +793,58 @@ class UpdateToolRequest(ToolsBaseModel):
 # UpdateTool - Response
 class UpdateToolResponse(ToolsBaseModel):
     tool_id: Optional[str] = Field(default=None, alias="ToolId")
+
+
+class AsyncExecCommandRequest(ToolsBaseModel):
+    tool_id: str = Field(..., alias="ToolId")
+    user_session_id: Optional[str] = Field(default=None, alias="UserSessionId")
+    session_id: Optional[str] = Field(default=None, alias="SessionId")
+    task_id: Optional[str] = Field(default=None, alias="TaskId")
+    exec_dir: Optional[str] = Field(default=None, alias="ExecDir")
+    ttl: Optional[int] = Field(default=None, alias="Ttl")
+    command: str = Field(..., alias="Command")
+
+
+class AsyncExecCommandResponse(ToolsBaseModel):
+    command: Optional[str] = Field(default=None, alias="Command")
+    exec_dir: Optional[str] = Field(default=None, alias="ExecDir")
+    session_id: Optional[str] = Field(default=None, alias="SessionId")
+    status: Optional[str] = Field(default=None, alias="Status")
+    task_id: Optional[str] = Field(default=None, alias="TaskId")
+    tool_id: Optional[str] = Field(default=None, alias="ToolId")
+    user_session_id: Optional[str] = Field(default=None, alias="UserSessionId")
+
+
+class ViewAsyncCommandRequest(ToolsBaseModel):
+    tool_id: str = Field(..., alias="ToolId")
+    user_session_id: Optional[str] = Field(default=None, alias="UserSessionId")
+    session_id: Optional[str] = Field(default=None, alias="SessionId")
+    task_id: str = Field(..., alias="TaskId")
+    ttl: Optional[int] = Field(default=None, alias="Ttl")
+
+
+class ViewAsyncCommandResponse(ToolsBaseModel):
+    command: Optional[str] = Field(default=None, alias="Command")
+    exit_code: Optional[int] = Field(default=None, alias="ExitCode")
+    output: Optional[str] = Field(default=None, alias="Output")
+    session_id: Optional[str] = Field(default=None, alias="SessionId")
+    status: Optional[str] = Field(default=None, alias="Status")
+    task_id: Optional[str] = Field(default=None, alias="TaskId")
+    tool_id: Optional[str] = Field(default=None, alias="ToolId")
+    user_session_id: Optional[str] = Field(default=None, alias="UserSessionId")
+
+
+class DeleteAsyncCommandRequest(ToolsBaseModel):
+    tool_id: str = Field(..., alias="ToolId")
+    user_session_id: Optional[str] = Field(default=None, alias="UserSessionId")
+    session_id: Optional[str] = Field(default=None, alias="SessionId")
+    task_id: str = Field(..., alias="TaskId")
+    ttl: Optional[int] = Field(default=None, alias="Ttl")
+
+
+class DeleteAsyncCommandResponse(ToolsBaseModel):
+    deleted: Optional[bool] = Field(default=None, alias="Deleted")
+    session_id: Optional[str] = Field(default=None, alias="SessionId")
+    task_id: Optional[str] = Field(default=None, alias="TaskId")
+    tool_id: Optional[str] = Field(default=None, alias="ToolId")
+    user_session_id: Optional[str] = Field(default=None, alias="UserSessionId")
