@@ -1,0 +1,92 @@
+name: Security Audit (CVE gate)
+
+# Supply-chain CVE gate. Runs a Software Composition Analysis (SCA) scan on
+# both dependency trees the repo ships/uses:
+#   - Python runtime dependencies (the published SDK)  -> pip-audit
+#   - docs toolchain (VitePress/npm)                   -> npm audit
+# Fails the build when a gated vulnerability is found, so a vulnerable
+# dependency cannot silently reach main or a release.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly re-scan (Mon 03:17 UTC) catches newly disclosed CVEs in deps that
+    # have not otherwise changed. Off-peak minute to avoid the top-of-hour rush.
+    - cron: '17 3 * * 1'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  python-audit:
+    name: pip-audit (Python deps)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install pip-audit
+        run: python -m pip install --upgrade pip pip-audit
+
+      # Strict gate: any known vulnerability in the runtime dependency set
+      # fails the job. requirements.txt is the SDK's shipped dependency
+      # manifest. Add advisory IDs to .pip-audit-ignore (one GHSA/PYSEC per
+      # line, '#'-comments allowed) only with a written justification.
+      - name: Audit runtime dependencies
+        run: |
+          set -euo pipefail
+          ignore_args=()
+          if [[ -f .pip-audit-ignore ]]; then
+            while IFS= read -r line; do
+              line="${line%%#*}"
+              line="$(echo "$line" | xargs || true)"
+              [[ -z "$line" ]] && continue
+              ignore_args+=("--ignore-vuln" "$line")
+            done < .pip-audit-ignore
+          fi
+          # ${arr[@]+...} guards the empty-array case under `set -u`.
+          python -m pip_audit \
+            --requirement requirements.txt \
+            --progress-spinner off \
+            --strict \
+            ${ignore_args[@]+"${ignore_args[@]}"}
+
+  docs-audit:
+    name: npm audit (docs toolchain)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: docs
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: docs/package-lock.json
+
+      - name: Install docs dependencies
+        run: npm ci
+
+      # The docs toolchain is a build-time-only tree (never shipped in the
+      # PyPI wheel). Gate on critical; known dev-server-only advisories in the
+      # VitePress/Vite/esbuild chain have no fix on the current stable line and
+      # are reported (non-blocking) below.
+      - name: "Audit docs dependencies (gate: critical)"
+        run: npm audit --audit-level=critical
+
+      - name: Report all advisories (non-blocking)
+        if: always()
+        run: npm audit || true
