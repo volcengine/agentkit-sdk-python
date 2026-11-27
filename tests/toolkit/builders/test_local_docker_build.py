@@ -137,7 +137,7 @@ def _golang_common(entry_point: str, **overrides) -> CommonConfig:
         agent_name="mygoagent",
         entry_point=entry_point,
         language="Golang",
-        language_version="1.24",
+        language_version="1.25",
     )
     base.update(overrides)
     return CommonConfig(**base)
@@ -373,6 +373,15 @@ def test_golang_build_script_entry_happy_path(tmp_path):
     # The rendered Dockerfile references the .sh entry via the golang template
     # (build script branch runs `sh <entry_relative_path>`).
     dockerfile_text = (tmp_path / "Dockerfile").read_text()
+    assert (
+        "FROM agentkit-prod-public-cn-beijing.cr.volces.com/base/compile_basego:1.25 AS builder"
+        in dockerfile_text
+    )
+    assert "GO_VERSION=1.25" in dockerfile_text
+    assert (
+        "FROM agentkit-prod-public-cn-beijing.cr.volces.com/base/runtime_basego:latest"
+        in dockerfile_text
+    )
     assert "src/svc/build.sh" in dockerfile_text
 
 

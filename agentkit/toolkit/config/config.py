@@ -82,8 +82,8 @@ class CommonConfig(AutoSerializableMixin):
                         "message": "Python version must be 3.10, 3.11, 3.12, or 3.13",
                     },
                     "Golang": {
-                        "choices": ["1.24"],
-                        "message": "Golang version must be '1.24'",
+                        "choices": ["1.24", "1.25"],
+                        "message": "Golang version must be '1.24' or '1.25'",
                     },
                 },
             },
@@ -155,7 +155,7 @@ class CommonConfig(AutoSerializableMixin):
                 "language_version": "3.12",
                 "dependencies_file": "requirements.txt",
             },
-            "golang": {"language_version": "1.24", "dependencies_file": "go.mod"},
+            "golang": {"language_version": "1.25", "dependencies_file": "go.mod"},
         }
         return mapping.get((language or "python").lower(), mapping["python"])
 
@@ -191,7 +191,7 @@ class CommonConfig(AutoSerializableMixin):
 
         if (
             not lv
-            or lv in ("3.12", "1.24")
+            or lv in ("3.12", "1.24", "1.25")
             or lv.startswith("3.")
             and language.lower() == "go"
         ):
