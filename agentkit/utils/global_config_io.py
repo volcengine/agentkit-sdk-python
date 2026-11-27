@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any, Optional, Tuple
 
 
-_cache: Tuple[Optional[float], dict] = (None, {})
+_cache: Tuple[Optional[Path], Optional[float], dict] = (None, None, {})
 
 
 def get_default_global_config_path() -> Path:
@@ -38,13 +38,13 @@ def read_global_config_dict(
         mtime = path.stat().st_mtime
     except FileNotFoundError:
         if force_reload:
-            _cache = (None, {})
+            _cache = (None, None, {})
         return {}
     except Exception:
         return {}
 
-    cached_mtime, cached_data = _cache
-    if not force_reload and cached_mtime == mtime:
+    cached_path, cached_mtime, cached_data = _cache
+    if not force_reload and cached_path == path and cached_mtime == mtime:
         return cached_data
 
     try:
@@ -53,7 +53,7 @@ def read_global_config_dict(
         with open(path, "r", encoding="utf-8") as f:
             data = yaml.safe_load(f) or {}
         parsed = data if isinstance(data, dict) else {}
-        _cache = (mtime, parsed)
+        _cache = (path, mtime, parsed)
         return parsed
     except Exception:
         return {}
@@ -86,7 +86,7 @@ def write_global_config_dict(
 
     try:
         mtime = path.stat().st_mtime
-        _cache = (mtime, data)
+        _cache = (path, mtime, data)
     except Exception:
         pass
 
