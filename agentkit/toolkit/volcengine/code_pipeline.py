@@ -25,6 +25,24 @@ logger = logging.getLogger(__name__)
 
 
 class VeCodePipeline:
+    AGENTKIT_BUILD_PARAMETER_KEYS = frozenset(
+        {
+            "DOCKERFILE_PATH",
+            "DOWNLOAD_PATH",
+            "PROJECT_ROOT_DIR",
+            "TOS_BUCKET_NAME",
+            "TOS_REGION",
+            "TOS_PROJECT_FILE_NAME",
+            "TOS_PROJECT_FILE_PATH",
+            "CR_NAMESPACE",
+            "CR_INSTANCE",
+            "CR_DOMAIN",
+            "CR_OCI",
+            "CR_TAG",
+            "CR_REGION",
+        }
+    )
+
     def __init__(
         self,
         access_key: str = "",
@@ -315,6 +333,26 @@ class VeCodePipeline:
             return res["Result"]["Id"]
         except KeyError:
             raise Exception(f"Create pipeline failed: {res}")
+
+    @classmethod
+    def is_agentkit_build_pipeline(cls, pipeline: dict) -> bool:
+        """Return whether a ListPipelines item matches AgentKit's build template."""
+        parameters = pipeline.get("Parameters") or []
+        keys = {
+            str(parameter.get("Key") or "")
+            for parameter in parameters
+            if isinstance(parameter, dict)
+        }
+        if cls.AGENTKIT_BUILD_PARAMETER_KEYS.issubset(keys):
+            return True
+
+        spec = pipeline.get("Spec") or ""
+        if not isinstance(spec, str):
+            return False
+        return all(
+            f"parameters.{key}" in spec or f"${key}" in spec
+            for key in cls.AGENTKIT_BUILD_PARAMETER_KEYS
+        )
 
     def run_pipeline(
         self,

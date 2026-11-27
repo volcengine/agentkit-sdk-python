@@ -1240,9 +1240,17 @@ class VeCPCRBuilder(Builder):
             )
             cp_client = VeCodePipeline(region=config.cp_region, provider=provider)
 
-            # Get or create agentkit-cli-workspace
-            workspace_name = "agentkit-cli-workspace"
-            if not cp_client.workspace_exists_by_name(workspace_name):
+            # Get or create the configured workspace.
+            workspace_name = config.cp_workspace_name or DEFAULT_WORKSPACE_NAME
+            workspace_result = cp_client.get_workspaces_by_name(
+                workspace_name, page_size=100
+            )
+            matching_workspaces = [
+                item
+                for item in workspace_result.get("Items", [])
+                if item.get("Name") == workspace_name
+            ]
+            if not matching_workspaces:
                 logger.info(f"Workspace '{workspace_name}' does not exist, creating...")
                 self.reporter.warning(
                     f"Workspace '{workspace_name}' does not exist, creating..."
@@ -1257,16 +1265,11 @@ class VeCPCRBuilder(Builder):
                     f"Workspace created successfully: {workspace_name}"
                 )
             else:
-                # Workspace exists, get its ID
-                result = cp_client.get_workspaces_by_name(workspace_name, page_size=1)
-                if result.get("Items") and len(result["Items"]) > 0:
-                    workspace_id = result["Items"][0]["Id"]
-                    logger.info(
-                        f"Using existing workspace: {workspace_name} (ID: {workspace_id})"
-                    )
-                    self.reporter.success(f"Using workspace: {workspace_name}")
-                else:
-                    raise Exception(f"Unable to get workspace '{workspace_name}' ID")
+                workspace_id = matching_workspaces[0]["Id"]
+                logger.info(
+                    f"Using existing workspace: {workspace_name} (ID: {workspace_id})"
+                )
+                self.reporter.success(f"Using workspace: {workspace_name}")
 
             logger.info(f"Using workspace: {workspace_name} (ID: {workspace_id})")
 
@@ -1276,8 +1279,6 @@ class VeCPCRBuilder(Builder):
             # Check if pipeline already exists - try multiple lookup strategies
             # Case 1: If Pipeline ID is configured, use ID for exact lookup
 
-            # tmp: temp fix for pipeline id issue, cp_pipeline_id should be empty string for fix cp name
-            config.cp_pipeline_id = ""
             if config.cp_pipeline_id and config.cp_pipeline_id != AUTO_CREATE_VE:
                 try:
                     # Get pipeline details by ID
@@ -1287,6 +1288,11 @@ class VeCPCRBuilder(Builder):
 
                     if result.get("Items") and len(result["Items"]) > 0:
                         pipeline_info = result["Items"][0]
+                        if not cp_client.is_agentkit_build_pipeline(pipeline_info):
+                            raise Exception(
+                                f"Pipeline ID '{config.cp_pipeline_id}' is not compatible "
+                                "with AgentKit cloud builds"
+                            )
                         found_pipeline_name = pipeline_info.get("Name", "")
 
                         # If name is also configured, validate name-ID consistency
@@ -1331,8 +1337,8 @@ class VeCPCRBuilder(Builder):
                         )
 
                 except Exception as e:
-                    if "does not match" in str(e):
-                        raise  # Name-ID mismatch, propagate exception
+                    if "does not match" in str(e) or "not compatible" in str(e):
+                        raise
                     logger.warning(
                         f"Pipeline lookup by ID failed: {str(e)}, will create new pipeline"
                     )
@@ -1344,14 +1350,21 @@ class VeCPCRBuilder(Builder):
                         workspace_id=workspace_id, name_filter=config.cp_pipeline_name
                     )
 
-                    if (
-                        existing_pipelines.get("Items")
-                        and len(existing_pipelines["Items"]) > 0
-                    ):
+                    matching_pipelines = [
+                        item
+                        for item in existing_pipelines.get("Items", [])
+                        if item.get("Name") == config.cp_pipeline_name
+                    ]
+                    if matching_pipelines:
                         # Found existing pipeline
-                        pipeline_info = existing_pipelines["Items"][0]
+                        pipeline_info = matching_pipelines[0]
                         pipeline_id = pipeline_info["Id"]
                         found_name = pipeline_info.get("Name", "")
+                        if not cp_client.is_agentkit_build_pipeline(pipeline_info):
+                            raise Exception(
+                                f"Pipeline '{found_name}' is not compatible with "
+                                "AgentKit cloud builds"
+                            )
 
                         logger.info(
                             f"Reusing pipeline by name: {found_name} (ID: {pipeline_id})"
@@ -1380,6 +1393,8 @@ class VeCPCRBuilder(Builder):
                             "Configured pipeline name does not exist, will create new pipeline"
                         )
                 except Exception as e:
+                    if "not compatible" in str(e):
+                        raise
                     logger.warning(
                         f"Pipeline lookup by name failed: {str(e)}, will create new pipeline"
                     )
